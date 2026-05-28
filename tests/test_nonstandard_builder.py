@@ -45,8 +45,20 @@ from htmd.builder.nonstandard import (
     _normalize_residue_charges,
     _backbone_charge_map,
     _load_ff14sb_amino_lib_amber,
+    _load_ff14sb_amino_lib_openmm,
+    _engine_for_forcefield,
+    _resolve_forcefield,
+    _warn_if_openff_mismatched_charges,
     _FF14SB_BACKBONE_CHARGES_BY_CLASS,
 )
+
+try:
+    import openff.nagl  # noqa: F401
+    import openff.nagl_models  # noqa: F401
+
+    _nagl = True
+except (ImportError, SyntaxError):
+    _nagl = False
 
 
 # Lazy-loaded once for the _backbone_charge_map unit tests below.
@@ -679,7 +691,7 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
     openmm_built, _ = openff_build(
         pmol.copy(),
         outdir=str(tmp_path / "openmm"),
-        extra_xml=[out.xml_path],
+        extra_xml=list(out.xml_paths),
         custombonds=out.custombonds,
         ionize=False,
         solvate=False,
@@ -782,14 +794,22 @@ def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
         specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
     )
 
-    assert out.xml_path is not None
-    assert os.path.isfile(out.xml_path)
-    assert os.path.getsize(out.xml_path) > 0
+    # GAFF path emits exactly one combined OpenMM XML appended to
+    # ``xml_paths`` (named ``gaff_combined.xml``); locate it.
+    gaff_xml = next(
+        (p for p in out.xml_paths if p.endswith("gaff_combined.xml")), None
+    )
+    assert gaff_xml is not None, (
+        f"GAFF run should have appended a gaff_combined.xml to xml_paths, "
+        f"got {out.xml_paths}"
+    )
+    assert os.path.isfile(gaff_xml)
+    assert os.path.getsize(gaff_xml) > 0
 
     ff = app.ForceField(
         "amber14/protein.ff14SB.xml",
         "amber14/tip3p.xml",
-        out.xml_path,
+        gaff_xml,
     )
 
     # Each per-residue topo file should correspond to a residue template
@@ -1467,6 +1487,258 @@ def _test_backbone_charge_map_his_name_falls_through_to_charge_class():
         _backbone_charge_map("HIS", "", present, 1, ff14sb_lib=lib)
         == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
     )
+
+
+# ---------------------------------------------------------------------------
+# Forcefield dispatch helpers (engine selection, per-resname routing).
+# ---------------------------------------------------------------------------
+
+
+def _test_engine_for_forcefield_gaff_variants_dispatch_to_antechamber():
+    # The rule is "starts with 'gaff' (case-insensitive) -> antechamber,
+    # everything else -> openff". Lock it so a future change doesn't
+    # silently route GAFF FFs through the SMIRNOFF engine or vice-versa.
+    assert _engine_for_forcefield("gaff") == "antechamber"
+    assert _engine_for_forcefield("gaff2") == "antechamber"
+    assert _engine_for_forcefield("GAFF2") == "antechamber"
+    assert _engine_for_forcefield("Gaff") == "antechamber"
+
+
+def _test_engine_for_forcefield_offxml_dispatches_to_openff():
+    assert _engine_for_forcefield("openff-2.3.0.offxml") == "openff"
+    assert _engine_for_forcefield("openff_unconstrained-2.3.0.offxml") == "openff"
+    # An offxml filename that doesn't start with "openff" still routes to
+    # the SMIRNOFF engine - the rule is "anything not GAFF goes to openff".
+    assert _engine_for_forcefield("custom_sage.offxml") == "openff"
+
+
+def _test_engine_for_forcefield_non_string_raises():
+    with pytest.raises(TypeError):
+        _engine_for_forcefield(None)
+    with pytest.raises(TypeError):
+        _engine_for_forcefield(2.3)
+
+
+def _test_resolve_forcefield_single_string_applies_everywhere():
+    lookup = _resolve_forcefield("gaff2")
+    assert lookup("BEN") == ("antechamber", "gaff2")
+    assert lookup("ALC") == ("antechamber", "gaff2")
+    lookup = _resolve_forcefield("openff_unconstrained-2.3.0.offxml")
+    assert lookup("BEN") == ("openff", "openff_unconstrained-2.3.0.offxml")
+
+
+def _test_resolve_forcefield_dict_with_default_routes_per_resname():
+    lookup = _resolve_forcefield(
+        {
+            "NLE": "openff_unconstrained-2.3.0.offxml",
+            "default": "gaff2",
+        }
+    )
+    assert lookup("NLE") == ("openff", "openff_unconstrained-2.3.0.offxml")
+    # Unlisted resnames fall back to the explicit default.
+    assert lookup("ALC") == ("antechamber", "gaff2")
+
+
+def _test_resolve_forcefield_dict_without_default_falls_back_to_gaff2():
+    lookup = _resolve_forcefield({"NLE": "openff_unconstrained-2.3.0.offxml"})
+    # The default is gaff2 when not specified.
+    assert lookup("ALC") == ("antechamber", "gaff2")
+    assert lookup("NLE") == ("openff", "openff_unconstrained-2.3.0.offxml")
+
+
+def _test_resolve_forcefield_rejects_non_string_values():
+    with pytest.raises(TypeError):
+        _resolve_forcefield({"NLE": 2.3})  # validated up front
+    with pytest.raises(TypeError):
+        _resolve_forcefield(2.3)  # not str or dict
+
+
+@pytest.fixture
+def htmd_logs_to_caplog():
+    """htmd's logger has ``propagate=0`` in ``logging.ini`` so its
+    records never reach pytest's caplog root handler. Re-enable
+    propagation for the duration of the test and restore it after."""
+    import logging
+    htmd_logger = logging.getLogger("htmd")
+    original = htmd_logger.propagate
+    htmd_logger.propagate = True
+    try:
+        yield
+    finally:
+        htmd_logger.propagate = original
+
+
+def _test_warn_if_openff_mismatched_charges_warns_on_openff_plus_non_nagl(
+    caplog, htmd_logs_to_caplog
+):
+    # SMIRNOFF + non-NAGL fires the warning.
+    with caplog.at_level("WARNING"):
+        _warn_if_openff_mismatched_charges(
+            "openff_unconstrained-2.3.0.offxml", "gasteiger"
+        )
+    assert any("NAGL reproduces" in r.message for r in caplog.records)
+
+
+def _test_warn_if_openff_mismatched_charges_silent_on_openff_plus_nagl(
+    caplog, htmd_logs_to_caplog
+):
+    # SMIRNOFF + NAGL is the recommended combination - no warning.
+    with caplog.at_level("WARNING"):
+        _warn_if_openff_mismatched_charges(
+            "openff_unconstrained-2.3.0.offxml", "nagl"
+        )
+    assert not any("NAGL reproduces" in r.message for r in caplog.records)
+
+
+def _test_warn_if_openff_mismatched_charges_silent_on_gaff(
+    caplog, htmd_logs_to_caplog
+):
+    # GAFF-only call - no SMIRNOFF in play, no warning regardless of
+    # charge method. The charge-FF mismatch concern only applies to Sage.
+    with caplog.at_level("WARNING"):
+        _warn_if_openff_mismatched_charges("gaff2", "gasteiger")
+        _warn_if_openff_mismatched_charges("gaff2", "resp")
+    assert not any("NAGL reproduces" in r.message for r in caplog.records)
+
+
+def _test_warn_if_openff_mismatched_charges_warns_on_mixed_dict(
+    caplog, htmd_logs_to_caplog
+):
+    # A per-resname dict containing at least one SMIRNOFF entry triggers
+    # the warning when paired with a non-NAGL charge model.
+    with caplog.at_level("WARNING"):
+        _warn_if_openff_mismatched_charges(
+            {"NLE": "openff_unconstrained-2.3.0.offxml", "default": "gaff2"},
+            "gasteiger",
+        )
+    assert any("NAGL reproduces" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# NAGL charges with the GAFF2 backend. The Gasteiger pattern in
+# _fftype_antechamber (pre-compute, set ac_charge=None, antechamber only
+# types) was extended to nagl/resp/resp-multiconf. NAGL is the only one
+# we can exercise without parameterize / Psi4.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _nagl),
+    reason="NAGL + GAFF2 needs antechamber on PATH and the openff-nagl stack",
+)
+def _test_fftype_antechamber_with_nagl_charges(tmp_path):
+    from moleculekit.molecule import Molecule
+    from htmd.builder._ambertools import _fftype_antechamber
+
+    # Protonated benzamidinium, the 3PTB ligand. Templating from the
+    # SMILES locks bond orders + explicit hydrogens so antechamber can
+    # type cleanly, and locks the +1 formal charge so NAGL respects it.
+    mol = Molecule("3PTB")
+    mol.filter("resname BEN", _logger=False)
+    mol.templateResidueFromSmiles("all", BEN_SMILES, addHs=True, _logger=False)
+    assert int(mol.formalcharge.sum()) == 1
+    # Pre-condition: partial charges start at zero. If a future moleculekit
+    # change populates mol.charge from formal charges or some other source,
+    # the post-typing "charges differ from input" check below would no
+    # longer detect a silent no-op in _assign_nagl_charges.
+    assert np.all(mol.charge == 0.0), (
+        "templateResidueFromSmiles should leave mol.charge at zeros; "
+        "this test relies on the zero start state to detect a NAGL no-op"
+    )
+
+    typed, _, _ = _fftype_antechamber(
+        mol,
+        tmpdir=str(tmp_path),
+        forcefield="GAFF2",
+        netcharge=1,
+        charge_method="nagl",
+    )
+
+    # GAFF2 atom typing should still run despite the externally-computed
+    # charges (antechamber called with -c absent, only -at gaff2).
+    # Spot-check: protonated benzamidinium should pick up the GAFF2 types
+    # for sp2 aromatic carbons (ca), the central sp2 amidinium C (ce),
+    # aromatic ring H (ha), amide H on N (hn), and the cationic
+    # amidinium nitrogen (nv).
+    assert set(typed.atomtype) >= {"ca", "ce", "ha", "hn", "nv"}
+
+    # NAGL honours the formal charge, so the per-atom charges must sum
+    # to the +1 amidinium net charge.
+    assert abs(typed.charge.sum() - 1.0) < 1e-3
+    # Charges actually got computed (not a NAGL no-op silently returning
+    # zeros that then get rebalanced to sum to formal charge somehow).
+    # Every atom in protonated benzamidinium sits in a polar / aromatic
+    # / amidinium environment - no atom should have charge exactly 0.
+    assert np.all(typed.charge != 0.0), (
+        f"At least one atom has charge exactly 0, suggesting NAGL "
+        f"was a no-op: {typed.charge}"
+    )
+    # Sanity bound on individual charges (avoids regressing to garbage).
+    assert -1.0 < typed.charge.min() < typed.charge.max() < 1.0
+
+
+# ---------------------------------------------------------------------------
+# ff14SB amino-lib parity between parmed (AmberTools amino*.lib) and
+# OpenMM (amber14/protein.ff14SB.xml). The two backends use these
+# independently now, but parity is the chemistry-correctness invariant
+# - if either upstream drifts, this drift detector trips.
+# ---------------------------------------------------------------------------
+
+
+# ACE/NME methyl atom-name aliases between parmed and OpenMM. Both
+# libraries describe the same physical atoms; only the labels differ.
+_FF14SB_CAP_NAME_ALIASES = {
+    ("ACE", "H1"): "HH31",
+    ("ACE", "H2"): "HH32",
+    ("ACE", "H3"): "HH33",
+    ("NME", "C"): "CH3",
+    ("NME", "H1"): "HH31",
+    ("NME", "H2"): "HH32",
+    ("NME", "H3"): "HH33",
+}
+
+
+@pytest.mark.skipif(not _tleap, reason="parmed amino*.lib loader needs teLeap")
+def _test_ff14sb_amino_lib_parmed_vs_openmm_parity():
+    """Assert the parmed-loaded (amino*.lib) and OpenMM-loaded
+    (protein.ff14SB.xml) ff14SB amino libraries produce byte-identical
+    ``(type, charge)`` for every common atom. Drift detector for either
+    upstream package - if antechamber and openff build paths ever
+    silently disagree on backbone-pin charges, this trips first."""
+    parmed_lib = _load_ff14sb_amino_lib_amber()
+    omm_lib = _load_ff14sb_amino_lib_openmm()
+
+    # Same set of residues (78 mid-chain + N/C-terminal variants).
+    assert set(parmed_lib) == set(omm_lib)
+
+    # OpenMM types are prefixed with "protein-" in the XML; the loader
+    # strips that prefix so the returned shape matches parmed's bare-
+    # class type names. Verify both bare-class types and bit-identical
+    # charges for every common atom.
+    n_compared = 0
+    for resname, p_atoms in parmed_lib.items():
+        o_atoms = omm_lib[resname]
+        for atom_name, (p_type, p_charge) in p_atoms.items():
+            # Resolve the ACE/NME cap-atom alias on the parmed side
+            # so the lookup finds the OpenMM-side atom.
+            lookup_name = _FF14SB_CAP_NAME_ALIASES.get(
+                (resname, atom_name), atom_name
+            )
+            if lookup_name not in o_atoms:
+                continue  # tolerate a missing alias gracefully
+            o_type, o_charge = o_atoms[lookup_name]
+            assert p_type == o_type, (
+                f"{resname}.{atom_name}: parmed type {p_type!r} != "
+                f"openmm type {o_type!r}"
+            )
+            assert p_charge == o_charge, (
+                f"{resname}.{atom_name}: parmed charge {p_charge!r} != "
+                f"openmm charge {o_charge!r}"
+            )
+            n_compared += 1
+    # Sanity: we should have actually compared a non-trivial number of
+    # atoms. ff14SB has ~1275 atoms across the 78 residues.
+    assert n_compared > 1000
 
 
 # ---------------------------------------------------------------------------

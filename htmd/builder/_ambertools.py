@@ -27,10 +27,19 @@ from moleculekit.molecule import Molecule
 logger = logging.getLogger(__name__)
 
 
+# ``_CHARGE_METHOD_MAP[method]`` is the antechamber ``-c`` flag value, or
+# ``None`` when the charges are pre-computed externally and antechamber
+# should only do atom typing (carrying the existing mol.charge through).
+# Externally-computed methods: gasteiger (RDKit PEOE), nagl (OpenFF GNN
+# surrogate for AM1-BCC), resp / resp-multiconf (Psi4 ESP fit via
+# parameterize).
 _CHARGE_METHOD_MAP = {
     "am1-bcc": "bcc",
-    "gasteiger": "gas",
+    "gasteiger": None,
     "abcg2": "abcg2",
+    "nagl": None,
+    "resp": None,
+    "resp-multiconf": None,
     None: None,
 }
 
@@ -39,6 +48,9 @@ _FORCEFIELD_MAP = {
     "gaff2": ("gaff2", "2"),
 }
 
+# Charge methods that work under Pyodide. AM1-BCC needs the SQM backend,
+# NAGL needs PyTorch, RESP needs Psi4 - none of those are available
+# in-browser, so only the lightweight RDKit Gasteiger path works there.
 _PYODIDE_CHARGE_METHODS = {"gasteiger", None}
 
 
@@ -85,31 +97,15 @@ def _run_ambertools(program, cmd, cwd, use_pyodide=False, input_files=None):
     return None
 
 
-def _assign_rdkit_gasteiger_charges(mol):
-    """Compute Gasteiger (PEOE) partial charges with RDKit and write them
-    onto ``mol.charge`` in place.
-
-    antechamber's own ``-c gas`` ignores the net charge and produces a
-    charge set summing to zero even for an ion. RDKit's Gasteiger seeds
-    from the per-atom formal charges, so the charges sum to the actual
-    net charge - it handles charged species correctly. RDKit is already a
-    moleculekit dependency and is available under Pyodide.
-    """
-    from moleculekit.rdkittools import molecule_to_rdkitmol
-    from rdkit.Chem import AllChem
-
-    rdmol = molecule_to_rdkitmol(mol, sanitize=True, _logger=False)
-    AllChem.ComputeGasteigerCharges(rdmol)
-    charges = np.array(
-        [float(a.GetDoubleProp("_GasteigerCharge")) for a in rdmol.GetAtoms()],
-        dtype=np.float32,
-    )
-    if not np.all(np.isfinite(charges)):
-        raise RuntimeError(
-            "RDKit Gasteiger produced non-finite charges; the molecule may "
-            "have an atom in an environment its parameters do not cover."
-        )
-    mol.charge = charges
+# Charge helpers moved to ``_charge_helpers`` so the GAFF (this file) and
+# SMIRNOFF (``openmm.py``) backends can both reach them without a
+# circular import. Re-exported here under the historic name for the
+# (few) downstream call sites that still import it directly.
+from htmd.builder._charge_helpers import (  # noqa: E402
+    _assign_rdkit_gasteiger_charges,
+    _assign_nagl_charges,
+    _assign_resp_charges,
+)
 
 
 def _fftype_antechamber(
@@ -186,13 +182,23 @@ def _fftype_antechamber(
         )
     ac_charge = _CHARGE_METHOD_MAP[charge_key]
 
-    if charge_key == "gasteiger":
-        # antechamber's '-c gas' ignores the net charge (its charges sum
-        # to zero even for an ion). Compute Gasteiger with RDKit instead,
-        # which seeds from formal charges, and let antechamber only assign
-        # atom types, carrying these charges through unchanged.
+    if charge_key in ("gasteiger", "nagl", "resp", "resp-multiconf"):
+        # Externally-computed charges. Antechamber's own ``-c gas`` ignores
+        # the net charge (its output sums to zero even for an ion), so
+        # Gasteiger goes through RDKit. NAGL is a GNN surrogate for
+        # AM1-BCC. RESP uses parameterize's Psi4 fit. In every case we
+        # pre-compute the charges on a copy of the molecule, then let
+        # antechamber only do atom typing (``ac_charge = None``) so it
+        # carries the externally-fit charges through unchanged.
         mol = mol.copy()
-        _assign_rdkit_gasteiger_charges(mol)
+        if charge_key == "gasteiger":
+            _assign_rdkit_gasteiger_charges(mol)
+        elif charge_key == "nagl":
+            _assign_nagl_charges(mol)
+        elif charge_key == "resp":
+            _assign_resp_charges(mol, multi_conf=False)
+        elif charge_key == "resp-multiconf":
+            _assign_resp_charges(mol, multi_conf=True)
         ac_charge = None
 
     input_mol2 = "input.mol2"

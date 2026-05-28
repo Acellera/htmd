@@ -903,12 +903,80 @@ def _test_parameterize_ligands_openff_multi_resname():
         assert len(ic["ImproperTorsions"].key_map) == _BEN_EXPECTED_IMPROPER_KEYS
 
 
+# The forcefield choice determines which output attributes are populated:
+# pure GAFF2 emits prepi (topo_paths) + frcmod (frcmod_paths) + a single
+# combined OpenMM XML (gaff_combined.xml in xml_paths); pure SMIRNOFF
+# emits only per-cluster XML fragments in xml_paths. Both populate
+# xml_paths so the result is always openmm.build-consumable;
+# amber.build only works when frcmod_paths is non-empty (i.e. GAFF
+# involvement). Lock the contract so a future refactor can't silently
+# swap which attribute gets populated.
+@pytest.mark.skipif(
+    not (_openmm_installed and _openff_installed and _tleap_installed and _nagl_installed),
+    reason="OpenMM + OpenFF Interchange + AmberTools + NAGL required",
+)
+def _test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
+    """Pure GAFF2 -> prepi + frcmod + a single combined gaff_combined.xml
+    in xml_paths. Pure openff -> per-cluster xml_paths only (no prepi,
+    no frcmod, no gaff_combined.xml)."""
+    from moleculekit.molecule import Molecule
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+    from htmd.builder.nonstandard import parameterizeFromSpecs
+
+    mol = Molecule(os.path.join(_PARAM_TEST_DIR, "3PTB_BEN.cif"))
+    mol.filter("resname BEN", _logger=False)
+    mol.templateResidueFromSmiles("resname BEN", BEN_SMILES, addHs=True)
+    specs = detectNonStandardResidues(mol)
+
+    # Pure GAFF2 forcefield.
+    out_gaff = parameterizeFromSpecs(
+        specs,
+        mol,
+        outdir=str(tmp_path / "gaff"),
+        forcefield="gaff2",
+        charge_method="gasteiger",
+    )
+    assert len(out_gaff.topo_paths) == 1, "GAFF2 should emit one prepi/cif"
+    assert len(out_gaff.frcmod_paths) == 1, "GAFF2 should emit one frcmod"
+    # GAFF emits a single combined OpenMM XML named ``gaff_combined.xml``
+    # appended to ``xml_paths``. The filename encodes provenance so the
+    # downstream caller can tell GAFF-derived XMLs from SMIRNOFF ones.
+    assert len(out_gaff.xml_paths) == 1, (
+        "GAFF2 should produce one combined XML appended to xml_paths"
+    )
+    assert out_gaff.xml_paths[0].endswith("gaff_combined.xml"), (
+        f"GAFF combined XML should be named gaff_combined.xml, "
+        f"got {out_gaff.xml_paths[0]}"
+    )
+    assert os.path.isfile(out_gaff.xml_paths[0]), out_gaff.xml_paths[0]
+
+    # Pure SMIRNOFF forcefield.
+    out_openff = parameterizeFromSpecs(
+        specs,
+        mol,
+        outdir=str(tmp_path / "openff"),
+        forcefield="openff_unconstrained-2.3.0.offxml",
+        charge_method="nagl",
+    )
+    assert out_openff.topo_paths == [], "SMIRNOFF must not emit AMBER prepi"
+    assert out_openff.frcmod_paths == [], "SMIRNOFF must not emit frcmod"
+    assert len(out_openff.xml_paths) >= 1, (
+        "SMIRNOFF must emit at least one per-cluster XML"
+    )
+    # No GAFF involvement, so no gaff_combined.xml in the list.
+    assert not any(
+        p.endswith("gaff_combined.xml") for p in out_openff.xml_paths
+    ), "Pure-SMIRNOFF call should not emit a gaff_combined.xml"
+    for p in out_openff.xml_paths:
+        assert os.path.isfile(p), p
+
+
 @pytest.mark.skipif(
     not (_openmm_installed and _openff_installed),
     reason="OpenMM + OpenFF Interchange required",
 )
 def _test_parameterize_from_specs_openff_backend_ben(tmp_path):
-    """End-to-end Phase 2B: parameterizeFromSpecs with backend='openff' on
+    """End-to-end Phase 2B: parameterizeFromSpecs with the SMIRNOFF forcefield on
     a free ligand (3PTB BEN). Verify the emitted XML loads in OpenMM
     ForceField and reproduces the same energy as Interchange.to_openmm_system."""
     from moleculekit.molecule import Molecule
@@ -927,7 +995,7 @@ def _test_parameterize_from_specs_openff_backend_ben(tmp_path):
         specs,
         mol,
         outdir=str(tmp_path / "params"),
-        backend="openff",
+        forcefield="openff_unconstrained-2.3.0.offxml",
         charge_method="gasteiger",
     )
 
@@ -935,7 +1003,6 @@ def _test_parameterize_from_specs_openff_backend_ben(tmp_path):
     assert out.topo_paths == []
     assert out.frcmod_paths == []
     assert out.custombonds == []
-    assert out.xml_path is None
     # Should populate xml_paths with exactly one entry for BEN.
     assert len(out.xml_paths) == 1
     assert os.path.isfile(out.xml_paths[0])
@@ -1044,7 +1111,7 @@ def _test_parameterize_from_specs_openff_cluster_nle(tmp_path):
         specs,
         pmol,
         outdir=str(tmp_path / "params"),
-        backend={"NLE": "openff", "default": "antechamber"},
+        forcefield={"NLE": "openff_unconstrained-2.3.0.offxml", "default": "gaff2"},
         charge_method="gasteiger",
     )
 
@@ -1171,7 +1238,7 @@ def _test_parameterize_from_specs_openff_cluster_crosslinks(tmp_path):
         specs,
         pmol,
         outdir=str(tmp_path / "params"),
-        backend="openff",
+        forcefield="openff_unconstrained-2.3.0.offxml",
         charge_method="gasteiger",
     )
     assert (
@@ -1256,7 +1323,7 @@ def _test_parameterize_from_specs_openff_backbone_pin(tmp_path):
             specs,
             pmol,
             outdir=str(tmp_path / f"params_pin{pin}_norm{norm}"),
-            backend={"NLE": "openff", "default": "antechamber"},
+            forcefield={"NLE": "openff_unconstrained-2.3.0.offxml", "default": "gaff2"},
             charge_method="gasteiger",
             pin_backbone_charges=pin,
             normalize=norm,
@@ -1520,7 +1587,7 @@ def _test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
         specs,
         pmol,
         outdir=str(tmp_path / "params_antechamber"),
-        backend="antechamber",
+        forcefield="gaff2",
         charge_method="gasteiger",
         pin_backbone_charges=True,
         normalize="cluster",
@@ -1529,7 +1596,7 @@ def _test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
         specs,
         pmol,
         outdir=str(tmp_path / "params_openff"),
-        backend="openff",
+        forcefield="openff_unconstrained-2.3.0.offxml",
         charge_method="gasteiger",
         pin_backbone_charges=True,
         normalize="cluster",
@@ -1548,7 +1615,7 @@ def _test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
     openmm_build(
         pmol.copy(),
         outdir=str(tmp_path / "build_omm_antechamber"),
-        extra_xml=[out_a.xml_path] if out_a.xml_path else [],
+        extra_xml=list(out_a.xml_paths),
         custombonds=out_a.custombonds,
         solvate=False,
         **common_kwargs,
@@ -1720,7 +1787,7 @@ def _test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
         specs,
         pmol,
         outdir=str(tmp_path / "params_antechamber"),
-        backend="antechamber",
+        forcefield="gaff2",
         charge_method="gasteiger",
         pin_backbone_charges=True,
         normalize="cluster",
@@ -1729,7 +1796,7 @@ def _test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
         specs,
         pmol,
         outdir=str(tmp_path / "params_openff"),
-        backend="openff",
+        forcefield="openff_unconstrained-2.3.0.offxml",
         charge_method="gasteiger",
         pin_backbone_charges=True,
         normalize="cluster",
@@ -1748,7 +1815,7 @@ def _test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
     omm_a_built, _ = openmm_build(
         pmol.copy(),
         outdir=str(tmp_path / "build_omm_antechamber"),
-        extra_xml=[out_a.xml_path],
+        extra_xml=list(out_a.xml_paths),
         custombonds=out_a.custombonds,
         ionize=False,
         solvate=False,
@@ -1925,7 +1992,7 @@ def _test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
         specs,
         pmol,
         outdir=str(tmp_path / "params_antechamber"),
-        backend="antechamber",
+        forcefield="gaff2",
         charge_method="gasteiger",
         pin_backbone_charges=True,
         normalize="cluster",
@@ -1933,7 +2000,7 @@ def _test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
     mol_a, sys_a = openmm_build(
         pmol.copy(),
         outdir=str(tmp_path / "build_antechamber"),
-        extra_xml=[out_a.xml_path],
+        extra_xml=list(out_a.xml_paths),
         custombonds=out_a.custombonds,
         ionize=False,
         solvate=False,
@@ -1945,7 +2012,7 @@ def _test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
         specs,
         pmol,
         outdir=str(tmp_path / "params_openff"),
-        backend="openff",
+        forcefield="openff_unconstrained-2.3.0.offxml",
         charge_method="gasteiger",
         pin_backbone_charges=True,
         normalize="cluster",

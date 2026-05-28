@@ -321,93 +321,36 @@ def _require_openff_python():
         )
 
 
-def _assign_resp_charges(mol, multi_conf=False):
-    """Compute RESP charges (Restrained ElectroStatic Potential fit to a
-    Psi4-computed QM ESP) and write them onto ``mol.charge`` in place.
-
-    Dispatches to ``parameterize.charge.psi4resp.get_resp_psi4_charges``,
-    which runs HF/6-31G* (or def2-SV(P) when heavy elements are present)
-    via Psi4, builds the Merz-Singh-Kollman grid via openff-recharge, and
-    runs the iterative two-stage RESP fit. With ``multi_conf=True`` the
-    fit is performed jointly over up to 10 RDKit-generated conformers.
-
-    Requires the Acellera ``parameterize`` package (private; not on
-    public PyPI) and Psi4 + openff-recharge. Sensible only for the
-    openff backend - GAFF/GAFF2 expect antechamber-fit charges.
-    """
-    try:
-        from parameterize.charge.psi4resp import get_resp_psi4_charges
-    except ImportError as e:
-        raise ImportError(
-            "charge_method='resp'/'resp-multiconf' requires the Acellera "
-            "'parameterize' package (private, not on public PyPI) plus "
-            "Psi4 and openff-recharge. Contact the Acellera team for "
-            "access, or pick a different charge method."
-        ) from e
-
-    charges = get_resp_psi4_charges(mol, multi_conf=multi_conf)
-    arr = np.asarray(charges, dtype=np.float32)
-    if not np.all(np.isfinite(arr)):
-        raise RuntimeError(
-            "RESP fit produced non-finite charges; the Psi4 ESP "
-            "calculation or the iterative solver likely diverged."
-        )
-    mol.charge = arr
-
-
-def _assign_nagl_charges(mol, model_name="openff-gnn-am1bcc-1.0.0.pt"):
-    """Compute AM1-BCC-equivalent partial charges with NAGL (a GNN
-    surrogate for AM1-BCC) and write them onto ``mol.charge`` in place.
-
-    NAGL is a SMIRNOFF-ecosystem tool that reproduces AM1-BCC charges
-    via a graph neural network, avoiding the SQM step. It is several
-    orders of magnitude faster than antechamber's AM1-BCC on medium-to-
-    large molecules and honours the formal charge. Only meaningful for
-    the openff backend - GAFF/GAFF2 expect antechamber-fit charges.
-
-    NAGL is an opt-in dependency (it pulls PyTorch + pytorch-lightning).
-    Install with ``uv sync --group nagl`` or ``pip install
-    acellera-openff-nagl acellera-openff-nagl-models torch
-    pytorch-lightning``.
-    """
-    try:
-        from openff.nagl import GNNModel
-        from openff.nagl_models import get_model
-    except ImportError as e:
-        raise ImportError(
-            "charge_method='nagl' requires the openff-nagl stack (NAGL + "
-            "PyTorch). Install with 'uv sync --group nagl' or 'pip "
-            "install acellera-openff-nagl acellera-openff-nagl-models "
-            "torch pytorch-lightning'."
-        ) from e
-
-    off_mol = mol.toOpenFFMolecule(sanitize=True, assignStereo=True)
-    model = GNNModel.load(get_model(model_name))
-    charges = model.compute_property(off_mol)
-    arr = np.asarray(getattr(charges, "magnitude", charges), dtype=np.float32)
-    if not np.all(np.isfinite(arr)):
-        raise RuntimeError(
-            "NAGL produced non-finite charges; the molecule may have an "
-            "atom in an environment the GNN was not trained on."
-        )
-    mol.charge = arr
+# NAGL / RESP / Gasteiger charge helpers live in ``_charge_helpers`` so
+# the GAFF backend (``_ambertools.py``) and the SMIRNOFF backend
+# (this file) can both reach them without a circular import.
+from htmd.builder._charge_helpers import (  # noqa: E402
+    _assign_rdkit_gasteiger_charges,
+    _assign_nagl_charges,
+    _assign_resp_charges,
+)
 
 
 def parameterizeLigandsOpenFF(
     mol,
     ligand_ff="openff_unconstrained-2.3.0.offxml",
-    charge_method="gasteiger",
+    charge_method="nagl",
     resnames=None,
 ):
     """Parameterise free ligand residues via OpenFF Interchange.
 
-    Slices each ligand residue out of *mol*, assigns partial charges
-    (default RDKit Gasteiger, which honours the net formal charge unlike
-    antechamber's ``-c gas``), applies the chosen SMIRNOFF force field
-    via :func:`openff.interchange.Interchange.from_smirnoff`, and returns
+    Slices each ligand residue out of *mol*, assigns partial charges,
+    applies the chosen SMIRNOFF force field via
+    :func:`openff.interchange.Interchange.from_smirnoff`, and returns
     one :class:`Interchange` per resname. The returned objects can be
     combined with other Interchanges via ``ic.combine(other)`` and
     exported to OpenMM via ``ic.to_openmm()``.
+
+    The default charge model is NAGL, which is the OpenFF-recommended
+    fast surrogate for AM1-BCC (Sage 2.0-2.2) / AshGC (Sage 2.3.0).
+    Using a different charge model logs a warning: Sage's vdW + torsion
+    parameters were fit alongside a specific charge model, so other
+    charge choices give a thermodynamically inconsistent potential.
 
     Mirrors the OpenFF protein-ligand tutorial pattern::
 
@@ -424,24 +367,26 @@ def parameterizeLigandsOpenFF(
         orders, e.g. via
         :meth:`moleculekit.molecule.Molecule.templateResidueFromSmiles`.
     ligand_ff : str, optional
-        Name of an OpenFF force field offxml. ``"openff_unconstrained-*"``
-        variants are recommended when the final system will be
-        energy-minimised; constrained variants are only correct for
-        rigid-water MD.
+        Name of an OpenFF force field offxml. The default
+        ``"openff_unconstrained-2.3.0.offxml"`` is the right choice for
+        ``openmm.build``: the bond / angle / torsion / vdW / charge
+        parameters are byte-identical to the constrained variant
+        ``"openff-2.3.0.offxml"`` (per the OpenFF README: "Each mainline
+        force field is currently available in two forms - both with and
+        without bond constraints to hydrogen"), and ``openmm.build``
+        already applies ``constraints=app.HBonds`` at ``createSystem``
+        time so the X-H bonds are constrained at the simulator level.
+        Pick the constrained variant only if the emitted XML will be
+        consumed by a downstream tool that runs ``createSystem`` without
+        passing ``constraints``.
     charge_method : str or None, optional
-        ``"gasteiger"`` (default) - compute Gasteiger PEOE charges with
-        RDKit before SMIRNOFF application and pass them through
-        ``charge_from_molecules`` so SMIRNOFF does not overwrite them.
-        Honours the net formal charge.
-        ``"nagl"`` - compute AM1-BCC-equivalent charges with the OpenFF
-        NAGL graph neural network surrogate. Much faster than antechamber
-        AM1-BCC on medium-to-large molecules. Needs PyTorch.
-        ``"resp"`` / ``"resp-multiconf"`` - RESP fit to a Psi4-computed
-        QM ESP. The most accurate option but requires the private
-        Acellera ``parameterize`` package plus Psi4. The multi-conf
-        variant averages the fit over up to 10 conformers.
-        ``None`` - let SMIRNOFF assign its own charges (e.g. AM1-BCC for
-        Sage). Requires sqm from AmberTools at runtime.
+        ``"nagl"`` (default, recommended) - AM1-BCC-equivalent partial
+        charges from the OpenFF NAGL graph neural network. Sage was fit
+        alongside this charge model. Needs PyTorch.
+        Other choices log a warning. ``"gasteiger"`` - RDKit PEOE.
+        ``"resp"`` / ``"resp-multiconf"`` - RESP via parameterize + Psi4.
+        ``None`` - let SMIRNOFF assign its own charges (e.g. AM1-BCC
+        via ToolkitAM1BCCHandler).
     resnames : list[str] or None, optional
         Subset of resnames to parameterise. ``None`` parameterises every
         unique resname in *mol*.
@@ -455,6 +400,21 @@ def parameterizeLigandsOpenFF(
     from openff.toolkit import ForceField
     from openff.interchange import Interchange
     from htmd.builder._ambertools import _assign_rdkit_gasteiger_charges
+
+    # SMIRNOFF forcefields are fit alongside a specific charge model;
+    # warn (don't error) if a different charge model is used since the
+    # vdW + torsion parameters are entangled with the charge values.
+    if charge_method != "nagl":
+        logger.warning(
+            f"parameterizeLigandsOpenFF was called with "
+            f"charge_method={charge_method!r}; OpenFF Sage was fit "
+            "alongside a specific charge model (AM1-BCC for Sage 2.0-"
+            "2.2, AshGC for Sage 2.3.0) that NAGL reproduces. Using "
+            "any other charge model against Sage's LJ and torsion "
+            "parameters gives a thermodynamically inconsistent "
+            "potential. Pass charge_method='nagl' for the recommended "
+            "behaviour."
+        )
 
     if resnames is None:
         resnames = [str(r) for r in np.unique(mol.resname) if str(r)]
@@ -487,7 +447,6 @@ def parameterizeLigandsOpenFF(
             )
 
         off_mol = sub.toOpenFFMolecule(sanitize=True, assignStereo=True)
-
         kwargs = {"force_field": ff, "topology": [off_mol]}
         if charge_method is not None:
             kwargs["charge_from_molecules"] = [off_mol]

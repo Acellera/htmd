@@ -152,19 +152,19 @@ class ClusterOutputs:
     frcmod_paths: list = field(default_factory=list)
     # Custombonds to feed via ``custombonds=``. One pair per cluster bond.
     custombonds: list = field(default_factory=list)
-    # Path to a single OpenMM ForceField XML covering every residue and
-    # parameter the run produced via the antechamber backend. Drop it into
-    # ``openmm.app.ForceField(*defaultFf(), xml_path)`` alongside ff14SB
-    # and tip3p; the peptide bonds resolve through ff14SB (NCAA backbones
-    # are renamed to ff14SB classes) and the GAFF2 sidechain / junction
-    # terms come from this file.
-    xml_path: Optional[str] = None
 
-    # Per-residue OpenMM ForceField XML fragments produced by the openff
-    # backend (one per resname). Each is a self-contained ``<ForceField>``
-    # document. Feed all of them plus ``xml_path`` (if set) into
-    # ``openmm.app.ForceField(*defaultFf(), *xml_paths, xml_path)`` to
-    # assemble the full force field for the system.
+    # OpenMM ``<ForceField>`` XML files for ``htmd.builder.openmm.build``.
+    # The GAFF backend (when in use) contributes one combined file named
+    # ``gaff_<ff>_combined.xml`` listing every GAFF-typed residue + its
+    # parameters; the openff backend contributes one per-cluster fragment
+    # named ``cluster_<idx>.xml`` (plus one ``<resname>.xml`` per free
+    # ligand). Synthetic atom-type names are globally unique by
+    # construction (cluster-index prefix), so the files can be loaded
+    # together via ``openmm.app.ForceField(*defaultFf(), *xml_paths)``
+    # without name collisions. To know whether the GAFF path ran (and
+    # therefore whether ``amber.build`` is also a viable consumer),
+    # check ``frcmod_paths``: GAFF populates both ``frcmod_paths`` and
+    # an entry in ``xml_paths``; openff populates only ``xml_paths``.
     xml_paths: list = field(default_factory=list)
 
 
@@ -852,76 +852,87 @@ class _ClusterDispatch:
     in_cluster_set: set = field(default_factory=set)
 
 
-_SUPPORTED_BACKENDS = ("antechamber", "openff")
-_DEFAULT_FORCEFIELD = {
-    "antechamber": "GAFF2",
-    "openff": "openff_unconstrained-2.3.0.offxml",
-}
-
-
-def _resolve_backend_map(backend):
-    """Normalise the ``backend`` argument to a callable ``resname -> name``.
-
-    ``backend`` may be:
-      - a single backend name (``"antechamber"`` or ``"openff"``) applied
-        to every resname,
-      - a dict mapping resname -> backend name, with optional ``"default"``
-        key providing the fallback.
-    """
-    if isinstance(backend, str):
-        if backend not in _SUPPORTED_BACKENDS:
-            raise ValueError(
-                f"backend={backend!r}: expected one of {_SUPPORTED_BACKENDS} "
-                f"or a dict mapping resname -> backend."
-            )
-        return lambda resname: backend
-    if isinstance(backend, dict):
-        default = backend.get("default", "antechamber")
-        if default not in _SUPPORTED_BACKENDS:
-            raise ValueError(
-                f"backend default={default!r}: expected one of "
-                f"{_SUPPORTED_BACKENDS}"
-            )
-        for k, v in backend.items():
-            if k == "default":
-                continue
-            if v not in _SUPPORTED_BACKENDS:
-                raise ValueError(
-                    f"backend[{k!r}]={v!r}: expected one of "
-                    f"{_SUPPORTED_BACKENDS}"
-                )
-        return lambda resname: backend.get(resname, default)
-    raise TypeError(
-        f"backend must be str or dict, got {type(backend).__name__}"
-    )
-
-
-def _resolve_forcefield_map(forcefield, backend_for):
-    """Normalise the ``forcefield`` argument to a callable
-    ``resname -> ff_name``.
-
-    Defaults per backend: GAFF2 for antechamber, Sage 2.3 (unconstrained)
-    for openff. ``forcefield`` may be a single name (applied everywhere)
-    or a dict mapping resname -> ff name.
-    """
-    if forcefield is None:
-        return lambda resname: _DEFAULT_FORCEFIELD[backend_for(resname)]
-    if isinstance(forcefield, str):
-        return lambda resname: forcefield
-    if isinstance(forcefield, dict):
-        default = forcefield.get(
-            "default",
-            None,
+def _engine_for_forcefield(ff_name):
+    """Return the internal engine tag (``"antechamber"`` or ``"openff"``)
+    for a given forcefield string. Any name starting with ``gaff``
+    (case-insensitive) goes through antechamber + parmchk2; everything
+    else is treated as a SMIRNOFF offxml filename and goes through
+    OpenFF Interchange."""
+    if not isinstance(ff_name, str):
+        raise TypeError(
+            f"forcefield name must be a string, got {type(ff_name).__name__}"
         )
+    return "antechamber" if ff_name.lower().startswith("gaff") else "openff"
+
+
+def _forcefields_in(forcefield):
+    """Yield every forcefield name referenced by the user-supplied
+    ``forcefield`` argument, regardless of whether it is a string or a
+    per-resname dict. Used by validators that need to inspect the whole
+    set up front.
+    """
+    if isinstance(forcefield, str):
+        yield forcefield
+        return
+    if isinstance(forcefield, dict):
+        yield from forcefield.values()
+
+
+def _warn_if_openff_mismatched_charges(forcefield, charge_method):
+    """Log a warning if a SMIRNOFF (openff) forcefield is used with any
+    charge method other than ``"nagl"``. The Sage vdW + torsion
+    parameters were fit alongside a specific charge model (AM1-BCC for
+    Sage 2.0-2.2, AshGC for Sage 2.3.0), and NAGL is the OpenFF-
+    recommended fast surrogate that reproduces those charges. Using
+    any other charge model against Sage's LJ + torsions gives a
+    thermodynamically inconsistent potential, but we leave the choice
+    to the caller (warn, don't error).
+    """
+    if charge_method == "nagl":
+        return
+    for ff_name in _forcefields_in(forcefield):
+        if _engine_for_forcefield(ff_name) != "openff":
+            continue
+        logger.warning(
+            f"forcefield={ff_name!r} (SMIRNOFF) is being used with "
+            f"charge_method={charge_method!r}; OpenFF Sage was fit "
+            "alongside a specific charge model (AM1-BCC for Sage 2.0-"
+            "2.2, AshGC for Sage 2.3.0) that NAGL reproduces. Using "
+            "any other charge model against Sage's LJ + torsion "
+            "parameters gives a thermodynamically inconsistent "
+            "potential. Switch to charge_method='nagl' for the "
+            "recommended behaviour."
+        )
+        return  # one warning per call is enough
+
+
+def _resolve_forcefield(forcefield):
+    """Normalise the ``forcefield`` argument to a callable
+    ``resname -> (engine, ff_name)``.
+
+    ``engine`` is the internal dispatch tag (``"antechamber"`` for GAFF
+    / ``"openff"`` for SMIRNOFF); ``ff_name`` is the user-supplied force-
+    field name passed through to the engine's parameter generator
+    (antechamber's ``-at`` flag for GAFF, the offxml filename for
+    SMIRNOFF). ``forcefield`` may be a single string applied to every
+    resname, or a dict mapping ``resname -> name`` with optional
+    ``"default"`` key providing the fallback.
+    """
+    if isinstance(forcefield, str):
+        engine = _engine_for_forcefield(forcefield)
+        return lambda resname: (engine, forcefield)
+    if isinstance(forcefield, dict):
+        default = forcefield.get("default", "gaff2")
+        # Validate every entry up front so a typo doesn't only surface
+        # when the offending resname is dispatched.
+        for k, v in forcefield.items():
+            _engine_for_forcefield(v)  # raises TypeError if not a string
         def _lookup(resname):
-            if resname in forcefield:
-                return forcefield[resname]
-            if default is not None:
-                return default
-            return _DEFAULT_FORCEFIELD[backend_for(resname)]
+            ff = forcefield.get(resname, default)
+            return (_engine_for_forcefield(ff), ff)
         return _lookup
     raise TypeError(
-        f"forcefield must be str, dict, or None, got {type(forcefield).__name__}"
+        f"forcefield must be str or dict, got {type(forcefield).__name__}"
     )
 
 
@@ -1047,6 +1058,7 @@ def _parameterize_cluster_antechamber(
     cluster_model,
     cluster_outdir,
     *,
+    forcefield,
     charge_method,
     am1_path_length,
     use_pyodide,
@@ -1056,10 +1068,10 @@ def _parameterize_cluster_antechamber(
     parameter_sets,
 ):
     """Antechamber backend for one cluster: type the combined model compound
-    via :func:`_fftype_antechamber`, then split per-residue via
-    :func:`prepareClusterResidues`. Mutates ``residue_templates`` and
-    ``parameter_sets`` in place with the per-residue contributions for the
-    final XML emit.
+    via :func:`_fftype_antechamber` using the chosen GAFF variant, then
+    split per-residue via :func:`prepareClusterResidues`. Mutates
+    ``residue_templates`` and ``parameter_sets`` in place with the
+    per-residue contributions for the final XML emit.
 
     Returns the :class:`ClusterOutputs`-shaped artifact bundle for this
     cluster (topo, frcmod, custombonds path lists).
@@ -1071,6 +1083,7 @@ def _parameterize_cluster_antechamber(
     typed_mol, typed_path, frcmod_path = _fftype_antechamber(
         cluster_mol,
         tmpdir=cluster_outdir,
+        forcefield=forcefield,
         netcharge=netcharge,
         charge_method=charge_method,
         am1_path_length=am1_path_length,
@@ -1096,6 +1109,7 @@ def _parameterize_free_residue_antechamber(
     ligand_dir,
     outdir,
     *,
+    forcefield,
     charge_method,
     am1_path_length,
     use_pyodide,
@@ -1104,8 +1118,9 @@ def _parameterize_free_residue_antechamber(
     parameter_sets,
 ):
     """Antechamber backend for one free residue: write a per-residue CIF,
-    type and charge it via :func:`_fftype_antechamber`, clean the frcmod,
-    and append to the residue-template / parameter-set accumulators.
+    type and charge it via :func:`_fftype_antechamber` using the chosen
+    GAFF variant, clean the frcmod, and append to the residue-template /
+    parameter-set accumulators.
 
     Returns ``(out_cif_path, out_frcmod_path)`` for the per-residue
     ``ClusterOutputs.topo_paths`` / ``ClusterOutputs.frcmod_paths`` lists.
@@ -1118,6 +1133,7 @@ def _parameterize_free_residue_antechamber(
     typed_mol, _, frcmod_path = _fftype_antechamber(
         sub,
         tmpdir=ligand_dir,
+        forcefield=forcefield,
         netcharge=netcharge,
         charge_method=charge_method,
         am1_path_length=am1_path_length,
@@ -2313,8 +2329,7 @@ def parameterizeFromSpecs(
     specs,
     mol,
     outdir,
-    backend="antechamber",
-    forcefield=None,
+    forcefield="gaff2",
     charge_method="am1-bcc",
     am1_path_length=15,
     pin_backbone_charges=True,
@@ -2340,22 +2355,38 @@ def parameterizeFromSpecs(
         The molecule the specs describe. Must already carry covalent
         bonds (typically the post-``systemPrepare`` molecule).
     outdir : str
-        Output directory for all generated CIF / frcmod files.
+        Output directory for all generated CIF / frcmod / XML files.
+    forcefield : str or dict, optional
+        Force field for the non-canonical atoms. Default ``"gaff2"``.
+        A name starting with ``"gaff"`` dispatches through antechamber
+        + parmchk2 and emits prepi + frcmod (consumable by
+        :func:`amber.build`) plus a combined OpenMM XML; any other
+        string is treated as a SMIRNOFF offxml filename
+        (e.g. ``"openff_unconstrained-2.3.0.offxml"``) and dispatches
+        through OpenFF Interchange, emitting only per-cluster OpenMM
+        XML (consumable by :func:`openmm.build`). A dict
+        ``{resname: ff_name, "default": ff_name}`` lets different
+        residues use different force fields; mixing within a single
+        cluster is not supported (the cluster compound is parameterised
+        as one molecule).
     charge_method : str, optional
-        Charge model for the non-canonical atoms. ``"am1-bcc"`` (the
-        default) is the most accurate and honours the net charge.
-        ``"gasteiger"`` is faster, is computed via RDKit so it also
-        honours the net charge, and is the automatic fallback under
-        Pyodide where AM1-BCC's SQM backend is unavailable.
-        ``"nagl"`` (openff backend only) uses the OpenFF NAGL graph
-        neural network as an AM1-BCC surrogate - much faster than
-        antechamber AM1-BCC on medium-to-large molecules and honours
-        the formal charge. Requires PyTorch.
-        ``"resp"`` / ``"resp-multiconf"`` (openff backend only) fit
-        RESP charges to a Psi4-computed QM ESP. Most accurate option
-        but requires the private Acellera ``parameterize`` package +
-        Psi4. ``resp-multiconf`` averages over up to 10 conformers.
-        ``"abcg2"`` (antechamber backend only) is AM1-BCC v2.
+        Charge model for the non-canonical atoms. Orthogonal to
+        ``forcefield`` - every model works with both GAFF and SMIRNOFF
+        typing (the externally-fit methods pre-compute charges, then
+        the engine only types). ``"am1-bcc"`` (default) is the most
+        accurate and honours the net charge. ``"gasteiger"`` is faster,
+        computed via RDKit so it also honours the net charge, and is
+        the automatic fallback under Pyodide where AM1-BCC's SQM
+        backend is unavailable. ``"nagl"`` uses the OpenFF NAGL graph
+        neural network as an AM1-BCC surrogate - much faster on
+        medium-to-large molecules. Requires PyTorch. ``"resp"`` /
+        ``"resp-multiconf"`` fit RESP charges to a Psi4-computed QM
+        ESP. Most accurate option but requires the private Acellera
+        ``parameterize`` package + Psi4. ``resp-multiconf`` averages
+        over up to 10 conformers (free ligands only; cluster path
+        downgrades to single-conformer RESP since RDKit's ETKDG isn't
+        appropriate for clusters with ACE/NME caps). ``"abcg2"`` is
+        AM1-BCC v2, only meaningful with GAFF.
     am1_path_length : int or None, optional
         Maximum path length for AM1-BCC charge equivalence determination,
         passed to antechamber's ``-pl`` flag. Caps antechamber's atom-
@@ -2393,10 +2424,26 @@ def parameterizeFromSpecs(
     Returns
     -------
     :class:`ClusterOutputs`
-        Aggregated topology files, frcmod files, and custombonds for the
-        whole system. Feed ``out.topo_paths`` to ``amber.build(topo=...)``,
-        ``out.frcmod_paths`` to ``param=``, and ``out.custombonds`` to
-        ``custombonds=``.
+        Aggregated topology / parameter files and custombonds for the
+        whole system. The ``forcefield`` choice determines what is
+        populated:
+
+        - GAFF forcefield: ``out.topo_paths`` (prepi) + ``out.frcmod_paths``
+          (frcmod, for :func:`amber.build`) plus one combined OpenMM XML
+          (``gaff_combined.xml``) appended to ``out.xml_paths``.
+        - SMIRNOFF forcefield: per-cluster XML fragments appended to
+          ``out.xml_paths`` only; ``topo_paths`` / ``frcmod_paths`` stay
+          empty.
+        - Mixed: both above contribute. Synthetic atom-type names are
+          globally unique by construction, so the XMLs load together
+          via ``openmm.app.ForceField(*defaultFf(), *out.xml_paths)``.
+
+        ``out.custombonds`` is populated in every case and matches the
+        ``custombonds=`` argument of :func:`amber.build` /
+        :func:`openmm.build`. To tell whether GAFF was involved (and
+        therefore whether :func:`amber.build` is also viable), check
+        ``frcmod_paths``: it is non-empty iff at least one residue went
+        through the GAFF path.
 
     Examples
     --------
@@ -2460,8 +2507,7 @@ def parameterizeFromSpecs(
             "or normalize='cluster' / 'per_residue' (absorb the shift)."
         )
 
-    backend_for = _resolve_backend_map(backend)
-    forcefield_for = _resolve_forcefield_map(forcefield, backend_for)
+    forcefield_for = _resolve_forcefield(forcefield)
 
     if use_pyodide is None:
         use_pyodide = _in_pyodide()
@@ -2471,6 +2517,32 @@ def parameterizeFromSpecs(
             "falling back to Gasteiger charges."
         )
         charge_method = "gasteiger"
+
+    # SMIRNOFF forcefields are fit alongside a specific charge model
+    # (Sage 2.0-2.2 with AM1-BCC, Sage 2.3.0 with AshGC). The vdW + torsion
+    # parameters are entangled with the charge values, so using a different
+    # charge model gives a thermodynamically inconsistent potential. Warn
+    # the user but don't reject - they may have a reason (e.g. comparing
+    # backends with the same external charge model for diagnostic tests).
+    _warn_if_openff_mismatched_charges(forcefield, charge_method)
+
+    # SMIRNOFF parameters can't be expressed losslessly as AMBER frcmod
+    # (e.g. SMIRNOFF supports more torsion periodicities and improper
+    # conventions than frcmod can represent), so the openff path emits
+    # only OpenMM XML - which means the resulting ClusterOutputs is
+    # consumable by ``openmm.build`` but not by ``amber.build``. Log an
+    # info reminding the user, since the symptom otherwise ("tleap
+    # can't find topology for resname X") is non-obvious.
+    if any(
+        _engine_for_forcefield(ff) == "openff"
+        for ff in _forcefields_in(forcefield)
+    ):
+        logger.info(
+            "SMIRNOFF (openff) forcefield in use; the per-cluster XML "
+            "outputs are consumable by htmd.builder.openmm.build only "
+            "(via extra_xml=). Use htmd.builder.amber.build only when "
+            "every NCAA is parameterised with GAFF/GAFF2."
+        )
 
     os.makedirs(outdir, exist_ok=True)
     dispatch = _detect_clusters(mol, specs)
@@ -2549,14 +2621,18 @@ def parameterizeFromSpecs(
         os.makedirs(cluster_outdir, exist_ok=True)
 
         cluster_model = buildClusterModel(mol, cluster_spec, cluster_outdir)
-        # Cluster backend is taken from the FIRST member's resname; mixing
-        # backends within a single multi-residue cluster isn't supported
-        # (the cluster compound is one molecule, parameterised as a unit).
-        cluster_backend = backend_for(dispatch.groups[members[0]]["resname"])
-        if cluster_backend == "antechamber":
+        # Forcefield is taken from the FIRST member's resname; mixing
+        # GAFF and SMIRNOFF within a single multi-residue cluster is not
+        # supported (the cluster compound is one molecule, parameterised
+        # as a unit).
+        cluster_engine, cluster_ff = forcefield_for(
+            dispatch.groups[members[0]]["resname"]
+        )
+        if cluster_engine == "antechamber":
             cluster_out = _parameterize_cluster_antechamber(
                 cluster_model,
                 cluster_outdir,
+                forcefield=cluster_ff,
                 charge_method=charge_method,
                 am1_path_length=am1_path_length,
                 use_pyodide=use_pyodide,
@@ -2567,24 +2643,17 @@ def parameterizeFromSpecs(
             )
             out.topo_paths.extend(cluster_out.topo_paths)
             out.frcmod_paths.extend(cluster_out.frcmod_paths)
-        elif cluster_backend == "openff":
+        else:  # openff
             _parameterize_cluster_openff(
                 cluster_model,
                 cluster_outdir,
-                forcefield=forcefield_for(
-                    dispatch.groups[members[0]]["resname"]
-                ),
+                forcefield=cluster_ff,
                 charge_method=charge_method,
                 use_pyodide=use_pyodide,
                 pin_backbone_charges=pin_backbone_charges,
                 normalize=normalize,
                 interchange_xml_paths=out.xml_paths,
                 cluster_index=ci,
-            )
-        else:
-            raise ValueError(
-                f"backend={cluster_backend!r} not implemented for cluster "
-                f"containing {[dispatch.groups[m]['resname'] for m in members]!r}"
             )
 
     # Non-chain residues that ended up outside any cluster: run antechamber
@@ -2617,13 +2686,14 @@ def parameterizeFromSpecs(
         seen_ligand_resnames.add(g["resname"])
         ligand_dir = os.path.join(outdir, f"ligand_{g['resname']}")
         os.makedirs(ligand_dir, exist_ok=True)
-        backend_name = backend_for(g["resname"])
-        if backend_name == "antechamber":
+        engine, ff_name = forcefield_for(g["resname"])
+        if engine == "antechamber":
             out_cif, out_frcmod = _parameterize_free_residue_antechamber(
                 mol,
                 g,
                 ligand_dir,
                 outdir,
+                forcefield=ff_name,
                 charge_method=charge_method,
                 am1_path_length=am1_path_length,
                 use_pyodide=use_pyodide,
@@ -2633,26 +2703,28 @@ def parameterizeFromSpecs(
             )
             out.topo_paths.append(out_cif)
             out.frcmod_paths.append(out_frcmod)
-        elif backend_name == "openff":
+        else:  # openff
             _parameterize_free_residue_openff(
                 mol,
                 g,
                 ligand_dir,
-                forcefield=forcefield_for(g["resname"]),
+                forcefield=ff_name,
                 charge_method=charge_method,
                 use_pyodide=use_pyodide,
                 interchange_xml_paths=out.xml_paths,
             )
-        else:
-            raise ValueError(
-                f"backend={backend_name!r} not implemented for resname "
-                f"{g['resname']!r}"
-            )
 
     if residue_templates:
-        xml_path = os.path.join(outdir, "parameters.xml")
-        _emit_openmm_xml(residue_templates, parameter_sets, xml_path)
-        out.xml_path = xml_path
+        # Single combined XML for everything the GAFF/antechamber path
+        # produced - same parameters as topo_paths + frcmod_paths, just
+        # in OpenMM ForceField format. Named ``gaff_combined.xml`` so the
+        # provenance is obvious from the filename; appended to
+        # ``xml_paths`` so callers don't have to handle GAFF vs SMIRNOFF
+        # XML emission separately (``frcmod_paths`` already tells them
+        # whether GAFF was involved).
+        gaff_xml_path = os.path.join(outdir, "gaff_combined.xml")
+        _emit_openmm_xml(residue_templates, parameter_sets, gaff_xml_path)
+        out.xml_paths.append(gaff_xml_path)
 
     return out
 
