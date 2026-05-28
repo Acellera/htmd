@@ -25,6 +25,14 @@ try:
     logging.config.fileConfig(
         os.path.join(htmd.home.home(), "logging.ini"), disable_existing_loggers=False
     )
+    # Optional environment override for the HTMD log line format.
+    # Set HTMD_LOG_FORMAT to any logging.Formatter format string -
+    # e.g. "%(name)s - %(levelname)s - %(message)s" to drop the timestamp.
+    _log_format = os.environ.get("HTMD_LOG_FORMAT")
+    if _log_format:
+        _formatter = logging.Formatter(_log_format)
+        for _h in logging.getLogger("htmd").handlers:
+            _h.setFormatter(_formatter)
 except Exception:
     print("HTMD: Logging setup failed")
 
