@@ -1,89 +1,69 @@
 # Makefile for Sphinx documentation
 #
 
-# You can set these variables from the command line.
-SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
-SPHINXAPIDOC  = sphinx-apidoc
+SPHINXOPTS    ?=
+SPHINXBUILD   ?= sphinx-build
+SPHINXAPIDOC  ?= sphinx-apidoc
 PAPER         =
 BUILDDIR      = build
-TUTORIALSDIR  = source/tutorials
+SOURCEDIR     = source
+TUTORIALSDIR  = $(SOURCEDIR)/tutorials
+HOWTODIR      = $(SOURCEDIR)/how-to
+REFERENCEDIR  = $(SOURCEDIR)/reference
 HTMDTAG       = $(shell python gethtmdtag.py tag)
 HTMDBRANCH    = $(shell python gethtmdtag.py branch)
-IPYNB_FILES   = $(shell ls ../tutorials/*.ipynb)
-IPYNB_OUT    := $(addprefix $(TUTORIALSDIR)/,$(notdir $(IPYNB_FILES)))
+
+# Notebook mapping: each list is the basename set that lands in a specific
+# Diátaxis subdir. Sources all live in ../tutorials/ at repo root (so the
+# tutorials test fixture stays put).
+TUT_ADAPTIVE  = adaptive-sampling.ipynb adaptive-bandit.ipynb
+TUT_ANALYSIS  = projections.ipynb ligand-binding-analysis.ipynb protein-folding-analysis.ipynb
+HT_NOTEBOOKS  = md-protocols.ipynb WrappingTutorial.ipynb mu-opioid-receptor-gpcr-equilibration.ipynb cxcl12-conformational-analysis.ipynb MaxSubstructuralAlignment.ipynb SequenceAlignment.ipynb FFEvaluate.ipynb MembraneBuilder.ipynb docking-simulation-generators.ipynb
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
 $(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don\'t have Sphinx installed, grab it from http://sphinx-doc.org/)
 endif
 
-# Internal variables.
-PAPEROPT_a4     = -D latex_paper_size=a4
-PAPEROPT_letter = -D latex_paper_size=letter
-ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
-# the i18n builder cannot share the environment and doctrees with the others
-I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
-
-.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest coverage gettext static
+.PHONY: help clean html tutorials rst publish
 
 html: Makefile rst
-	@$(SPHINXBUILD) -M html "source" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 help:
-	@echo "Please use \`make <target>' where <target> is one of"
-	@echo "  html       to make standalone HTML files"
-	@echo "  dirhtml    to make HTML files named index.html in directories"
-	@echo "  singlehtml to make a single large HTML file"
-	@echo "  pickle     to make pickle files"
-	@echo "  json       to make JSON files"
-	@echo "  htmlhelp   to make HTML files and a HTML help project"
-	@echo "  qthelp     to make HTML files and a qthelp project"
-	@echo "  applehelp  to make an Apple Help Book"
-	@echo "  devhelp    to make HTML files and a Devhelp project"
-	@echo "  epub       to make an epub"
-	@echo "  latex      to make LaTeX files, you can set PAPER=a4 or PAPER=letter"
-	@echo "  latexpdf   to make LaTeX files and run them through pdflatex"
-	@echo "  latexpdfja to make LaTeX files and run them through platex/dvipdfmx"
-	@echo "  text       to make text files"
-	@echo "  man        to make manual pages"
-	@echo "  texinfo    to make Texinfo files"
-	@echo "  info       to make Texinfo files and run them through makeinfo"
-	@echo "  gettext    to make PO message catalogs"
-	@echo "  changes    to make an overview of all changed/added/deprecated items"
-	@echo "  xml        to make Docutils-native XML files"
-	@echo "  pseudoxml  to make pseudoxml-XML files for display purposes"
-	@echo "  linkcheck  to check all external links for integrity"
-	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
-	@echo "  coverage   to run coverage check of the documentation (if enabled)"
+	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 clean:
-	rm -f source/htmd.*
-	rm -rf $(TUTORIALSDIR)
-	rm -f source/version
+	rm -rf $(REFERENCEDIR)/htmd.* $(REFERENCEDIR)/modules.rst
+	rm -rf $(TUTORIALSDIR)/*.ipynb $(TUTORIALSDIR)/system-prep $(TUTORIALSDIR)/adaptive $(TUTORIALSDIR)/analysis
+	rm -rf $(TUTORIALSDIR)/img $(TUTORIALSDIR)/**/img
+	rm -rf $(HOWTODIR)/*.ipynb $(HOWTODIR)/img $(HOWTODIR)/wrapping_img
+	rm -f $(SOURCEDIR)/version $(SOURCEDIR)/llms-full.txt
 	rm -rf $(BUILDDIR)
 
 publish:
 	ssh software.acellera.com 'rm -rf /var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/*'
-	scp -r source/* www.acellera.com:/var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/
-	#ssh software.acellera.com 'chmod -R g+rwX software.acellera.com/'
+	scp -r $(SOURCEDIR)/* www.acellera.com:/var/www/software.acellera.com/source/htmd/$(HTMDBRANCH)/
 
-# Copy .ipynb tutorials and their image dirs into source/tutorials/.
-# myst-nb consumes the .ipynb files directly (see source_suffix in conf.py)
-# so no nbconvert step is needed; cached outputs in the notebooks render
-# as-is because nb_execution_mode = "off".
-$(TUTORIALSDIR)/%.ipynb: ../tutorials/%.ipynb
-	mkdir -p $(TUTORIALSDIR)
-	cp $< $@
-
-tutorials: $(IPYNB_OUT)
-	@if [ -d ../tutorials/wrapping_img ]; then cp -R ../tutorials/wrapping_img $(TUTORIALSDIR)/; fi
-	@if [ -d ../tutorials/img ]; then cp -R ../tutorials/img $(TUTORIALSDIR)/; fi
+# Copy .ipynb tutorials into their Diátaxis destinations. myst-nb consumes
+# the .ipynb files directly (see source_suffix in conf.py); cached outputs
+# render as-is because nb_execution_mode = "off".
+tutorials:
+	@mkdir -p $(TUTORIALSDIR)/adaptive $(TUTORIALSDIR)/analysis $(HOWTODIR)
+	@for nb in $(TUT_ADAPTIVE); do cp ../tutorials/$$nb $(TUTORIALSDIR)/adaptive/$$nb; done
+	@for nb in $(TUT_ANALYSIS); do cp ../tutorials/$$nb $(TUTORIALSDIR)/analysis/$$nb; done
+	@for nb in $(HT_NOTEBOOKS); do cp ../tutorials/$$nb $(HOWTODIR)/$$nb; done
+	@if [ -d ../tutorials/img ]; then \
+		cp -R ../tutorials/img $(TUTORIALSDIR)/adaptive/; \
+		cp -R ../tutorials/img $(TUTORIALSDIR)/analysis/; \
+		cp -R ../tutorials/img $(HOWTODIR)/; \
+	fi
+	@if [ -d ../tutorials/wrapping_img ]; then cp -R ../tutorials/wrapping_img $(HOWTODIR)/; fi
 
 rst: tutorials
-	rm -f source/htmd.*
-	$(SPHINXAPIDOC) --force --separate -o source ../htmd/ >/dev/null
-	echo "$(HTMDTAG)" > source/version
+	@mkdir -p $(REFERENCEDIR)
+	rm -f $(REFERENCEDIR)/htmd.* $(REFERENCEDIR)/modules.rst
+	$(SPHINXAPIDOC) --no-toc --force --separate -o $(REFERENCEDIR) ../htmd/ >/dev/null
+	echo "$(HTMDTAG)" > $(SOURCEDIR)/version
 	@echo
-	@echo "Build finished. The RST files are on source/"
-
+	@echo "Build finished. The RST files are on $(REFERENCEDIR)/"

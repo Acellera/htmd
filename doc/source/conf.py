@@ -1,9 +1,14 @@
 # Configuration file for the Sphinx documentation builder.
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import os
 from pathlib import Path
 
 from acellera_docs_theme import apply
+
+# Drop the timestamp from HTMD / moleculekit log lines in rendered tutorial output.
+os.environ.setdefault("HTMD_LOG_FORMAT", "%(name)s - %(levelname)s - %(message)s")
+os.environ.setdefault("MOLECULEKIT_LOG_FORMAT", "%(name)s - %(levelname)s - %(message)s")
 
 # -- Project information -----------------------------------------------------
 
@@ -47,7 +52,10 @@ myst_enable_extensions = [
 ]
 myst_heading_anchors = 3
 
-nb_execution_mode = "off"  # tutorials are pre-rendered; flip to "cache" when adopting MyST-NB
+nb_execution_mode = "auto"  # execute .md tutorials on first build; .ipynb tutorials ship with cached outputs
+nb_execution_excludepatterns = ["**/*.ipynb"]  # legacy notebooks carry their own outputs (and pop viewers if rerun)
+nb_execution_in_temp = True  # run each notebook in a temp dir so build artefacts don't pollute source/
+nb_execution_timeout = 600  # antechamber + tLeap inside the system-prep tutorials can take minutes
 nb_merge_streams = True
 
 # -- Acellera unified branding ----------------------------------------------
