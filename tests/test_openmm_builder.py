@@ -813,7 +813,7 @@ _BEN_NAGL_EXPECTED_CHARGES = [
 
 @pytest.mark.skipif(
     not (_openmm_installed and _openff_installed and _nagl_installed),
-    reason="OpenMM + OpenFF Interchange + NAGL required (install with 'uv sync --group nagl')",
+    reason="OpenMM + OpenFF Interchange + NAGL required (install with 'pip install acellera-htmd[nagl]')",
 )
 def _test_parameterize_ligands_openff_ben_nagl():
     """Build an Interchange for BEN via Sage 2.3 with NAGL charges (an

@@ -57,9 +57,8 @@ def _assign_nagl_charges(mol, model_name="openff-gnn-am1bcc-1.0.0.pt"):
     typing engine is independent.
 
     NAGL is an opt-in dependency (it pulls PyTorch + pytorch-lightning).
-    Install with ``uv sync --group nagl`` or ``pip install
-    acellera-openff-nagl acellera-openff-nagl-models torch
-    pytorch-lightning``.
+    Install with ``pip install acellera-htmd[nagl]`` (or ``uv sync
+    --extra nagl``).
     """
     try:
         from openff.nagl import GNNModel
@@ -67,9 +66,8 @@ def _assign_nagl_charges(mol, model_name="openff-gnn-am1bcc-1.0.0.pt"):
     except ImportError as e:
         raise ImportError(
             "charge_method='nagl' requires the openff-nagl stack (NAGL + "
-            "PyTorch). Install with 'uv sync --group nagl' or 'pip "
-            "install acellera-openff-nagl acellera-openff-nagl-models "
-            "torch pytorch-lightning'."
+            "PyTorch). Install with 'pip install acellera-htmd[nagl]' or "
+            "'uv sync --extra nagl'."
         ) from e
 
     off_mol = mol.toOpenFFMolecule(sanitize=True, assignStereo=True)
