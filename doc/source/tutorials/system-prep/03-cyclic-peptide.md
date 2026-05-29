@@ -18,6 +18,10 @@ kernelspec:
 - HTMD installed.
 - You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>` - this tutorial builds on the same five-step flow.
 
+```{note}
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the SMILES dictionary you pass to `templateResidueFromSmiles`. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the input structure's connectivity to find the non-canonical residues and the ring-closing peptide bond on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` handles the cluster parameterisation without any extra wiring.
+```
+
 ## What makes cyclic peptides interesting
 
 Cyclosporin A is a head-to-tail cyclic 11-residue peptide. Almost every residue is N-methylated or otherwise modified, and there are no canonical anchors - every residue is a non-canonical amino acid (NCAA), and the first and last residues are covalently joined to close the ring.

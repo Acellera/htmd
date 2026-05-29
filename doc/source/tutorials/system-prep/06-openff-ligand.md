@@ -20,11 +20,13 @@ kernelspec:
 
 ## Why a different small-molecule force field
 
-Tutorial 02 parameterises `BEN` with **GAFF2** through antechamber. GAFF2 is a solid generic default and is what the AMBER ecosystem has long used for small molecules. The OpenFF / SMIRNOFF family ("Sage") is a more recent alternative:
+{doc}`Tutorial 02 <02-protein-ligand>` parameterises `BEN` with **GAFF2** through antechamber. GAFF2 is a solid generic default and is what the AMBER ecosystem has long used for small molecules. The [OpenFF / SMIRNOFF family](https://openforcefield.org/force-fields/) ("Sage") is a more recent alternative:
 
-- Fully open, transferable parameters with no separate `frcmod` overlay.
-- Charge model fit against AM1-BCC, with the {py:mod}`openff.nagl` GNN as a fast surrogate (Gasteiger or AM1-BCC at the SMILES level miss some of the polarisation Sage was trained on).
-- Native OpenMM XML output, no tLeap round-trip.
+- **Direct SMARTS-based parameter assignment** via the [SMIRNOFF format](https://openforcefield.github.io/standards/standards/smirnoff/): a single ~300-line force-field XML replaces GAFF2's many-line atom-typing rules, with chemistry-aware specificity (sulfonamides, phosphates, and bridgehead nitrogens are typed correctly from Sage 2.1 onwards).
+- **vdW parameters retrained** against experimental mass density and enthalpy-of-mixing data from NIST.
+- **Valence parameters** (bonds, angles, torsions) fit against quantum-chemical optimised geometries and torsion profiles, with torsions split per central-bond multiplicity from Sage 2.3.
+- **Charges via NAGL**, an AM1-BCC graph-neural-network surrogate introduced with Sage 2.3 - much faster than running AM1-BCC per-residue, and what the Sage release was validated against.
+- **Native OpenMM XML output**, no tLeap round-trip. Training inputs, scripts, and results are public on the [OpenFF GitHub org](https://github.com/openforcefield).
 
 For any ligand where you want the latest, externally-validated force-field assignment, swap GAFF2 for an OpenFF release. The {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` interface is unchanged - you flip two arguments:
 

@@ -97,6 +97,51 @@ build/
 
 The `structure.prmtop` + `structure.pdb` pair is what {py:func}`acemd.protocols.setup_equilibration` (or any other MD driver) consumes.
 
+## Force-field defaults and overrides
+
+`amber.build` consumes three categories of force-field input, each with its own argument:
+
+| Argument | Default | Format |
+| --- | --- | --- |
+| `ff` | {py:func}`amber.defaultFf() <htmd.builder.amber.defaultFf>` | tLeap `leaprc.*` files (the master force-field selectors). |
+| `topo` | {py:func}`amber.defaultTopo() <htmd.builder.amber.defaultTopo>` (empty) | Residue topology templates: `.prepi`, `.prep`, `.in`, `.cif`, or `.mol2` (the last two are converted to prepi via `prepgen` automatically). |
+| `param` | {py:func}`amber.defaultParam() <htmd.builder.amber.defaultParam>` (empty) | Parameter overlays: `.frcmod`. |
+
+Inspect the active defaults:
+
+```{code-cell} python
+print(amber.defaultFf())
+```
+
+To **replace** the force-field set, pass your own list to `ff=`:
+
+```python
+amber.build(
+    solvated,
+    outdir="./build",
+    ff=["leaprc.protein.ff19SB", "leaprc.water.opc"],   # ff19SB protein + OPC water
+)
+```
+
+To **augment** the build with extra residue templates or parameters (e.g. an NCAA you parameterised with antechamber, or a custom cofactor), pass them via `topo=` and `param=`:
+
+```python
+amber.build(
+    solvated,
+    outdir="./build",
+    topo=["./params/MY_RES.prepi"],
+    param=["./params/MY_RES.frcmod"],
+)
+```
+
+This is exactly what {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` produces for non-canonical residues in {doc}`tutorial 02 <02-protein-ligand>` and onwards - the function returns `topo_paths` and `frcmod_paths` ready to feed straight in.
+
+To browse what's bundled with HTMD's tLeap install (leaprc files, prepi templates, frcmod overlays):
+
+```python
+amber.listFiles()
+```
+
 ## Parameters that matter
 
 | Argument | Effect |

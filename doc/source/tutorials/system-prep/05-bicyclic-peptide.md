@@ -18,6 +18,10 @@ kernelspec:
 - HTMD installed.
 - You've worked through {doc}`Build a stapled peptide <04-stapled-peptide>` - this tutorial extends the same scaffolded-NCAA pattern.
 
+```{note}
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the single SMILES you pass to `templateResidueFromSmiles` (for the LFI scaffold). {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the three `SG-Cn` thioether bonds and the three CYS chain-positions from the input structure's connectivity on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` carries them through to the build without any extra wiring.
+```
+
 ## What the bicycle is
 
 PDB `8QFZ` chain B is a 12-mer peptide containing three cysteine residues - **CYS11 (N-terminal), CYS17 (mid-chain), CYS22 (C-terminal)** - whose sulphur atoms (`SG`) are each thioether-bonded to one of the three anchor carbons (`C10`, `C11`, `C12`) of a small heterocyclic scaffold residue called **`LFI`** (1,3,5-tris(3-bromopropanoyl)hexahydro-1,3,5-triazine). Each `SG-Cn` closure replaces an LFI bromine, so the templating SMILES carries the unbound form with the three `Br` leaving groups.

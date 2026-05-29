@@ -18,6 +18,10 @@ kernelspec:
 - HTMD installed.
 - You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>`.
 
+```{note}
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the two extra SMILES strings you pass to `templateResidueFromSmiles` (one per NCAA). {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the staple bond from the input structure's connectivity on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` carries it through to the build without any extra wiring.
+```
+
 ## What the staple is
 
 PDB `8QU4` chain A is a 13-mer designed peptide containing two NCAAs:

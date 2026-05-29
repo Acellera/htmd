@@ -11,6 +11,8 @@ Build solvated, parameterised systems ready for production MD. Each tutorial is 
 04-stapled-peptide
 05-bicyclic-peptide
 06-openff-ligand
+07-membrane
+08-protein-rna
 ```
 
 The {doc}`system-building overview <../../explanation/system-building>` lays out the conceptual pipeline these tutorials walk through; the [API reference](../../reference/index.md) for {py:mod}`htmd.builder` and {py:mod}`htmd.builder.nonstandard` has the full argument lists.
