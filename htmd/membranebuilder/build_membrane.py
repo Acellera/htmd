@@ -972,6 +972,13 @@ def buildMembrane(
     resolveRingPenetrations(lipids, xysize)
     memb = _createMembraneMolecule(lipids)
 
+    # Per-lipid templates ship with empty segid, which makes
+    # htmd.builder.amber.build reject the structure ("Atoms ... do not have
+    # segid defined"). Assign a default lipid segid so downstream builders
+    # get a fully-segmented molecule. The waters added by solvate() below
+    # already get their own segids (W0, W1, ...).
+    memb.segid[memb.segid == ""] = "MEMB"
+
     head_mask = np.zeros(memb.numAtoms, dtype=bool)
     for resname, headname in {(ll.resname.upper(), ll.headname) for ll in lipids}:
         head_mask |= (memb.resname == resname) & (memb.name == headname)
