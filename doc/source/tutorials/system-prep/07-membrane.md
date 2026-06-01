@@ -41,6 +41,11 @@ from htmd.membranebuilder.build_membrane import buildMembrane
 import numpy as np
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
+```
+
 ## Step 1 - Load the RCSB structure and align it to OPM
 
 ```{code-cell} python
@@ -53,13 +58,17 @@ mol.align("protein and name CA", refmol=ref, mode="structure")
 print(f"bilayer thickness: {thickness} Å, atoms after removing water: {mol.numAtoms}")
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol)
+```
+
 The workflow is: load the structure you actually want to simulate (from RCSB or a local file), then rotate it onto OPM's membrane-aligned orientation. {py:func}`~moleculekit.opm.get_opm_pdb` fetches OPM's mirror of the same PDB - rotated and translated so that the bilayer center sits at `z=0` and the membrane normal points along `+z`. {py:meth}`~moleculekit.molecule.Molecule.align` with `mode="structure"` runs TM-align between the two, so the two structures don't need to have identical atom counts (OPM often trims residues that don't sit in the bilayer plane). The returned `thickness` is the OPM-fit double-leaflet thickness (33.4 Å for 5VBL). This is the alignment {py:func}`~htmd.membranebuilder.build_membrane.buildMembrane` expects from its `solute=` argument.
 
 ## Step 2 - Detect the non-standard residues
 
 ```{code-cell} python
 mol = autoSegment(mol, fields=("segid", "chain"))
-mol.remove("element H", _logger=False)
 
 specs = detectNonStandardResidues(mol)
 for spec in specs:

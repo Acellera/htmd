@@ -50,6 +50,11 @@ from htmd.builder import openmm
 from htmd.builder.nonstandard import parameterizeFromSpecs
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
+```
+
 ## Steps 1-4 - Same as the GAFF2 tutorial
 
 The prep pipeline is unchanged from {doc}`tutorial 02 <02-protein-ligand>` - see that tutorial for the per-step prose. Code-only recap:
@@ -57,8 +62,14 @@ The prep pipeline is unchanged from {doc}`tutorial 02 <02-protein-ligand>` - see
 ```{code-cell} python
 mol = Molecule("3PTB")
 mol = autoSegment(mol, fields=("segid", "chain"))
-mol.remove("element H")
+```
 
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol)
+```
+
+```{code-cell} python
 specs = detectNonStandardResidues(mol)
 
 BEN_SMILES = "[NH2+]=C(N)c1ccccc1"

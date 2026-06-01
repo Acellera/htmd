@@ -41,6 +41,11 @@ from htmd.builder.nonstandard import parameterizeFromSpecs
 from htmd.builder.solvate import solvate
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
+```
+
 ## Step 1 - Load and segment
 
 We use trypsin in complex with benzamidine (PDB `3PTB`). `BEN` is the non-canonical residue:
@@ -48,10 +53,12 @@ We use trypsin in complex with benzamidine (PDB `3PTB`). `BEN` is the non-canoni
 ```{code-cell} python
 mol = Molecule("3PTB")
 mol = autoSegment(mol, fields=("segid", "chain"))
-mol.remove("element H")
 ```
 
-The `remove("element H")` strips input hydrogens so the templating and `systemPrepare` steps can rebuild them consistently.
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol)
+```
 
 ## Step 2 - Detect non-standard residues
 
@@ -116,7 +123,7 @@ solvated = solvate(prepared, pad=10)
 ## Step 7 - Build
 
 ```{code-cell} python
-amber.build(
+built = amber.build(
     solvated,
     outdir="./build",
     custombonds=out.custombonds,
@@ -129,9 +136,13 @@ amber.build(
 
 The three new arguments (`custombonds`, `topo`, `param`) wire `parameterizeFromSpecs`'s outputs into tLeap. Ionisation, disulfide detection, and capping happen the same way as in a canonical-only build.
 
+```{code-cell} python
+:tags: [remove-input]
+show3d(built)
+```
+
 ## Gotchas
 
-- Strip input hydrogens with `mol.remove("element H")` before templating. Mixed input / template hydrogens cause overvalent atoms in the build.
 - For ionisable ligands, template with the SMILES of the **protonation state at your pH** (e.g. `[NH2+]=C(N)c1ccccc1` for benzamidinium at 7.4). Templating the neutral form locks the wrong protonation state into the parameterisation.
 - If a non-canonical residue is at the C-terminus and its template already carries `OXT`, pass `caps={"<segid>": ("ace", "none")}` to {py:func}`~htmd.builder.amber.build` so tLeap doesn't try to add an NME cap on top.
 - `parameterizeFromSpecs` dedupes by `(resname, is_n_term, is_c_term)`. Two MLE residues in the same chain-position bucket share one `MLE.prepi`; an N-terminal MLE plus a mid-chain MLE produce two distinct prepis.

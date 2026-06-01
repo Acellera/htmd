@@ -22,15 +22,21 @@ kernelspec:
 
 PDB `1AUD` is the **NMR solution structure of the human U1A protein bound to its own 3'-UTR polyadenylation inhibition element (PIE)**. U1A is one of the workhorse models for studying RNP recognition: the protein binds the RNA loop nucleotides through a classic RRM β-sheet, and the RNA backbone wraps around the protein surface.
 
-Concretely: 101 protein residues + 30 nt of RNA, all canonical, no metal cofactors, no covalent crosslinks. The RNA covers the two U1A-binding stem-loops of the PIE as one continuous 30-mer strand. The residue numbering follows the natural pre-mRNA - resids 19-30 from one stem-loop, 33-50 from the other - and the construct simply omits the linker residues 31-32, sealing the strand with a normal phosphodiester bond between O3'(30) and P(33) (1.61 Å, identical to every other intra-chain phosphodiester). That makes it the simplest possible protein-RNA build - the only things that change versus {doc}`tutorial 01 <01-protein>` are (a) dropping the NMR ensemble down to a single frame, and (b) the AMBER RNA force field handles the nucleotides automatically because `leaprc.RNA.OL3` is already in {py:func}`~htmd.builder.amber.defaultFf`.
+The only things that change versus {doc}`tutorial 01 <01-protein>` are (a) dropping the NMR ensemble down to a single frame, and (b) the AMBER RNA force field handles the nucleotides automatically because `leaprc.RNA.OL3` is already in {py:func}`~htmd.builder.amber.defaultFf`.
 
 ## Setup
 
 ```{code-cell} python
 from moleculekit.molecule import Molecule
+from moleculekit.tools.autosegment import autoSegment
 from moleculekit.tools.preparation import systemPrepare
 from htmd.builder import amber
 from htmd.builder.solvate import solvate
+```
+
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
 ```
 
 ## Step 1 - Load and pick a single frame
@@ -42,17 +48,20 @@ print(f"loaded {mol.numFrames} NMR conformers, {mol.numAtoms} atoms")
 mol.dropFrames(keep=0)
 ```
 
-NMR depositions ship as an **ensemble**: 1AUD has 31 conformers. The downstream prep / parameterisation / build pipeline works on a single frame at a time, so we keep frame 0. Pick a different frame, or run the prep on each frame separately, depending on your study design.
-
-## Step 2 - Assign segids per chain
-
 ```{code-cell} python
-mol.segid = mol.chain.copy()
+:tags: [remove-input]
+show3d(mol)
 ```
 
-We **don't** use {py:func}`~moleculekit.tools.autosegment.autoSegment` here. autoSegment splits a chain whenever the residue number jumps (and for nucleic acids it can't spatially validate the gap because its backbone check only knows protein atoms N/CA/C/O), so on 1AUD it would wrongly split chain B into two strands at the deleted-linker boundary - even though the phosphodiester bond from O3'(30) to P(33) is intact at 1.61 Å. Copying chain → segid keeps the RNA as a single 30-mer.
+NMR depositions ship as an **ensemble**: 1AUD has 31 conformers. The downstream prep / parameterisation / build pipeline works on a single frame at a time, so we keep frame 0. Pick a different frame, or run the prep on each frame separately, depending on your study design.
 
-For protein-only systems, where every chain is one segment and resid jumps usually do mean disordered loops, autoSegment is the right tool. For builds that mix in nucleic acids with non-natural residue numbering, copy `chain` into `segid` directly (or use {py:func}`~moleculekit.tools.autosegment.autoSegment2`, which segments by the covalent bond graph).
+## Step 2 - Segment
+
+```{code-cell} python
+mol = autoSegment(mol, fields=("segid", "chain"))
+```
+
+{py:func}`~moleculekit.tools.autosegment.autoSegment` walks the connectivity and assigns one segment per chain. For 1AUD the result is two segments: the 30-nt RNA construct as one strand (the residue-number jump from 30 to 33 is not a chain break - the phosphodiester bond from O3'(30) to P(33) is intact at 1.61 Å, and autoSegment's spatial validation recognises this) and the protein as the other.
 
 ## Step 3 - Prepare
 

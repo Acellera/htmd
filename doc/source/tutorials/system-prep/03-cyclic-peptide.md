@@ -43,13 +43,22 @@ from htmd.builder import amber
 from htmd.builder.nonstandard import parameterizeFromSpecs
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
+```
+
 ## Step 1 - Load and segment
 
 ```{code-cell} python
 mol = Molecule("4TOT")
 mol.filter("chain E")          # one of the cyclosporin copies in the crystal
 mol = autoSegment(mol, fields=("segid", "chain"))
-mol.remove("element H", _logger=False)
+```
+
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol)
 ```
 
 ## Step 2 - Detect

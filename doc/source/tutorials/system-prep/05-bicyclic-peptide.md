@@ -46,12 +46,22 @@ from htmd.builder import amber
 from htmd.builder.nonstandard import parameterizeFromSpecs
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
+```
+
 ## Step 1 - Load and segment
 
 ```{code-cell} python
 mol = Molecule("8QFZ")
 mol.filter("chain B")
 mol = autoSegment(mol, fields=("segid", "chain"))
+```
+
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol)
 ```
 
 ## Step 2 - Detect

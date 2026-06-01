@@ -38,12 +38,22 @@ from htmd.builder import amber
 from htmd.builder.solvate import solvate
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+from acellera_docs_theme.molstar import show3d
+```
+
 ## Step 1 - Load the structure
 
 We use Trp-cage (PDB `1L2Y`): a 20-residue mini-protein with no ligands and no non-standard residues. {py:class}`~moleculekit.molecule.Molecule` accepts either a local file path (PDB, mmCIF, PSF, PRMTOP, ...) or a four-character PDB ID it downloads from RCSB on the fly:
 
 ```{code-cell} python
 mol = Molecule("1L2Y")
+```
+
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol)
 ```
 
 ## Step 2 - Segment the chains
@@ -60,6 +70,11 @@ For protein-only systems the practical effect is one segment per chain (here, ju
 
 ```{code-cell} python
 prepared, specs = systemPrepare(mol, pH=7.4)
+```
+
+```{code-cell} python
+:tags: [remove-input]
+show3d(prepared)
 ```
 
 {py:func}`~moleculekit.tools.preparation.systemPrepare` runs PDB2PQR under the hood: predicts pKa values, picks protonation states at the requested pH, adds missing hydrogens, and returns the prepared molecule plus a list of non-canonical specs. When no `detect_specs` argument is supplied the function auto-detects and returns that list; when one is supplied it is returned unchanged. For a canonical-only protein the spec list is empty and you can ignore it.
