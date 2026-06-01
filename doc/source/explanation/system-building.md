@@ -1,6 +1,6 @@
 # System building
 
-System building is the work of turning a structure - a PDB, a homology model, a docked complex - into a simulation-ready system: protonated, segmented, solvated, ionised, parameterised against a force field, and written to a topology + coordinates pair that an MD engine accepts. HTMD treats this as a first-class workflow, not a script you string together by hand, and supports the full range of biomolecular systems through a single API.
+System building is the work of turning a structure - a PDB, a homology model, a docked complex - into a simulation-ready system: protonated, segmented, solvated, ionised, parameterized against a force field, and written to a topology + coordinates pair that an MD engine accepts. HTMD treats this as a first-class workflow, not a script you string together by hand, and supports the full range of biomolecular systems through a single API.
 
 ## The canonical pipeline
 
@@ -17,10 +17,10 @@ flowchart LR
 
 - **Segmentation** ({py:func}`~moleculekit.tools.autosegment.autoSegment`) labels each contiguous chain - and each non-protein residue - in its own segment, so the builder treats the components independently and doesn't extend protein chains through HETATM ligands.
 - **Non-standard residue detection** ({py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues`) inspects the molecule and returns one spec per residue the force field doesn't natively know (ligands, NCAAs, modified residues, crosslinkers).
-- **SMILES templating** ({py:meth}`~moleculekit.molecule.Molecule.templateResidueFromSmiles`) sets correct bond orders, formal charges, and hydrogen counts on each non-standard residue from its reference SMILES - a prerequisite for clean parameterisation.
+- **SMILES templating** ({py:meth}`~moleculekit.molecule.Molecule.templateResidueFromSmiles`) sets correct bond orders, formal charges, and hydrogen counts on each non-standard residue from its reference SMILES - a prerequisite for clean parameterization.
 - **Preparation** ({py:func}`~moleculekit.tools.preparation.systemPrepare`) does pKa-aware protonation, missing-sidechain repair and partial backbone repair, and mutation; passed the `detect_specs=` list it preserves the templated non-standard residues across the PDB2PQR pass.
-- **Parameterisation** ({py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs`) runs antechamber on each non-standard residue, emits per-residue topology files (`topo_paths`), parameter files (`frcmod_paths`), and a `custombonds` list the builder feeds straight to tLeap.
-- **Force-field build** ({py:func}`htmd.builder.amber.build` - the most fully featured backend - or {py:func}`htmd.builder.charmm.build` / {py:func}`htmd.builder.openmm.build`) consumes the prepared molecule plus the parameterisation outputs and writes a simulation-ready topology + coordinates pair.
+- **Parameterization** ({py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs`) runs antechamber on each non-standard residue, emits per-residue topology files (`topo_paths`), parameter files (`frcmod_paths`), and a `custombonds` list the builder feeds straight to tLeap.
+- **Force-field build** ({py:func}`htmd.builder.amber.build` - the most fully featured backend - or {py:func}`htmd.builder.charmm.build` / {py:func}`htmd.builder.openmm.build`) consumes the prepared molecule plus the parameterization outputs and writes a simulation-ready topology + coordinates pair.
 
 Solvation ({py:func}`~htmd.builder.solvate.solvate`) and ionisation ({py:func}`~htmd.builder.ionize.ionize`) can be called explicitly before the build step, or left to the builder's own `ionize=True` default.
 
@@ -38,7 +38,7 @@ NCAAs - phosphorylated residues, fluorinated analogues, modified backbones, pept
 2. {py:meth}`~moleculekit.molecule.Molecule.templateResidueFromSmiles` is called once per unique non-standard residue with its reference SMILES, fixing bond orders and adding hydrogens.
 3. {py:func}`~moleculekit.tools.preparation.systemPrepare` is called with `detect_specs=specs` so PDB2PQR protonates the canonical residues while preserving the templated non-standard ones, then {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` produces the GAFF2 topologies and AMBER ff14SB-anchored parameters that `amber.build` consumes.
 
-Default charge model for NCAA parameterisation is **AM1-BCC** (standard GAFF-quality charges, slower); pass `charge_method="gasteiger"` to {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` for the much faster Gasteiger model when high-quality electrostatics aren't critical.
+Default charge model for NCAA parameterization is **AM1-BCC** (standard GAFF-quality charges, slower); pass `charge_method="gasteiger"` to {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` for the much faster Gasteiger model when high-quality electrostatics aren't critical.
 
 ### Stapled peptides, isopeptides, and cyclic peptides
 
@@ -66,7 +66,7 @@ See the {doc}`Membrane Builder how-to <../how-to/MembraneBuilder>` for the recip
 
 The same prepared molecule can be built under multiple force fields without redoing preparation:
 
-- **AMBER** ({py:func}`htmd.builder.amber.build`) via tLeap - the most fully featured backend, the one the NCAA flow is parameterised against (ff14SB anchors, GAFF2 atom types), and the recommended default for protein, protein-ligand, and crosslinked-NCAA systems.
+- **AMBER** ({py:func}`htmd.builder.amber.build`) via tLeap - the most fully featured backend, the one the NCAA flow is parameterized against (ff14SB anchors, GAFF2 atom types), and the recommended default for protein, protein-ligand, and crosslinked-NCAA systems.
 - **CHARMM** ({py:func}`htmd.builder.charmm.build`) via VMD/psfgen - for projects standardised on CHARMM force fields and CHARMM-GUI-style membrane setups.
 - **OpenMM** ({py:func}`htmd.builder.openmm.build`) for systems destined for OpenMM with custom XML force fields.
 

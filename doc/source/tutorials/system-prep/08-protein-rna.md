@@ -53,7 +53,7 @@ mol.dropFrames(keep=0)
 show3d(mol)
 ```
 
-NMR depositions ship as an **ensemble**: 1AUD has 31 conformers. The downstream prep / parameterisation / build pipeline works on a single frame at a time, so we keep frame 0. Pick a different frame, or run the prep on each frame separately, depending on your study design.
+NMR depositions ship as an **ensemble**: 1AUD has 31 conformers. The downstream prep / parameterization / build pipeline works on a single frame at a time, so we keep frame 0. Pick a different frame, or run the prep on each frame separately, depending on your study design.
 
 ## Step 2 - Segment
 

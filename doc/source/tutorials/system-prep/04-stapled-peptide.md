@@ -63,8 +63,13 @@ mol.segid[:] = "P"
 
 ```{code-cell} python
 :tags: [remove-input]
-show3d(mol)
+show3d(
+    mol,
+    highlight_bonds=[("resname NLE and name CE", "resname MK8 and name CE")],
+)
 ```
+
+The orange tube marks the **NLE.CE - MK8.CE staple bond** - the lone covalent crosslink that turns the linear 13-mer into a stapled macrocycle.
 
 ## Step 2 - Detect
 
@@ -148,5 +153,5 @@ print("staple bond present:", built.hasBond(nle_ce, mk8_ce)[0])
 
 ## See also
 
-- {doc}`Build a cyclic peptide <03-cyclic-peptide>` - head-to-tail cyclisation as a special case of inter-NCAA bonding.
+- {doc}`Build a cyclic peptide <05-cyclic-peptide>` - head-to-tail cyclisation as a special case of inter-NCAA bonding.
 - {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.

@@ -72,7 +72,7 @@ for spec in specs:
     print(spec)
 ```
 
-You should see one `ScaffoldSpec(resname='LFI', ...)` and three `ChainResidueSpec(resname='CYS', ..., new_resname='XX*')` entries. The three CYS residues each get a **different** `new_resname` so the downstream parameterisation can write a distinct topology per residue. Two reasons for the rename:
+You should see one `ScaffoldSpec(resname='LFI', ...)` and three `ChainResidueSpec(resname='CYS', ..., new_resname='XX*')` entries. The three CYS residues each get a **different** `new_resname` so the downstream parameterization can write a distinct topology per residue. Two reasons for the rename:
 
 1. **They're not canonical anymore.** Each one carries an extra `SG-Cn` thioether bond to the scaffold, so the standard ff14SB `CYS` template no longer matches - the sulphur valence is different, and ff14SB wouldn't know what to do at the new bond. Renaming to a non-canonical bucket lifts these residues out of the built-in `CYS` library and lets `parameterizeFromSpecs` write a per-residue topology that combines ff14SB backbone types with GAFF2 sulphur-side typing.
 2. **Each sits in a different chain position.** `CYS11` is N-terminal, `CYS17` is mid-chain, `CYS22` is C-terminal - so the backbone hydrogen counts and formal charges differ between them. `parameterizeFromSpecs` buckets by `(resname, is_n_term, is_c_term)`, so giving the three CYS the same `new_resname` would collapse them into one bucket and lose the chain-position distinction.
@@ -98,7 +98,7 @@ prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
 
 PDB2PQR protonates the canonical residues normally. The three CYS specs from step 2 carry the rename + `HG`-drop instructions, which `systemPrepare` applies at the end of the prep. The bond-capture mechanism preserves the three pre-existing `SG-Cn` bonds across the PDB2PQR pass.
 
-## Step 5 - Parameterise
+## Step 5 - Parameterize
 
 ```{code-cell} python
 out = parameterizeFromSpecs(
@@ -160,5 +160,5 @@ print("SG-Cn thioether bonds:", n_thioether)        # should be 3
 ## See also
 
 - {doc}`Build a stapled peptide <04-stapled-peptide>` - the simpler case of a direct NCAA-NCAA crosslink with no scaffold.
-- {doc}`Build a cyclic peptide <03-cyclic-peptide>` - head-to-tail cyclisation as another macrocycle topology.
+- {doc}`Build a cyclic peptide <05-cyclic-peptide>` - head-to-tail cyclisation as another macrocycle topology.
 - {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.

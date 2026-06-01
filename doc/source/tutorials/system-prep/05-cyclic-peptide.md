@@ -19,7 +19,7 @@ kernelspec:
 - You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>` - this tutorial builds on the same five-step flow.
 
 ```{note}
-The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the SMILES dictionary you pass to `templateResidueFromSmiles`. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the input structure's connectivity to find the non-canonical residues and the ring-closing peptide bond on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` handles the cluster parameterisation without any extra wiring.
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the SMILES dictionary you pass to `templateResidueFromSmiles`. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the input structure's connectivity to find the non-canonical residues and the ring-closing peptide bond on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` handles the cluster parameterization without any extra wiring.
 ```
 
 ## What makes cyclic peptides interesting
@@ -97,7 +97,7 @@ prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
 
 For a cyclic peptide with no canonical residues, `systemPrepare`'s PDB2PQR pass has nothing to do on the protonation side - the bond-capture / restore mechanism is what preserves the inter-NCAA peptide bonds (including the ring-closing one) through the prep. Passing `detect_specs=specs` rather than relying on the default auto-detect lets you reuse the list we already computed, edit it before prep (drop entries you don't want spec-handled, tweak a `new_resname`, ...), and thread the same list into `parameterizeFromSpecs`. The spec list is returned unchanged; rebinding it back into `specs` keeps the data flow visually obvious.
 
-## Step 5 - Parameterise
+## Step 5 - Parameterize
 
 ```{code-cell} python
 out = parameterizeFromSpecs(

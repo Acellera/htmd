@@ -56,6 +56,7 @@ nb_execution_mode = "auto"  # execute .md tutorials on first build; .ipynb tutor
 nb_execution_excludepatterns = ["**/*.ipynb"]  # legacy notebooks carry their own outputs (and pop viewers if rerun)
 nb_execution_in_temp = True  # run each notebook in a temp dir so build artefacts don't pollute source/
 nb_execution_timeout = 600  # antechamber + tLeap inside the system-prep tutorials can take minutes
+nb_execution_raise_on_error = True  # crashing tutorial cell -> failed build (instead of silent warning)
 nb_merge_streams = True
 
 # -- Acellera unified branding ----------------------------------------------

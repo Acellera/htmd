@@ -1,6 +1,6 @@
 # HTMD
 
-HTMD is a Python environment for **preparing, parameterising, simulating, and analysing biomolecular systems at scale**. It builds on [moleculekit](https://software.acellera.com/moleculekit/); see [HTMD and moleculekit](explanation/htmd-vs-moleculekit.md) for which package owns which feature.
+HTMD is a Python environment for **preparing, parameterizing, simulating, and analysing biomolecular systems at scale**. It builds on [moleculekit](https://software.acellera.com/moleculekit/); see [HTMD and moleculekit](explanation/htmd-vs-moleculekit.md) for which package owns which feature.
 
 ::::{grid} 2
 :gutter: 3
@@ -44,7 +44,7 @@ Concepts and mental models.
 * - Capability
   - What it covers
 * - **System building**
-  - Solvating, ionising, and parameterising proteins, ligands, membranes, non-canonical amino acids, stapled peptides, isopeptides, cyclic peptides, and disulfide-crosslinked assemblies through AMBER, OpenMM, or CHARMM. See {doc}`explanation/system-building`.
+  - Solvating, ionising, and parameterizing proteins, ligands, membranes, non-canonical amino acids, stapled peptides, isopeptides, cyclic peptides, and disulfide-crosslinked assemblies through AMBER, OpenMM, or CHARMM. See {doc}`explanation/system-building`.
 * - **MD simulation & MSM analysis**
   - Queue-aware simulation drivers plus the {py:class}`~htmd.simlist.Sim` → {py:class}`~htmd.projections.metric.Metric` → {py:class}`~htmd.projections.tica.TICA` → clustering → {py:class}`~htmd.model.Model` → {py:class}`~htmd.kinetics.Kinetics` pipeline. See {doc}`explanation/msm-workflow`.
 * - **Adaptive sampling**

@@ -21,12 +21,12 @@ kernelspec:
 
 For a protein containing only canonical residues, building is four steps after loading:
 
-1. {py:func}`~moleculekit.tools.autosegment.autoSegment` - split the molecule into one segment per chain.
+1. {py:func}`~moleculekit.tools.autosegment.autoSegment` - automatically split the structure into independent segments by walking the residue connectivity and starting a new segment at every real chain break (residue-number gap validated by backbone distance for proteins).
 2. {py:func}`~moleculekit.tools.preparation.systemPrepare` - protonate at the chosen pH, fix protonation states, fill in missing sidechains and some missing backbone heavy atoms.
 3. {py:func}`~htmd.builder.solvate.solvate` - wrap a water box around the prepared structure.
 4. {py:func}`htmd.builder.amber.build` - run tLeap to produce a `prmtop` + `pdb` pair (and ionise to the requested salt concentration).
 
-No NCAA detection or parameterisation step is needed when every residue is in tLeap's built-in ff14SB library.
+No NCAA detection or parameterization step is needed when every residue is in tLeap's built-in ff14SB library.
 
 ## Setup
 
@@ -62,9 +62,9 @@ show3d(mol)
 mol = autoSegment(mol, fields=("segid", "chain"))
 ```
 
-`autoSegment` walks the chain graph and assigns each contiguous protein chain - and each non-protein residue - to its own segment. This is what stops {py:func}`~htmd.builder.amber.build` from extending a protein chain through a HETATM ligand later, and from auto-capping the wrong terminus when an NCAA is at the chain end.
+{py:func}`~moleculekit.tools.autosegment.autoSegment` walks the structure residue-by-residue and starts a new segment whenever it sees a real chain break: a jump in residue numbers (e.g. resids 22 → 50 with no intermediate residues) that the spatial check confirms is a true gap in the backbone, *or* a transition from one chain identifier to another. Each contiguous run of bonded residues gets its own segid. This is what stops {py:func}`~htmd.builder.amber.build` from extending a protein chain through a HETATM ligand later, and from auto-capping the wrong terminus when a non-canonical residue sits at the chain end.
 
-For protein-only systems the practical effect is one segment per chain (here, just `P0`).
+For Trp-cage there's just one continuous chain, so autoSegment produces a single segment named `P0`.
 
 ## Step 3 - Prepare
 
@@ -74,7 +74,7 @@ prepared, specs = systemPrepare(mol, pH=7.4)
 
 ```{code-cell} python
 :tags: [remove-input]
-show3d(prepared)
+show3d(prepared, ball_and_stick="all")
 ```
 
 {py:func}`~moleculekit.tools.preparation.systemPrepare` runs PDB2PQR under the hood: predicts pKa values, picks protonation states at the requested pH, adds missing hydrogens, and returns the prepared molecule plus a list of non-canonical specs. When no `detect_specs` argument is supplied the function auto-detects and returns that list; when one is supplied it is returned unchanged. For a canonical-only protein the spec list is empty and you can ignore it.
@@ -85,7 +85,12 @@ show3d(prepared)
 solvated = solvate(prepared, pad=10)
 ```
 
-{py:func}`~htmd.builder.solvate.solvate` wraps a TIP3P water box around the prepared molecule. `pad=10` adds 10 Å of water in every direction beyond the molecule's bounding box - large enough to prevent the solute from seeing its own periodic image at typical box sizes.
+```{code-cell} python
+:tags: [remove-input]
+show3d(solvated)
+```
+
+{py:func}`~htmd.builder.solvate.solvate` wraps a TIP3P water box around the prepared molecule. `pad=10` adds 10 Å of water in every direction beyond the molecule's bounding box. We keep the box small to keep the tutorial fast; for a production run you'd typically use a larger pad (15-20 Å) so that any local unfolding or large-scale motion can't reach across the periodic boundary and interact with the protein's own image.
 
 ## Step 5 - Build under AMBER
 
@@ -138,7 +143,7 @@ amber.build(
 )
 ```
 
-To **augment** the build with extra residue templates or parameters (e.g. an NCAA you parameterised with antechamber, or a custom cofactor), pass them via `topo=` and `param=`:
+To **augment** the build with extra residue templates or parameters (e.g. an NCAA you parameterized with antechamber, or a custom cofactor), pass them via `topo=` and `param=`:
 
 ```python
 amber.build(
@@ -171,12 +176,12 @@ amber.listFiles()
 ## Gotchas
 
 - Always run `autoSegment` *before* `systemPrepare`. The segmentation reflects covalent connectivity, and `systemPrepare`'s C-terminal handling relies on it.
-- Hydrogens in the input PDB are dropped and re-added by `systemPrepare`. Don't try to preserve input Hs - the prep is what guarantees the protonation state is consistent with the chosen pH.
+- You don't have to strip input hydrogens before `systemPrepare`. If `titration=True` (the default) PDB2PQR re-protonates all titratable residues at the chosen pH and effectively overrides whatever Hs the input carried; passing `titration=False` keeps your input protonation. Either way, the prep is what reconciles the hydrogens with the rest of the build.
 - Solvate *before* `amber.build`, not after. `amber.build` does not wrap a water box on its own.
 - `saltconc` defaults to `0` (just neutralising counter-ions). Pass `saltconc=0.15` (or your target) for physiological ionic strength.
 - For systems with bound metals like Zn or Ca, you'll usually want to keep them by including them in the input - tLeap has parameters for the common ones.
 
 ## See also
 
-- {doc}`Build a protein with a ligand <02-protein-ligand>` - the next step up: non-canonical residues, SMILES templating, parameterisation.
+- {doc}`Build a protein with a ligand <02-protein-ligand>` - the next step up: non-canonical residues, SMILES templating, parameterization.
 - {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.

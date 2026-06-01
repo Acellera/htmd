@@ -12,7 +12,7 @@ kernelspec:
 
 # Build a protein with a ligand using OpenFF
 
-**You will learn:** how to parameterise the benzamidine ligand with the **OpenFF Sage** small-molecule force field (instead of the default GAFF2) and build the resulting trypsin + benzamidine system through {py:func}`htmd.builder.openmm.build`.
+**You will learn:** how to parameterize the benzamidine ligand with the **OpenFF Sage** small-molecule force field (instead of the default GAFF2) and build the resulting trypsin + benzamidine system through {py:func}`htmd.builder.openmm.build`.
 
 **Prerequisites:**
 - HTMD installed with the OpenFF extra: `pip install acellera-htmd[openff,nagl]`.
@@ -20,7 +20,7 @@ kernelspec:
 
 ## Why a different small-molecule force field
 
-{doc}`Tutorial 02 <02-protein-ligand>` parameterises `BEN` with **GAFF2** through antechamber. GAFF2 is a solid generic default and is what the AMBER ecosystem has long used for small molecules. The [OpenFF / SMIRNOFF family](https://openforcefield.org/force-fields/) ("Sage") is a more recent alternative:
+{doc}`Tutorial 02 <02-protein-ligand>` parameterizes `BEN` with **GAFF2** through antechamber. GAFF2 is a solid generic default and is what the AMBER ecosystem has long used for small molecules. The [OpenFF / SMIRNOFF family](https://openforcefield.org/force-fields/) ("Sage") is a more recent alternative:
 
 - **Direct SMARTS-based parameter assignment** via the [SMIRNOFF format](https://openforcefield.github.io/standards/standards/smirnoff/): a single ~300-line force-field XML replaces GAFF2's many-line atom-typing rules, with chemistry-aware specificity (sulfonamides, phosphates, and bridgehead nitrogens are typed correctly from Sage 2.1 onwards).
 - **vdW parameters retrained** against experimental mass density and enthalpy-of-mixing data from NIST.
@@ -36,7 +36,7 @@ For any ligand where you want the latest, externally-validated force-field assig
 The OpenMM builder ({py:func}`htmd.builder.openmm.build`) consumes the emitted force-field XML directly - no separate prepi/frcmod step.
 
 ```{warning}
-Parameterising **any** residue under OpenFF binds the whole system to the OpenMM builder. The `.frcmod` format that tLeap consumes can't represent the full SMIRNOFF feature set, so {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` emits only the OpenMM force-field XML on the SMIRNOFF branch and {py:func}`htmd.builder.amber.build` has nothing to consume. If you need an AMBER `prmtop` produced by tLeap, stay on the GAFF2 path in {doc}`tutorial 02 <02-protein-ligand>`. The OpenMM builder still writes a `prmtop` + `pdb` pair, so the *downstream* MD engine (ACEMD, OpenMM, GROMACS, ...) doesn't care.
+Parameterizing **any** residue under OpenFF binds the whole system to the OpenMM builder. The `.frcmod` format that tLeap consumes can't represent the full SMIRNOFF feature set, so {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` emits only the OpenMM force-field XML on the SMIRNOFF branch and {py:func}`htmd.builder.amber.build` has nothing to consume. If you need an AMBER `prmtop` produced by tLeap, stay on the GAFF2 path in {doc}`tutorial 02 <02-protein-ligand>`. The OpenMM builder still writes a `prmtop` + `pdb` pair, so the *downstream* MD engine (ACEMD, OpenMM, GROMACS, ...) doesn't care.
 ```
 
 ## Setup
@@ -78,7 +78,7 @@ mol.templateResidueFromSmiles('resname "BEN"', BEN_SMILES, addHs=True)
 prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
 ```
 
-## Step 5 - Parameterise with OpenFF Sage
+## Step 5 - Parameterize with OpenFF Sage
 
 ```{code-cell} python
 out = parameterizeFromSpecs(
@@ -98,13 +98,19 @@ print(out)
 ## Step 6 - Build under OpenMM
 
 ```{code-cell} python
+# 3PTB ships with crystallographic waters that systemPrepare keeps; strip
+# them so openmm.build's internal solvation step runs (otherwise it sees
+# the mol as already-solvated and skips it, leaving only the close-in
+# crystal waters that the ioniser can't safely swap for ions).
+prepared.remove("water", _logger=False)
+
 built, system = openmm.build(
     prepared,
     outdir="./build",
     extra_xml=list(out.xml_paths),
     custombonds=out.custombonds,
     solvate=True,
-    padding=10.0,
+    padding=15.0,
     ionize=True,
     saltconc=0.15,
 )
@@ -131,5 +137,5 @@ Argument breakdown:
 
 ## See also
 
-- {doc}`Build a protein with a ligand <02-protein-ligand>` - the same system parameterised under GAFF2 via tLeap.
+- {doc}`Build a protein with a ligand <02-protein-ligand>` - the same system parameterized under GAFF2 via tLeap.
 - {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.

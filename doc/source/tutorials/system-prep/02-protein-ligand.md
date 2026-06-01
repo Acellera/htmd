@@ -12,7 +12,7 @@ kernelspec:
 
 # Build a protein with a ligand
 
-**You will learn:** how to detect non-standard residues in a structure, template them from SMILES, parameterise them with antechamber, and feed the result to {py:func}`~htmd.builder.amber.build`.
+**You will learn:** how to detect non-standard residues in a structure, template them from SMILES, parameterize them with antechamber, and feed the result to {py:func}`~htmd.builder.amber.build`.
 
 **Prerequisites:**
 - HTMD installed.
@@ -79,9 +79,16 @@ BEN_SMILES = "[NH2+]=C(N)c1ccccc1"
 mol.templateResidueFromSmiles('resname "BEN"', BEN_SMILES, addHs=True)
 ```
 
-The SMILES carries the **protonated** benzamidinium form (one of the amidine nitrogens is `[NH2+]`), which is the physiologically relevant state at pH 7.4. The RCSB chemical component for `BEN` is stored as the neutral amidine `N=C(N)c1ccccc1` - that's a starting point, but the SMILES you pass to `templateResidueFromSmiles` must encode the **protonation state at your target pH** with explicit formal charges. Templating the neutral form locks the wrong charges into the parameterisation.
+The SMILES carries the **protonated** benzamidinium form (one of the amidine nitrogens is `[NH2+]`), which is the physiologically relevant state at pH 7.4. The RCSB chemical component for `BEN` is stored as the neutral amidine `N=C(N)c1ccccc1` - that's a starting point, but the SMILES you pass to `templateResidueFromSmiles` must encode the **protonation state at your target pH** with explicit formal charges. Templating the neutral form locks the wrong charges into the parameterization.
 
 You don't have to hand-edit the SMILES for the mid-chain case: when a residue is peptide-bonded on one or both sides, the function automatically strips the terminal `-OH` / `-OXT` that's absent in the bonded copy and retries the match. Full heavy-atom coverage and explicit hydrogens still work best.
+
+```{code-cell} python
+:tags: [remove-input]
+show3d(mol, ball_and_stick="resname BEN", focus="resname BEN")
+```
+
+The viewer opens zoomed in on `BEN` (ball-and-stick on top of the protein cartoon). Look at the templating result: the amidine carbon now carries a double bond, the protonated `[NH2+]` nitrogen has two explicit hydrogens, and the `+1` formal charge sits as a small black label by the protonated nitrogen. None of that connectivity / charge information was in the input PDB - `templateResidueFromSmiles` pulled it from the SMILES and reconciled it with the existing heavy-atom positions.
 
 ## Step 4 - Prepare with the spec list
 
@@ -91,7 +98,7 @@ prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
 
 If you don't pass `detect_specs`, `systemPrepare` calls `detectNonStandardResidues` for you. Passing `detect_specs=specs` explicitly is useful when you want to **reuse** the list we already computed in step 2 (avoiding the duplicate detect call), **edit it** before prep (drop specs for residues you want to leave alone, tweak a `new_resname`, etc.), and **thread** the same list into `parameterizeFromSpecs` in step 5. `systemPrepare` returns the spec list unchanged as its second value; the rebind keeps the data flow visually obvious. To opt out of non-standard residue handling entirely, pass `detect_specs=[]`.
 
-## Step 5 - Parameterise
+## Step 5 - Parameterize
 
 ```{code-cell} python
 out = parameterizeFromSpecs(
@@ -143,12 +150,12 @@ show3d(built)
 
 ## Gotchas
 
-- For ionisable ligands, template with the SMILES of the **protonation state at your pH** (e.g. `[NH2+]=C(N)c1ccccc1` for benzamidinium at 7.4). Templating the neutral form locks the wrong protonation state into the parameterisation.
+- For ionisable ligands, template with the SMILES of the **protonation state at your pH** (e.g. `[NH2+]=C(N)c1ccccc1` for benzamidinium at 7.4). Templating the neutral form locks the wrong protonation state into the parameterization.
 - If a non-canonical residue is at the C-terminus and its template already carries `OXT`, pass `caps={"<segid>": ("ace", "none")}` to {py:func}`~htmd.builder.amber.build` so tLeap doesn't try to add an NME cap on top.
-- `parameterizeFromSpecs` dedupes by `(resname, is_n_term, is_c_term)`. Two MLE residues in the same chain-position bucket share one `MLE.prepi`; an N-terminal MLE plus a mid-chain MLE produce two distinct prepis.
+- `parameterizeFromSpecs` dedupes by `(resname, is_n_term, is_c_term)`. Two MLE residues in the same chain-position bucket share one topology/parameter set; an N-terminal MLE plus a mid-chain MLE produce two distinct topology/parameter sets.
 
 ## See also
 
-- {doc}`Build a cyclic peptide <03-cyclic-peptide>` - same flow with a head-to-tail cyclisation.
+- {doc}`Build a cyclic peptide <05-cyclic-peptide>` - same flow with a head-to-tail cyclisation.
 - {doc}`Build a stapled peptide <04-stapled-peptide>` - chemical crosslink between two NCAAs.
 - {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.

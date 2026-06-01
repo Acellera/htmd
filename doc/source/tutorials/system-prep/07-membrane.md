@@ -16,7 +16,7 @@ kernelspec:
 
 **Prerequisites:**
 - HTMD installed.
-- You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>` - this tutorial reuses the same NCAA detection / templating / parameterisation pipeline.
+- You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>` - this tutorial reuses the same NCAA detection / templating / parameterization pipeline.
 
 ## The system
 
@@ -78,7 +78,7 @@ for spec in specs:
 Look at what detect found:
 
 - Five `ChainResidueSpec` entries for the chain-resident NCAAs - `HRG`, `ALC`, `OIC`, `NLE`, and `200` (the C-terminal one). These are exactly the NCAAs we expect from the peptide's chemistry.
-- **Two extra `ChainResidueSpec` entries for canonical residues** - `GLU` (resid 10) renamed to `XX1` with `anchor_atom='CD'`, and `LYS` (resid 13) renamed to `XX2` with `anchor_atom='NZ'`. Those are the canonical residues at the **two ends of an isopeptide bond**: the apelin agonist is a side-chain macrocycle closed by a `GLU.CD - LYS.NZ` γ-glutamyl / ε-lysyl crosslink. Detect saw the inter-residue bond on the side-chain atoms (not the backbone) and emitted the rename + anchor automatically, so the downstream parameterisation gives each end of the isopeptide its own per-residue topology. The `custombonds` list emitted by {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` will close the ring at build time.
+- **Two extra `ChainResidueSpec` entries for canonical residues** - `GLU` (resid 10) renamed to `XX1` with `anchor_atom='CD'`, and `LYS` (resid 13) renamed to `XX2` with `anchor_atom='NZ'`. Those are the canonical residues at the **two ends of an isopeptide bond**: the apelin agonist is a side-chain macrocycle closed by a `GLU.CD - LYS.NZ` γ-glutamyl / ε-lysyl crosslink. Detect saw the inter-residue bond on the side-chain atoms (not the backbone) and emitted the rename + anchor automatically, so the downstream parameterization gives each end of the isopeptide its own per-residue topology. The `custombonds` list emitted by {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` will close the ring at build time.
 - One `LigandSpec` for the free `OLC` lipid co-crystallised with the protein.
 
 So we need to template every chain-resident NCAA *and* the free lipid - but **not** `GLU` / `LYS` (they're canonical residues whose only modification is the inter-side-chain bond, which detect handles entirely from connectivity):
@@ -142,6 +142,11 @@ system.append(memb)
 print(f"merged system: {system.numAtoms} atoms")
 ```
 
+```{code-cell} python
+:tags: [remove-input]
+show3d(system)
+```
+
 Two things going on here:
 
 - `buildMembrane` already carved the protein footprint out of the lipid placement (that's what `solute=prepared` does in the previous step), so the membrane and protein occupy disjoint XY space and no additional clash-removal is needed - a direct append is enough.
@@ -164,6 +169,11 @@ system = solvate(
 ```
 
 The XY box matches the lipid extent (so water doesn't poke out past the bilayer edge), and Z extends 15 Å above and below the tallest / lowest atom in the system - enough to fully solvate the protein's intracellular and extracellular domains. `solvate` will only place waters where there's space - no waters appear inside the bilayer.
+
+```{code-cell} python
+:tags: [remove-input]
+show3d(system)
+```
 
 ## Step 6 - Build under AMBER
 

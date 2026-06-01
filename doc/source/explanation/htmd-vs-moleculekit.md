@@ -19,7 +19,7 @@ If you can do it without launching a simulation, it's probably in moleculekit.
 
 HTMD builds on top of moleculekit and adds the machinery for **running and analysing many simulations** at once:
 
-- **System building** ({py:mod}`htmd.builder` and {py:mod}`htmd.membranebuilder`): solvating, ionising, and parameterising systems through CHARMM, AMBER, or OpenMM; placing membranes; closing loops.
+- **System building** ({py:mod}`htmd.builder` and {py:mod}`htmd.membranebuilder`): solvating, ionising, and parameterizing systems through CHARMM, AMBER, or OpenMM; placing membranes; closing loops.
 - **Queue-aware simulation drivers** (re-exported by {py:mod}`htmd.ui` from the `jobqueues` package - `LocalGPUQueue`, `LocalCPUQueue`, `SlurmQueue`, `LsfQueue`, `PBSQueue`): launching simulations across local GPUs or HPC queueing systems with a uniform interface.
 - **Adaptive sampling** ({py:mod}`htmd.adaptive`): driving multi-epoch campaigns whose next starting frames are chosen by an MSM built from earlier epochs - see [Adaptive sampling](adaptive-sampling.md).
 - **MSM analysis** ({py:mod}`htmd.simlist`, {py:mod}`htmd.metricdata`, {py:mod}`htmd.model`, {py:mod}`htmd.kinetics`, {py:mod}`htmd.clustering`): the simulation-list → projection → clustering → model → kinetics pipeline; see [MSM workflow](msm-workflow.md).
