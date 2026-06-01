@@ -257,7 +257,7 @@ def _run_pipeline(
     )
 
 
-def _test_disulfide_path_unchanged(tmp_path):
+def test_disulfide_path_unchanged(tmp_path):
     """An isolated Cys-Cys disulfide pair still gets renamed CYX with HG
     dropped through the existing disulfide rename machinery in
     ``_prepareMolecule``."""
@@ -300,7 +300,7 @@ def _test_disulfide_path_unchanged(tmp_path):
     assert (mol.name == "HG").sum() == 0
 
 
-def _test_amber_anchor_rename_via_custombonds(tmp_path):
+def test_amber_anchor_rename_via_custombonds(tmp_path):
     """Defense-in-depth: when a user passes a custombond from CYS SG to a
     scaffold atom directly to ``_prepareMolecule`` (skipping detect), the
     rename to CYX still happens and HG is dropped."""
@@ -375,7 +375,7 @@ def _test_amber_anchor_rename_via_custombonds(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",
 )
-def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
+def test_8qu4_stapled_peptide_end_to_end(tmp_path):
     """8QU4 chain A: 13-mer NF-Y-derived stapled peptide. NLE272.CE -
     MK8276.CE single bond (the staple after RCM closure) joins two NCAAs
     with no canonical anchor.
@@ -462,7 +462,7 @@ def _test_8qu4_stapled_peptide_end_to_end(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",
 )
-def _test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
+def test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     """8QFZ chain B: 12-mer cyclic peptide whose CYS11/17/22 sidechains
     are each thio-ether bonded to one of the LFI scaffold's three anchor
     carbons (a tricyclic peptide). CYS 11 is N-terminal, CYS 22 is
@@ -583,7 +583,7 @@ def _test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",
 )
-def _test_full_pipeline_5vbl(tmp_path):
+def test_full_pipeline_5vbl(tmp_path):
     """5VBL: chain A peptide inhibitor with five chain-resident NCAAs
     (200, ALC, HRG, NLE, OIC) and chain B protein with a free OLC ligand.
     No covalent crosslinks. The build must succeed and contain no
@@ -630,7 +630,7 @@ except ImportError:
     not (_antechamber and _tleap and _openmm),
     reason="OpenMM build comparison needs antechamber + teLeap + openmm",
 )
-def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
+def test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
     """5VBL: build the prepared mol twice, once via amber.build (tLeap
     consuming the prepi/frcmod outputs) and once via openff.build (OpenMM
     consuming the emitted ForceField XML), with solvation and ionization
@@ -713,7 +713,7 @@ def _test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
     not (_tleap and _openmm),
     reason="OpenMM-vs-amber build comparison needs teLeap + openmm",
 )
-def _test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
+def test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
     """6A5J: small canonical peptide (no NCAAs, no ligands). Builds via
     amber.build (tLeap) and openff.build (OpenMM ForceField XML) and
     asserts the two systems carry identical force-field data via
@@ -758,7 +758,7 @@ def _test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
     not (_antechamber and _openmm),
     reason="OpenMM XML test needs antechamber + openmm",
 )
-def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
+def test_parameterize_from_specs_emits_openmm_xml(tmp_path):
     """parameterizeFromSpecs should also emit a single OpenMM ForceField
     XML covering every residue in the run. Loading it alongside ff14SB
     must produce a ForceField whose residue templates include every
@@ -829,7 +829,7 @@ def _test_parameterize_from_specs_emits_openmm_xml(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",
 )
-def _test_full_pipeline_4tot_e(tmp_path):
+def test_full_pipeline_4tot_e(tmp_path):
     """4TOT_E: cyclosporin-like cyclic peptide with seven N-methylated /
     backbone-modified NCAAs. The build must succeed and contain no
     over-valent atoms."""
@@ -857,7 +857,7 @@ def _test_full_pipeline_4tot_e(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",
 )
-def _test_full_pipeline_1r1j(tmp_path):
+def test_full_pipeline_1r1j(tmp_path):
     """1R1J: glycoprotein with three NAG-Asn N-glycosylation sites. Each
     Asn ND2 - NAG C1 bond produces a CovalentLigandSpec(NAG) plus a
     CanonicalRenamedSpec(ASN). All three sites share one (ASN, ND2, NAG,
@@ -879,7 +879,7 @@ def _test_full_pipeline_1r1j(tmp_path):
     not _antechamber,
     reason="dedup test calls parameterizeFromSpecs which needs antechamber",
 )
-def _test_parameterize_from_specs_dedup_4tot(tmp_path):
+def test_parameterize_from_specs_dedup_4tot(tmp_path):
     """4TOT carries cyclosporin chains with three MLE residues per
     chain across multiple chains. parameterizeFromSpecs should run
     antechamber once per unique ``(resname, is_n_term, is_c_term)`` and
@@ -1038,25 +1038,25 @@ _LYS_STRIPPED = (
 )
 
 
-def _test_check_specs_protonated_passes_aliphatic():
+def test_check_specs_protonated_passes_aliphatic():
     mol, groups = _toy_mol([_HEXANE])
     _check_specs_protonated(mol, {0: None}, groups)  # must not raise
 
 
-def _test_check_specs_protonated_passes_aromatic():
+def test_check_specs_protonated_passes_aromatic():
     # The estimator treats the ring as all single bonds, so benzene's 6 H sit
     # well above the 0.2 * 12 threshold.
     mol, groups = _toy_mol([_BENZENE])
     _check_specs_protonated(mol, {0: None}, groups)  # must not raise
 
 
-def _test_check_specs_protonated_zero_hydrogens_raises():
+def test_check_specs_protonated_zero_hydrogens_raises():
     mol, groups = _toy_mol([_BARE_C4, _HEXANE])
     with pytest.raises(RuntimeError, match=r"under-protonated"):
         _check_specs_protonated(mol, {0: None}, groups)
 
 
-def _test_check_specs_protonated_stripped_sidechain_raises():
+def test_check_specs_protonated_stripped_sidechain_raises():
     # Backbone H present, every sidechain H missing -> still flagged.
     mol, groups = _toy_mol([_LYS_STRIPPED])
     with pytest.raises(RuntimeError) as exc:
@@ -1065,20 +1065,20 @@ def _test_check_specs_protonated_stripped_sidechain_raises():
     assert "2 hydrogen(s) present" in str(exc.value)
 
 
-def _test_check_specs_protonated_ignores_carbonless_residues():
+def test_check_specs_protonated_ignores_carbonless_residues():
     # A metal ion and an oxo-anion carry no expected H even with 0 H present.
     mol, groups = _toy_mol([_HEXANE, _ZINC, _SULFATE])
     _check_specs_protonated(mol, {1: None, 2: None}, groups)  # must not raise
 
 
-def _test_check_specs_protonated_ignores_tiny_carbon_species():
+def test_check_specs_protonated_ignores_tiny_carbon_species():
     # CO2 estimates only ~4 expected H -> below _MIN_EXPECTED_HYDROGENS, so
     # being H-free does not trip the check.
     mol, groups = _toy_mol([_HEXANE, _SMALL_CO2])
     _check_specs_protonated(mol, {1: None}, groups)  # must not raise
 
 
-def _test_check_specs_protonated_reports_every_bad_residue():
+def test_check_specs_protonated_reports_every_bad_residue():
     mol, groups = _toy_mol([_BARE_C4, _HEXANE, _LYS_STRIPPED])
     with pytest.raises(RuntimeError) as exc:
         _check_specs_protonated(mol, {0: None, 2: None}, groups)
@@ -1089,7 +1089,7 @@ def _test_check_specs_protonated_reports_every_bad_residue():
     assert "HEX" not in msg
 
 
-def _test_check_specs_protonated_no_bonds_is_noop():
+def test_check_specs_protonated_no_bonds_is_noop():
     # Defensive guard: without connectivity there is nothing to check.
     mol, groups = _toy_mol([("LIG", ["C", "C", "C"], [])])
     _check_specs_protonated(mol, {0: None}, groups)  # must not raise
@@ -1177,7 +1177,7 @@ def _parse_frcmod(tmp_path, text=_DIRTY_FRCMOD):
     return AmberParameterSet(str(fp))
 
 
-def _test_clean_frcmod_free_residue(tmp_path):
+def test_clean_frcmod_free_residue(tmp_path):
     # ca-ca-ca-ca-... straight chain: c3(0)-c3(1)-ca(2)-ca(3)-hc(4).
     mol = _typed_mol(
         ["C", "C", "C", "C", "H"],
@@ -1220,7 +1220,7 @@ def _test_clean_frcmod_free_residue(tmp_path):
     AmberParameterSet(str(out))  # re-parse, must not raise
 
 
-def _test_clean_frcmod_backbone_terms_dropped(tmp_path):
+def test_clean_frcmod_backbone_terms_dropped(tmp_path):
     # A chain-resident-NCAA-ish skeleton: N(0)-CT(1)-c3(2)-c3(3). N-CT is
     # purely backbone (the protein FF provides it) and must go; N-CT-c3 /
     # N-CT-c3-c3 span the backbone-sidechain boundary, are realized here, and
@@ -1249,7 +1249,7 @@ def _test_clean_frcmod_backbone_terms_dropped(tmp_path):
     assert "ca" not in pset.atom_types and "xx" not in pset.atom_types
 
 
-def _test_clean_frcmod_cap_atoms_excluded(tmp_path):
+def test_clean_frcmod_cap_atoms_excluded(tmp_path):
     # cc sits only on a "cap"/padding atom -> every cc parameter must go.
     mol = _typed_mol(
         ["C", "C", "C"],
@@ -1291,7 +1291,7 @@ _BACKBONE_PLUS_SIDECHAIN = ["N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3", 
 _NEUTRAL_BACKBONE = _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
 
 
-def _test_normalize_residue_charges_pins_map_and_rebalances():
+def test_normalize_residue_charges_pins_map_and_rebalances():
     # The charge_map atoms carry the pinned values and the residue sums
     # to its integer formal charge.
     sub = _charge_mol(_BACKBONE_PLUS_SIDECHAIN, [0.3] * len(_BACKBONE_PLUS_SIDECHAIN))
@@ -1301,7 +1301,7 @@ def _test_normalize_residue_charges_pins_map_and_rebalances():
     assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
 
 
-def _test_normalize_residue_charges_targets_integer_formal_charge():
+def test_normalize_residue_charges_targets_integer_formal_charge():
     # A residue with a non-zero formal charge is rebalanced to that
     # integer, not to zero.
     sub = _charge_mol(_BACKBONE_PLUS_SIDECHAIN, [-0.05] * len(_BACKBONE_PLUS_SIDECHAIN))
@@ -1311,7 +1311,7 @@ def _test_normalize_residue_charges_targets_integer_formal_charge():
     assert float(np.sum(sub.charge)) == pytest.approx(-1.0, abs=1e-4)
 
 
-def _test_normalize_residue_charges_residual_spares_pinned_atoms():
+def test_normalize_residue_charges_residual_spares_pinned_atoms():
     # The residual lands only on the non-pinned atoms, equally (the
     # minimum-L2 redistribution): pinned atoms keep exactly their value.
     names = _BACKBONE_PLUS_SIDECHAIN
@@ -1325,7 +1325,7 @@ def _test_normalize_residue_charges_residual_spares_pinned_atoms():
     assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
 
 
-def _test_normalize_residue_charges_empty_map_normalises_total():
+def test_normalize_residue_charges_empty_map_normalises_total():
     # No atoms to pin -> the residual relative to net_charge is spread
     # equally across all atoms so the residue sums to net_charge.
     # This is the scaffold path: no backbone to pin, but the per-residue
@@ -1339,7 +1339,7 @@ def _test_normalize_residue_charges_empty_map_normalises_total():
     assert np.allclose(np.array(sub.charge), 0.0, atol=1e-5)
 
 
-def _test_normalize_residue_charges_empty_map_targets_integer():
+def test_normalize_residue_charges_empty_map_targets_integer():
     # Empty map + non-zero target: same equal-share redistribution,
     # rebalances to the residue's integer formal charge.
     names = _BACKBONE_PLUS_SIDECHAIN
@@ -1350,7 +1350,7 @@ def _test_normalize_residue_charges_empty_map_targets_integer():
     assert np.allclose(np.array(sub.charge), -1.0 / n, atol=1e-5)
 
 
-def _test_normalize_residue_charges_pin_only_skips_normalization():
+def test_normalize_residue_charges_pin_only_skips_normalization():
     # net_charge=None applies the pin (backbone atoms get the charge_map
     # values) but does NOT redistribute the residual onto the free
     # atoms. Used by the cluster-level normalize path, which combines
@@ -1369,7 +1369,7 @@ def _test_normalize_residue_charges_pin_only_skips_normalization():
     assert np.array_equal(pinned, expected_pinned)
 
 
-def _test_backbone_charge_map_ncaa_charge_classes():
+def test_backbone_charge_map_ncaa_charge_classes():
     # An NCAA is absent from the libraries, so the amide charges come
     # from the charge class the residue's net charge selects.
     # The fallback path doesn't actually touch ff14sb_lib for NCAAs
@@ -1383,7 +1383,7 @@ def _test_backbone_charge_map_ncaa_charge_classes():
     assert _backbone_charge_map("", "", present, 2, ff14sb_lib={}) == {}
 
 
-def _test_backbone_charge_map_terminal_ncaa_is_empty():
+def test_backbone_charge_map_terminal_ncaa_is_empty():
     # A terminal NCAA has no library entry and no universal terminal
     # charges, so nothing is pinned.
     present = {"N", "H", "CA", "HA", "C", "O", "OXT"}
@@ -1391,7 +1391,7 @@ def _test_backbone_charge_map_terminal_ncaa_is_empty():
 
 
 @pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
-def _test_backbone_charge_map_proline_like_ncaa_uses_pro():
+def test_backbone_charge_map_proline_like_ncaa_uses_pro():
     # A proline-like NCAA (N with no bonded H) gets its backbone
     # pinned to ff14SB PRO charges - the only canonical residue with
     # this topology - per the Cornell/Cieplak + Betz/Ramos
@@ -1411,7 +1411,7 @@ def _test_backbone_charge_map_proline_like_ncaa_uses_pro():
     assert cmap["HA"] == pytest.approx(0.0641, abs=1e-4)
 
 
-def _test_backbone_charge_map_proline_like_terminal_is_empty():
+def test_backbone_charge_map_proline_like_terminal_is_empty():
     # A proline-like NCAA at a chain terminus is left untouched -
     # ff14SB has no terminal-PRO entry that strips H, and applying
     # the mid-chain PRO charges to a terminal residue would mismatch
@@ -1425,7 +1425,7 @@ def _test_backbone_charge_map_proline_like_terminal_is_empty():
     )
 
 
-def _test_backbone_charge_map_nterm_with_nh3_not_proline_like():
+def test_backbone_charge_map_nterm_with_nh3_not_proline_like():
     # An N-terminal residue with NH3+ atoms named H1/H2/H3 has bonded
     # H atoms but no atom literally named "H" in present_names. The
     # name-based "H absent" check would mis-classify it as proline-
@@ -1443,7 +1443,7 @@ def _test_backbone_charge_map_nterm_with_nh3_not_proline_like():
 
 
 @pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
-def _test_backbone_charge_map_canonical_midchain():
+def test_backbone_charge_map_canonical_midchain():
     # A mid-chain canonical CYS gets its whole backbone - residue-specific
     # CA / HA included - from the ff14SB CYS library entry; the sidechain
     # is left to antechamber.
@@ -1457,7 +1457,7 @@ def _test_backbone_charge_map_canonical_midchain():
 
 
 @pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
-def _test_backbone_charge_map_canonical_terminal_variants():
+def test_backbone_charge_map_canonical_terminal_variants():
     # The N-terminal variant pins the NH3+ hydrogens; the C-terminal
     # variant pins OXT. Sidechain atoms are never pinned.
     lib = _amber_lib_or_none()
@@ -1473,7 +1473,7 @@ def _test_backbone_charge_map_canonical_terminal_variants():
 
 
 @pytest.mark.skipif(not _tleap, reason="ff14SB amino lib lookup needs teLeap")
-def _test_backbone_charge_map_his_name_falls_through_to_charge_class():
+def test_backbone_charge_map_his_name_falls_through_to_charge_class():
     # "HIS" is not a library key (the libraries use HID / HIE / HIP), so
     # a His anchor falls through to the charge-class fallback: a neutral
     # His gets the neutral amide, a protonated (+1) His the cationic one.
@@ -1494,7 +1494,7 @@ def _test_backbone_charge_map_his_name_falls_through_to_charge_class():
 # ---------------------------------------------------------------------------
 
 
-def _test_engine_for_forcefield_gaff_variants_dispatch_to_antechamber():
+def test_engine_for_forcefield_gaff_variants_dispatch_to_antechamber():
     # The rule is "starts with 'gaff' (case-insensitive) -> antechamber,
     # everything else -> openff". Lock it so a future change doesn't
     # silently route GAFF FFs through the SMIRNOFF engine or vice-versa.
@@ -1504,7 +1504,7 @@ def _test_engine_for_forcefield_gaff_variants_dispatch_to_antechamber():
     assert _engine_for_forcefield("Gaff") == "antechamber"
 
 
-def _test_engine_for_forcefield_offxml_dispatches_to_openff():
+def test_engine_for_forcefield_offxml_dispatches_to_openff():
     assert _engine_for_forcefield("openff-2.3.0.offxml") == "openff"
     assert _engine_for_forcefield("openff_unconstrained-2.3.0.offxml") == "openff"
     # An offxml filename that doesn't start with "openff" still routes to
@@ -1512,14 +1512,14 @@ def _test_engine_for_forcefield_offxml_dispatches_to_openff():
     assert _engine_for_forcefield("custom_sage.offxml") == "openff"
 
 
-def _test_engine_for_forcefield_non_string_raises():
+def test_engine_for_forcefield_non_string_raises():
     with pytest.raises(TypeError):
         _engine_for_forcefield(None)
     with pytest.raises(TypeError):
         _engine_for_forcefield(2.3)
 
 
-def _test_resolve_forcefield_single_string_applies_everywhere():
+def test_resolve_forcefield_single_string_applies_everywhere():
     lookup = _resolve_forcefield("gaff2")
     assert lookup("BEN") == ("antechamber", "gaff2")
     assert lookup("ALC") == ("antechamber", "gaff2")
@@ -1527,7 +1527,7 @@ def _test_resolve_forcefield_single_string_applies_everywhere():
     assert lookup("BEN") == ("openff", "openff_unconstrained-2.3.0.offxml")
 
 
-def _test_resolve_forcefield_dict_with_default_routes_per_resname():
+def test_resolve_forcefield_dict_with_default_routes_per_resname():
     lookup = _resolve_forcefield(
         {
             "NLE": "openff_unconstrained-2.3.0.offxml",
@@ -1539,14 +1539,14 @@ def _test_resolve_forcefield_dict_with_default_routes_per_resname():
     assert lookup("ALC") == ("antechamber", "gaff2")
 
 
-def _test_resolve_forcefield_dict_without_default_falls_back_to_gaff2():
+def test_resolve_forcefield_dict_without_default_falls_back_to_gaff2():
     lookup = _resolve_forcefield({"NLE": "openff_unconstrained-2.3.0.offxml"})
     # The default is gaff2 when not specified.
     assert lookup("ALC") == ("antechamber", "gaff2")
     assert lookup("NLE") == ("openff", "openff_unconstrained-2.3.0.offxml")
 
 
-def _test_resolve_forcefield_rejects_non_string_values():
+def test_resolve_forcefield_rejects_non_string_values():
     with pytest.raises(TypeError):
         _resolve_forcefield({"NLE": 2.3})  # validated up front
     with pytest.raises(TypeError):
@@ -1568,7 +1568,7 @@ def htmd_logs_to_caplog():
         htmd_logger.propagate = original
 
 
-def _test_warn_if_openff_mismatched_charges_warns_on_openff_plus_non_nagl(
+def test_warn_if_openff_mismatched_charges_warns_on_openff_plus_non_nagl(
     caplog, htmd_logs_to_caplog
 ):
     # SMIRNOFF + non-NAGL fires the warning.
@@ -1579,7 +1579,7 @@ def _test_warn_if_openff_mismatched_charges_warns_on_openff_plus_non_nagl(
     assert any("NAGL reproduces" in r.message for r in caplog.records)
 
 
-def _test_warn_if_openff_mismatched_charges_silent_on_openff_plus_nagl(
+def test_warn_if_openff_mismatched_charges_silent_on_openff_plus_nagl(
     caplog, htmd_logs_to_caplog
 ):
     # SMIRNOFF + NAGL is the recommended combination - no warning.
@@ -1590,7 +1590,7 @@ def _test_warn_if_openff_mismatched_charges_silent_on_openff_plus_nagl(
     assert not any("NAGL reproduces" in r.message for r in caplog.records)
 
 
-def _test_warn_if_openff_mismatched_charges_silent_on_gaff(
+def test_warn_if_openff_mismatched_charges_silent_on_gaff(
     caplog, htmd_logs_to_caplog
 ):
     # GAFF-only call - no SMIRNOFF in play, no warning regardless of
@@ -1601,7 +1601,7 @@ def _test_warn_if_openff_mismatched_charges_silent_on_gaff(
     assert not any("NAGL reproduces" in r.message for r in caplog.records)
 
 
-def _test_warn_if_openff_mismatched_charges_warns_on_mixed_dict(
+def test_warn_if_openff_mismatched_charges_warns_on_mixed_dict(
     caplog, htmd_logs_to_caplog
 ):
     # A per-resname dict containing at least one SMIRNOFF entry triggers
@@ -1626,7 +1626,7 @@ def _test_warn_if_openff_mismatched_charges_warns_on_mixed_dict(
     not (_antechamber and _nagl),
     reason="NAGL + GAFF2 needs antechamber on PATH and the openff-nagl stack",
 )
-def _test_fftype_antechamber_with_nagl_charges(tmp_path):
+def test_fftype_antechamber_with_nagl_charges(tmp_path):
     from moleculekit.molecule import Molecule
     from htmd.builder._ambertools import _fftype_antechamber
 
@@ -1699,7 +1699,7 @@ _FF14SB_CAP_NAME_ALIASES = {
 
 
 @pytest.mark.skipif(not _tleap, reason="parmed amino*.lib loader needs teLeap")
-def _test_ff14sb_amino_lib_parmed_vs_openmm_parity():
+def test_ff14sb_amino_lib_parmed_vs_openmm_parity():
     """Assert the parmed-loaded (amino*.lib) and OpenMM-loaded
     (protein.ff14SB.xml) ff14SB amino libraries produce byte-identical
     ``(type, charge)`` for every common atom. Drift detector for either
@@ -1824,7 +1824,7 @@ def _run_8qfz_bicycle_param_reference(
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
 )
-def _test_custom_residue_param_reference_8qfz_per_residue(tmp_path):
+def test_custom_residue_param_reference_8qfz_per_residue(tmp_path):
     """8QFZ_B_bicycle under ``normalize='per_residue'``: every emitted
     per-residue unit (XX1/XX2/XX3 prepi, LFI cif) sums to its integer
     formal charge - the AMBER tLeap convention (Betz / R.E.D. / Ramos).
@@ -1893,7 +1893,7 @@ def _run_5vbl_param_reference(
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
 )
-def _test_custom_residue_param_reference_5vbl_cluster(tmp_path):
+def test_custom_residue_param_reference_5vbl_cluster(tmp_path):
     """5VBL_A under the default ``normalize='cluster'``: the cluster
     total is normalised to integer; per-residue totals stay at their
     natural Gasteiger values modulo a uniform shift."""
@@ -1906,7 +1906,7 @@ def _test_custom_residue_param_reference_5vbl_cluster(tmp_path):
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
 )
-def _test_custom_residue_param_reference_5vbl_per_residue(tmp_path):
+def test_custom_residue_param_reference_5vbl_per_residue(tmp_path):
     """5VBL_A under ``normalize='per_residue'``: every emitted unit
     sums to its integer formal charge (AMBER tLeap convention)."""
     _run_5vbl_param_reference(
@@ -1918,7 +1918,7 @@ def _test_custom_residue_param_reference_5vbl_per_residue(tmp_path):
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
 )
-def _test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
+def test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
     """5VBL_A under ``pin_backbone_charges=False`` and
     ``normalize=None``: no backbone pin, no rebalance. The per-atom
     charges are exactly the RDKit Gasteiger output and the cluster
@@ -1975,7 +1975,7 @@ def _test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
 )
-def _test_custom_residue_param_reference_8qfz_no_pin_no_normalize(tmp_path):
+def test_custom_residue_param_reference_8qfz_no_pin_no_normalize(tmp_path):
     """8QFZ_B_bicycle under ``pin_backbone_charges=False`` and
     ``normalize=None``: no backbone pin, no rebalance. The per-atom
     charges are exactly the RDKit Gasteiger output and the cluster
@@ -2172,7 +2172,7 @@ def _assert_built_matches_references(built, refdir, charge_tol=1e-3):
     not (_antechamber and _tleap),
     reason="end-to-end build verification needs antechamber + teLeap",
 )
-def _test_amber_build_8qfz_matches_reference(tmp_path):
+def test_amber_build_8qfz_matches_reference(tmp_path):
     """8QFZ_B_bicycle: run the full detect -> template -> systemPrepare ->
     parameterizeFromSpecs (default ``cluster`` mode + ``pin=True``) ->
     amber.build pipeline, then check that every atom of every spec'd
@@ -2218,7 +2218,7 @@ def _test_amber_build_8qfz_matches_reference(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build verification needs antechamber + teLeap",
 )
-def _test_amber_build_5vbl_matches_reference(tmp_path):
+def test_amber_build_5vbl_matches_reference(tmp_path):
     """5VBL_A: same as the 8QFZ end-to-end build check but on the
     chain-A peptide inhibitor with 5 chain-resident NCAAs (HRG, ALC,
     OIC, NLE, 200) + GLU(CD)-LYS(NZ) isopeptide (XX1/XX2 renames).
@@ -2283,7 +2283,7 @@ def _test_amber_build_5vbl_matches_reference(tmp_path):
     not (_antechamber and _tleap),
     reason="end-to-end build verification needs antechamber + teLeap",
 )
-def _test_amber_build_1u5u_hem_matches_reference(tmp_path):
+def test_amber_build_1u5u_hem_matches_reference(tmp_path):
     """1U5U_A: human catalase chain A with a heme-b (HEM) cofactor.
     The catalytic Fe is in the resting Fe(III) state, axially coordinated
     on the proximal side by a deprotonated tyrosinate (TYR-O-, -1 on the
@@ -2342,7 +2342,7 @@ def _test_amber_build_1u5u_hem_matches_reference(tmp_path):
     not (_antechamber and _tleap),
     reason="custom-residue parameterization needs antechamber + teLeap",
 )
-def _test_custom_residue_param_reference(tmp_path):
+def test_custom_residue_param_reference(tmp_path):
     """Golden test for the non-canonical parameterization pipeline.
 
     Runs detect -> template -> (systemPrepare) -> parameterizeFromSpecs on

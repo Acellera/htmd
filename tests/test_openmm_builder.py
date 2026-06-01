@@ -191,10 +191,10 @@ def _make_water_mol(resname="WAT", oxygen_name="OH2"):
 
 
 @pytest.mark.skipif(not _openmm_installed, reason="OpenMM not installed")
-class _TestOpenMMBuilder:
+class TestOpenMMBuilder:
     """Tests for htmd.builder.openmm.build()."""
 
-    def _test_defaultFf(self):
+    def test_defaultFf(self):
         from htmd.builder.openmm import defaultFf
 
         ff = defaultFf()
@@ -204,7 +204,7 @@ class _TestOpenMMBuilder:
         assert any("protein" in f for f in ff)
         assert any("tip3p" in f for f in ff)
 
-    def _test_resolve_ion_name(self):
+    def test_resolve_ion_name(self):
         from htmd.builder.openmm import _resolve_ion_name
 
         assert _resolve_ion_name("Na+") == "Na+"
@@ -217,7 +217,7 @@ class _TestOpenMMBuilder:
         with pytest.raises(ValueError):
             _resolve_ion_name("UnknownIon")
 
-    def _test_fix_water_naming(self):
+    def test_fix_water_naming(self):
         from htmd.builder.openmm import _fix_water_naming
 
         mol = _make_water_mol("WAT", "OH2")
@@ -232,10 +232,10 @@ class _TestOpenMMBuilder:
 
 
 @pytest.mark.skipif(not _openmm_installed, reason="OpenMM not installed")
-class _TestOpenMMComparative:
+class TestOpenMMComparative:
     """Build the same systems as test_amber_builder and compare energies."""
 
-    def _test_protein_prepared(self, tmpdir):
+    def test_protein_prepared(self, tmpdir):
         """3PTB with systemPrepare + autoSegment, no solvation."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -273,7 +273,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "3PTB prepared")
 
-    def _test_protein_raw(self, tmpdir):
+    def test_protein_raw(self, tmpdir):
         """3PTB without systemPrepare, no solvation."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -304,7 +304,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "3PTB raw")
 
-    def _test_disulfide_bonds(self, tmpdir):
+    def test_disulfide_bonds(self, tmpdir):
         """1GZM with explicit disulfide bond selections."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -353,7 +353,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "1GZM disulfide")
 
-    def _test_rna(self, tmpdir):
+    def test_rna(self, tmpdir):
         """6VA1 pure RNA, no solvation.
 
         AMBER uses RNA.Shaw while OpenFF uses RNA.OL3, so torsion
@@ -387,7 +387,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "6VA1 RNA", bonded_atol=0.5)
 
-    def _test_dna(self, tmpdir):
+    def test_dna(self, tmpdir):
         """1BNA pure DNA, no solvation."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -417,7 +417,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "1BNA DNA")
 
-    def _test_protein_rna(self, tmpdir):
+    def test_protein_rna(self, tmpdir):
         """3WBM protein + RNA complex with systemPrepare."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -454,7 +454,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "3WBM protein+RNA", bonded_atol=0.1)
 
-    def _test_caps(self, tmpdir):
+    def test_caps(self, tmpdir):
         """6A5J peptide with default caps."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -486,7 +486,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "6A5J caps")
 
-    def _test_cyclic_peptide(self, tmpdir):
+    def test_cyclic_peptide(self, tmpdir):
         """5VAV cyclic peptide."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -527,7 +527,7 @@ class _TestOpenMMComparative:
         sys.platform.startswith("win"),
         reason="AM1-BCC charge model unavailable on Windows",
     )
-    def _test_protein_ligand(self, tmpdir):
+    def test_protein_ligand(self, tmpdir):
         """3PTB protein + benzamidine ligand with GAFF2 small-molecule FF."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -582,7 +582,7 @@ class _TestOpenMMComparative:
             ene_amb = _heavy_atom_energy(amber_outdir)
             _compare_energies(ene_off, ene_amb, "3PTB+BEN protein+ligand")
 
-    def _test_membrane(self, tmpdir):
+    def test_membrane(self, tmpdir):
         """Pre-built POPC membrane with TIP3 water.
 
         OpenFF uses lipid17 while AMBER uses lipid21, so bonded parameters
@@ -609,7 +609,7 @@ class _TestOpenMMComparative:
         assert os.path.exists(os.path.join(outdir, "structure.pdb"))
         print(f"[Membrane] Built OK: {molbuilt.numAtoms} atoms")
 
-    def _test_ionize_salt(self, tmpdir):
+    def test_ionize_salt(self, tmpdir):
         """3PTB solvated with salt -- check ion counts."""
         from htmd.builder.openmm import build as openff_build
         from moleculekit.molecule import Molecule
@@ -708,7 +708,7 @@ _BEN_EXPECTED_CHARGES = [
     not (_openmm_installed and _openff_installed),
     reason="OpenMM + OpenFF Interchange required",
 )
-def _test_parameterize_ligands_openff_ben():
+def test_parameterize_ligands_openff_ben():
     """Build an Interchange for BEN via Sage 2.3 with RDKit Gasteiger charges
     and check the result against pre-recorded reference counts and per-atom
     charges. Acts as a regression baseline for the free-ligand path."""
@@ -815,7 +815,7 @@ _BEN_NAGL_EXPECTED_CHARGES = [
     not (_openmm_installed and _openff_installed and _nagl_installed),
     reason="OpenMM + OpenFF Interchange + NAGL required (install with 'pip install acellera-htmd[nagl]')",
 )
-def _test_parameterize_ligands_openff_ben_nagl():
+def test_parameterize_ligands_openff_ben_nagl():
     """Build an Interchange for BEN via Sage 2.3 with NAGL charges (an
     AM1-BCC GNN surrogate) and check the resulting per-atom charges against
     pre-recorded reference values. Confirms the ``charge_method="nagl"``
@@ -873,7 +873,7 @@ def _test_parameterize_ligands_openff_ben_nagl():
     not (_openmm_installed and _openff_installed),
     reason="OpenMM + OpenFF Interchange required",
 )
-def _test_parameterize_ligands_openff_multi_resname():
+def test_parameterize_ligands_openff_multi_resname():
     """Parameterise two different ligand resnames in one call (BEN + a
     renamed copy). Both should produce identical reference counts since
     XBEN is structurally identical to BEN."""
@@ -915,7 +915,7 @@ def _test_parameterize_ligands_openff_multi_resname():
     not (_openmm_installed and _openff_installed and _tleap_installed and _nagl_installed),
     reason="OpenMM + OpenFF Interchange + AmberTools + NAGL required",
 )
-def _test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
+def test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
     """Pure GAFF2 -> prepi + frcmod + a single combined gaff_combined.xml
     in xml_paths. Pure openff -> per-cluster xml_paths only (no prepi,
     no frcmod, no gaff_combined.xml)."""
@@ -975,7 +975,7 @@ def _test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
     not (_openmm_installed and _openff_installed),
     reason="OpenMM + OpenFF Interchange required",
 )
-def _test_parameterize_from_specs_openff_backend_ben(tmp_path):
+def test_parameterize_from_specs_openff_backend_ben(tmp_path):
     """End-to-end Phase 2B: parameterizeFromSpecs with the SMIRNOFF forcefield on
     a free ligand (3PTB BEN). Verify the emitted XML loads in OpenMM
     ForceField and reproduces the same energy as Interchange.to_openmm_system."""
@@ -1068,7 +1068,7 @@ NLE_SMILES = "CCCC[C@@H](C(=O)O)N"
     not (_openmm_installed and _openff_installed and _tleap_installed),
     reason="OpenMM + OpenFF Interchange + AmberTools (tleap/antechamber) required",
 )
-def _test_parameterize_from_specs_openff_cluster_nle(tmp_path):
+def test_parameterize_from_specs_openff_cluster_nle(tmp_path):
     """Cluster path via openff backend: parameterise an NLE singleton
     cluster (chain-resident NCAA + ACE/NME caps). Verify cap atoms are
     dropped, residue template covers only the NCAA atoms, ExternalBond
@@ -1217,7 +1217,7 @@ LFI_SMILES = "C1N(CN(CN1C(=O)CCBr)C(=O)CCBr)C(=O)CCBr"
     not (_openmm_installed and _openff_installed),
     reason="OpenMM + OpenFF Interchange required",
 )
-def _test_parameterize_from_specs_openff_cluster_crosslinks(tmp_path):
+def test_parameterize_from_specs_openff_cluster_crosslinks(tmp_path):
     """Phase 2E: 8QFZ-style scaffolded peptide cluster (LFI + 3 cysteines
     via S-C crosslinks). The emitted XML must carry ExternalBond markers
     at the cross-link atoms on each side, in addition to peptide N/C
@@ -1287,7 +1287,7 @@ def _test_parameterize_from_specs_openff_cluster_crosslinks(tmp_path):
     not (_openmm_installed and _openff_installed and _tleap_installed),
     reason="OpenMM + OpenFF Interchange + AmberTools (tleap/antechamber) required",
 )
-def _test_parameterize_from_specs_openff_backbone_pin(tmp_path):
+def test_parameterize_from_specs_openff_backbone_pin(tmp_path):
     """Phase 2E: pin_backbone_charges=True overrides NCAA backbone partial
     charges to ff14SB canonical values. With pin=False, the same atoms
     carry the SMIRNOFF / Gasteiger originals. Test the difference is
@@ -1561,7 +1561,7 @@ def _load_three_way_system(input_filename):
     reason="OpenMM + OpenFF Interchange + tleap required",
 )
 @pytest.mark.parametrize("input_filename", _THREE_WAY_SYSTEMS)
-def _test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
+def test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
     """Parametrized 3-way build comparison across diverse systems.
     For each: build via amber.build (gold standard), openmm.build with
     antechamber backend XML, and openmm.build with openff backend XML.
@@ -1728,7 +1728,7 @@ def _test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
     not (_openmm_installed and _openff_installed and _tleap_installed),
     reason="OpenMM + OpenFF Interchange + tleap required",
 )
-def _test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
+def test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
     """Build 5VBL chain-A THREE ways and compare topology + charges:
       1. amber.build (tleap) on the antechamber backend's prepi/frcmod
       2. openmm.build on the antechamber backend's merged XML
@@ -1935,7 +1935,7 @@ def _test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
     not (_openmm_installed and _openff_installed and _tleap_installed),
     reason="OpenMM + OpenFF Interchange + AmberTools (tleap/antechamber) required",
 )
-def _test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
+def test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
     """Build 5VBL chain-A two ways via openmm.build:
       - antechamber backend (GAFF2 sidechains, ff14SB-renamed backbone)
       - openff backend (Sage sidechains, ff14SB-class-override on backbone)
@@ -2121,7 +2121,7 @@ _BEN_REFERENCE_ENERGIES_KJ = {
     not (_openmm_installed and _openff_installed),
     reason="OpenMM + OpenFF Interchange required",
 )
-def _test_emitted_xml_matches_interchange_energy(tmp_path):
+def test_emitted_xml_matches_interchange_energy(tmp_path):
     """Round-trip fidelity: build a Sage Interchange for BEN, then
     construct an OpenMM System two ways and compare per-force single-
     point energies at the same coordinates:

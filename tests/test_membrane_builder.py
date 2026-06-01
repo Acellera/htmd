@@ -19,7 +19,7 @@ OPM_1BL8 = os.path.join(curr_dir, "1bl8_opm.pdb")
 OPM_1BL8_THICKNESS = 32.4
 
 
-def _test_subrandom_positions_scale_each_axis():
+def test_subrandom_positions_scale_each_axis():
     """Each XY axis must be scaled by its own box edge, not the last one.
 
     Regression test for a bug where _subrandom_particle_positions scaled all
@@ -44,7 +44,7 @@ def _test_subrandom_positions_scale_each_axis():
     assert (pos[:, 2] == 0).all()
 
 
-def _test_build_membrane(tmp_path):
+def test_build_membrane(tmp_path):
     buildMembrane(
         [20, 20],
         ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
@@ -59,7 +59,7 @@ def _test_build_membrane(tmp_path):
     assert not os.path.exists(tmp_path / "starting_structure.pdb")
 
 
-def _test_build_membrane_minimize(tmp_path):
+def test_build_membrane_minimize(tmp_path):
     buildMembrane(
         [20, 20],
         ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
@@ -74,7 +74,7 @@ def _test_build_membrane_minimize(tmp_path):
     assert os.path.exists(tmp_path / "starting_structure.pdb")
 
 
-def _test_build_membrane_equil(tmp_path):
+def test_build_membrane_equil(tmp_path):
     buildMembrane(
         [20, 20],
         ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
@@ -89,7 +89,7 @@ def _test_build_membrane_equil(tmp_path):
     assert os.path.exists(tmp_path / "starting_structure.pdb")
 
 
-# def _test_build_membrane_with_solute_2kdc(tmp_path):
+# def test_build_membrane_with_solute_2kdc(tmp_path):
 #     """End-to-end build around OPM-aligned 2KDC.
 
 #     Asserts:
@@ -132,7 +132,7 @@ def _test_build_membrane_equil(tmp_path):
 #     ), f"membrane heavy atom within 2 A of solute: min={dists.min():.2f}"
 
 
-def _test_build_membrane_with_solute_2kdc_lj_only(tmp_path):
+def test_build_membrane_with_solute_2kdc_lj_only(tmp_path):
     """Run buildMembrane around 2KDC up to and including the LJ packing
     (no minimization or equilibration). Verify the lj_packing.pdb debug
     file has both lipid heads and obstacles in the user's coordinate frame.
@@ -174,7 +174,7 @@ def _test_build_membrane_with_solute_2kdc_lj_only(tmp_path):
 
 
 @pytest.mark.skip(reason="slow on CPU")
-def _test_build_membrane_with_solute_1bl8(tmp_path):
+def test_build_membrane_with_solute_1bl8(tmp_path):
     """End-to-end build around OPM-aligned 1BL8 (KcsA potassium channel)
     in a pure POPC bilayer with minimization and very short NPT.
 
@@ -215,7 +215,7 @@ def _test_build_membrane_with_solute_1bl8(tmp_path):
     ), f"membrane heavy atom impossibly close to solute: min={dists.min():.2f}"
 
 
-def _test_solute_footprint_2kdc():
+def test_solute_footprint_2kdc():
     """Footprint and area-fraction of OPM-aligned 2KDC (M2 TM peptide).
 
     The OPM-distributed structure already has bilayer center at z=0 and the

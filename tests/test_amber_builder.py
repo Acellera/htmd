@@ -132,7 +132,7 @@ def _compareResultFolders(
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
 @pytest.mark.parametrize("pid", ["3PTB"])
-def _test_with_protein_prepare(tmp_path, pid):
+def test_with_protein_prepare(tmp_path, pid):
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.solvate import solvate
     from moleculekit.tools.autosegment import autoSegment
@@ -156,7 +156,7 @@ def _test_with_protein_prepare(tmp_path, pid):
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
 @pytest.mark.parametrize("pid", ["3PTB"])
-def _test_without_protein_prepare(tmp_path, pid):
+def test_without_protein_prepare(tmp_path, pid):
     from htmd.builder.solvate import solvate
 
     # Test without systemPrepare
@@ -173,7 +173,7 @@ def _test_without_protein_prepare(tmp_path, pid):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_protein_ligand(tmp_path):
+def test_protein_ligand(tmp_path):
     # Test protein ligand building with parametrized ligand
     refdir = os.path.join(curr_dir, "data", "test-amber-build", "protLig")
 
@@ -195,7 +195,7 @@ def _test_protein_ligand(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_custom_disulfide_bonds(tmp_path):
+def test_custom_disulfide_bonds(tmp_path):
     from htmd.builder.solvate import solvate
 
     np.random.seed(1)
@@ -224,7 +224,7 @@ def _test_custom_disulfide_bonds(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_custom_teleap_imports(tmp_path):
+def test_custom_teleap_imports(tmp_path):
     from htmd.builder.solvate import solvate
 
     pid = "3PTB"
@@ -248,7 +248,7 @@ def _test_custom_teleap_imports(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_rna(tmp_path):
+def test_rna(tmp_path):
     from htmd.builder.solvate import solvate
 
     np.random.seed(1)
@@ -263,7 +263,7 @@ def _test_rna(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_dna(tmp_path):
+def test_dna(tmp_path):
     from htmd.builder.solvate import solvate
 
     np.random.seed(1)
@@ -278,7 +278,7 @@ def _test_dna(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_protein_rna(tmp_path):
+def test_protein_rna(tmp_path):
     from htmd.builder.solvate import solvate
     from moleculekit.tools.preparation import systemPrepare
     from moleculekit.tools.autosegment import autoSegment
@@ -298,7 +298,7 @@ def _test_protein_rna(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_caps(tmp_path):
+def test_caps(tmp_path):
     from htmd.builder.solvate import solvate
     from moleculekit.tools.preparation import systemPrepare
 
@@ -346,7 +346,7 @@ def _test_caps(tmp_path):
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
 @pytest.mark.parametrize("pdbid", ["5VBL", "1AWF"])
-def _test_non_standard_residue_building(tmp_path, pdbid):
+def test_non_standard_residue_building(tmp_path, pdbid):
     homedir = os.path.join(curr_dir, "data", "test-amber-build", "non-standard")
 
     protdir = os.path.join(homedir, pdbid)
@@ -366,7 +366,7 @@ def _test_non_standard_residue_building(tmp_path, pdbid):
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
 @pytest.mark.skipif(sys.platform.startswith("darwin"), reason="Fails on OSX")
-def _test_cofactor_building(tmp_path):
+def test_cofactor_building(tmp_path):
     homedir = os.path.join(curr_dir, "data", "test-amber-build", "cofactors")
 
     mol = Molecule(os.path.join(homedir, "cofactors.pdb"))
@@ -377,7 +377,7 @@ def _test_cofactor_building(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_post_translational_modifications_building(tmp_path):
+def test_post_translational_modifications_building(tmp_path):
     homedir = os.path.join(curr_dir, "data", "test-amber-build", "post-translational")
 
     mol = Molecule(os.path.join(homedir, "4EFP_nolig.pdb"))
@@ -390,7 +390,7 @@ def _test_post_translational_modifications_building(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_cyclic_peptide_building(tmp_path):
+def test_cyclic_peptide_building(tmp_path):
     np.random.seed(1)
 
     mol = Molecule("5VAV")
@@ -404,7 +404,7 @@ def _test_cyclic_peptide_building(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_membrane(tmp_path):
+def test_membrane(tmp_path):
     np.random.seed(1)
 
     homedir = os.path.join(curr_dir, "data", "test-amber-build", "membrane")
@@ -418,7 +418,7 @@ def _test_membrane(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_cif_building(tmp_path):
+def test_cif_building(tmp_path):
     # Tests that mol2 and cif building produce same results
     np.random.seed(1)
 
@@ -441,7 +441,7 @@ def _test_cif_building(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_ionize_salt(tmp_path):
+def test_ionize_salt(tmp_path):
     from htmd.builder.solvate import solvate
 
     np.random.seed(1)
@@ -465,7 +465,7 @@ def _test_ionize_salt(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-def _test_atomtype_decollisioning(tmp_path):
+def test_atomtype_decollisioning(tmp_path):
     # Tests that mol2 and cif building produce same results
     np.random.seed(1)
 
