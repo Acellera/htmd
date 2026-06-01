@@ -497,3 +497,177 @@ def test_atomtype_decollisioning(tmp_path):
         "decollisioning",
         ignore_ftypes=(".log", ".txt", ".frcmod", ".in", ".mol2", ".cif"),
     )
+
+
+# ----------------------------------------------------------------------
+# Regression tests for the bond-directive residue indexing.
+#
+# tLeap's `<unit>.<N>.<atom>` selector resolves against the residue
+# position in the *combined* unit produced by load + combine, NOT the
+# PDB resid field. The bond-directive writer in _write_tleap_script must
+# therefore compute each atom's position in the load order
+# (solute -> water -> cyclic_*, matching the order of the `combine`
+# directive it emits). These tests pin that contract: changing the
+# combine order without updating the position helper, or vice versa,
+# will break them.
+# ----------------------------------------------------------------------
+
+
+def _ala_mol(resid, segid, chain, x0, resname="ALA"):
+    """Build a synthetic ALA residue at a chosen position - just enough
+    atoms for _tleap_residue_positions to recognise it as a residue.
+    """
+    mol = Molecule().empty(4)
+    mol.name[:] = ["N", "CA", "C", "O"]
+    mol.element[:] = ["N", "C", "C", "O"]
+    mol.resname[:] = resname
+    mol.resid[:] = resid
+    mol.chain[:] = chain
+    mol.segid[:] = segid
+    mol.record[:] = "ATOM"
+    mol.coords = np.array(
+        [
+            [x0 + 0.0, 0.0, 0.0],
+            [x0 + 1.5, 0.0, 0.0],
+            [x0 + 2.5, 1.0, 0.0],
+            [x0 + 2.0, 2.0, 0.0],
+        ],
+        dtype=np.float32,
+    ).reshape(4, 3, 1)
+    return mol
+
+
+def _hoh_mol(resid, segid, x0):
+    """Build a synthetic water residue."""
+    mol = Molecule().empty(3)
+    mol.name[:] = ["O", "H1", "H2"]
+    mol.element[:] = ["O", "H", "H"]
+    mol.resname[:] = "HOH"
+    mol.resid[:] = resid
+    mol.chain[:] = "W"
+    mol.segid[:] = segid
+    mol.record[:] = "HETATM"
+    mol.coords = np.array(
+        [[x0, 0, 0], [x0 + 1, 0, 0], [x0, 1, 0]], dtype=np.float32
+    ).reshape(3, 3, 1)
+    return mol
+
+
+def test_tleap_residue_positions_solute_only():
+    """All non-water non-cyclic residues get sequential positions 1..N."""
+    from htmd.builder.amber import _tleap_residue_positions
+
+    parts = [_ala_mol(r, "P0", "A", x0=r * 5.0) for r in (1, 2, 3)]
+    mol = Molecule()
+    for p in parts:
+        mol.append(p)
+
+    pos = _tleap_residue_positions(mol, cyc_info=[], include_water=False)
+    # Three ALA residues, each with 4 atoms -> positions [1,1,1,1, 2,2,2,2, 3,3,3,3].
+    assert list(pos) == [1] * 4 + [2] * 4 + [3] * 4
+
+
+def test_tleap_residue_positions_solute_then_water():
+    """Solute residues get 1..N_solute, then waters get N_solute+1..."""
+    from htmd.builder.amber import _tleap_residue_positions
+
+    mol = Molecule()
+    mol.append(_ala_mol(1, "P0", "A", x0=0.0))
+    mol.append(_hoh_mol(2, "P1", x0=10.0))  # water in the middle of mol order
+    mol.append(_hoh_mol(3, "P1", x0=12.0))
+    mol.append(_ala_mol(4, "P2", "B", x0=20.0))  # solute again, after waters
+
+    pos = _tleap_residue_positions(mol, cyc_info=[], include_water=True)
+    # Two solute residues (4 atoms each) followed by two waters (3 atoms each).
+    # Solute first -> positions 1 and 2 - this is the load-order in the
+    # final combined unit, NOT the mol order which has waters interleaved.
+    ala0_pos = set(pos[mol.atomselect(f'resid 1')].tolist())
+    ala4_pos = set(pos[mol.atomselect(f'resid 4')].tolist())
+    hoh2_pos = set(pos[mol.atomselect(f'resid 2 and water')].tolist())
+    hoh3_pos = set(pos[mol.atomselect(f'resid 3 and water')].tolist())
+    assert ala0_pos == {1}, "first solute residue must be at position 1"
+    assert ala4_pos == {2}, "second solute residue must be at position 2"
+    assert hoh2_pos == {3}, "waters must be appended after all solute"
+    assert hoh3_pos == {4}
+
+
+def test_tleap_residue_positions_cyclic_appended_in_cyc_info_order():
+    """Cyclic-segment residues are appended after solute+water, in the
+    same order the _write_tleap_script combine emits.
+    """
+    from htmd.builder.amber import _tleap_residue_positions
+
+    mol = Molecule()
+    mol.append(_ala_mol(1, "P0", "A", x0=0.0))  # solute
+    mol.append(_hoh_mol(2, "W0", x0=10.0))  # water
+    mol.append(_ala_mol(3, "CYC1", "X", x0=20.0))  # first cyclic seg
+    mol.append(_ala_mol(4, "CYC2", "Y", x0=30.0))  # second cyclic seg
+
+    # cyc_info entries name the cyclic segs in the order they're combined.
+    # See _write_tleap_script: `mol = combine {mol wat cyc_CYC1 cyc_CYC2}`.
+    cyc_info = [("cyc_CYC1", "cyclic_CYC1.pdb", 1, 1),
+                ("cyc_CYC2", "cyclic_CYC2.pdb", 1, 1)]
+    pos = _tleap_residue_positions(mol, cyc_info=cyc_info, include_water=True)
+
+    solute_pos = set(pos[mol.atomselect("resid 1")].tolist())
+    water_pos = set(pos[mol.atomselect("water")].tolist())
+    cyc1_pos = set(pos[mol.segid == "CYC1"].tolist())
+    cyc2_pos = set(pos[mol.segid == "CYC2"].tolist())
+    # Order in combined unit: solute (1) -> water (2) -> CYC1 (3) -> CYC2 (4).
+    assert solute_pos == {1}
+    assert water_pos == {2}
+    assert cyc1_pos == {3}
+    assert cyc2_pos == {4}
+
+
+def test_custombond_directive_matches_combined_unit_position(tmp_path):
+    """Regression test: when waters sit between two solute residues in
+    the htmd-internal mol order, the bond directive must reference the
+    solute residue's position in input.pdb (its load order in the
+    combined unit), not its renumbered PDB resid.
+
+    This is the bug that broke the 8QFZ bicyclic-peptide tutorial after
+    we stopped stripping waters before the build.
+    """
+    # Synthesize: ALA(P0/1) + 2 waters (W0/2,3) + ALA(P1/4). The
+    # _prepareMolecule renumber will turn these into resids 1, 2, 3, 4
+    # in mol order. After splitting waters out to solvent.pdb, the
+    # solute-only input.pdb has only 2 ALA residues - so the load-order
+    # position of the second ALA is 2, NOT 4.
+    mol = Molecule()
+    mol.append(_ala_mol(1, "P0", "A", x0=0.0))
+    mol.append(_hoh_mol(10, "W0", x0=5.0))
+    mol.append(_hoh_mol(11, "W0", x0=7.0))
+    mol.append(_ala_mol(50, "P1", "B", x0=20.0))
+
+    custombonds = [
+        # User selection strings against the input mol's PDB resids.
+        ('segid "P0" and chain "A" and resid 1 and name "CA"',
+         'segid "P1" and chain "B" and resid 50 and name "CA"'),
+    ]
+
+    # execute=False -> write tleap.in without running tleap.
+    build(
+        mol,
+        outdir=str(tmp_path),
+        ionize=False,
+        custombonds=custombonds,
+        execute=False,
+    )
+
+    tleap_in = (tmp_path / "tleap.in").read_text()
+
+    # The bond must reference mol.<position_in_combined_unit>, not
+    # mol.<htmd-renumbered-resid>. With 2 solute + 2 waters, the second
+    # ALA is the 2nd residue of solute -> position 2 in the combined
+    # unit. mol.4 would point at the second water, which has no CA atom.
+    assert "bond mol.1.CA mol.2.CA" in tleap_in, (
+        "custombond directive must use combined-unit residue position 2 "
+        "for the post-water solute residue, not its htmd-renumbered resid 4. "
+        f"Got:\n{tleap_in}"
+    )
+    assert "mol.4.CA" not in tleap_in, (
+        "Found mol.4.CA in tleap.in - that would point at a water residue, "
+        "not the second solute residue. The bond-directive writer is using "
+        f"the wrong residue index. tleap.in:\n{tleap_in}"
+    )
