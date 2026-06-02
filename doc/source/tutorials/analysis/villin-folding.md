@@ -52,7 +52,7 @@ from sklearn.cluster import MiniBatchKMeans
 
 The filtered trajectories (already stripped of waters and ions, aligned for analysis) ship as a zip on Figshare ([HTMD tutorial data, DOI 10.6084/m9.figshare.32541291](https://doi.org/10.6084/m9.figshare.32541291)) - download [protein_folding_datasets.zip](https://ndownloader.figshare.com/files/65180772) and extract it once. ~2.5 GB. The tutorial reads the absolute path from the `HTMD_TUTORIAL_DATASETS` environment variable so the same notebook works regardless of where you extracted to.
 
-The dataset is organised as several "epochs" (independent adaptive-sampling rounds). {py:func}`~htmd.simlist.simlist` builds one list per epoch (it dedups by folder name within a call), and {py:func}`~htmd.simlist.simmerge` stitches them into a single combined list while preserving traj IDs:
+The dataset is organised as several "epochs" (independent adaptive-sampling rounds). {py:func}`~htmd.simlist.simlist` builds one list per epoch — duplicate folder basenames within a single call would raise — and {py:func}`~htmd.simlist.simmerge` stitches the per-epoch lists into one combined list, renumbering the `simid` indices to be sequential across the merged whole:
 
 ```{code-cell} python
 DATASETS = Path(os.environ["HTMD_TUTORIAL_DATASETS"]) / "protein_folding_datasets"
@@ -64,7 +64,7 @@ for epoch in sorted(DATASETS.glob("*/")):
 len(sims)
 ```
 
-A {py:class}`~htmd.simlist.Sim` is the unit of analysis: trajectory frames + the matching topology PDB.
+A {py:class}`~htmd.simlist.Sim` is the unit of analysis: trajectory frames + the matching topology / structure file (any moleculekit-supported topology format works — PDB, PSF, prmtop, ...).
 
 ## Step 2 - Project geometry to Cα distances
 
@@ -83,7 +83,7 @@ data.fstep = 0.1  # ns per frame - tells downstream code the time axis
 data.plotTrajSizes()
 ```
 
-Drop any anomalously short trajectories (sub-sampled or crashed) - they confuse the lag-time fit later:
+Drop any trajectories whose length isn't the **statistical mode** (the most common frame count). By default `dropTraj()` removes anything off that mode — both crashed (too short) and over-run (too long) — so the rest of the pipeline sees a uniform-length set:
 
 ```{code-cell} python
 data.dropTraj()
@@ -150,7 +150,7 @@ r = kin.getRates()
 print(r)
 ```
 
-`Kinetics` reads the macrostate model and computes mean-first-passage times + folding/unfolding rates between every pair of macrostates. The output table has `source → sink` MFPTs and rates in ns and 1/s.
+`Kinetics` reads the macrostate model and computes mean-first-passage times and rates. {py:meth}`~htmd.kinetics.Kinetics.getRates` returns a single `Rates` object for one auto-detected source → sink pair (folded → unfolded by default). To inspect *all* pairs, pass `source=` / `sink=` explicitly per call, or use `kin.plotRates()` (below) which iterates internally.
 
 ```{code-cell} python
 kin.plotRates()
@@ -171,7 +171,7 @@ Flux pathways visualise the dominant transition routes in TPT (transition-path t
 | `tica.project(3)` | Number of TIC coordinates kept. 3-5 is typical; check the eigenvalue spectrum to decide. |
 | `MiniBatchKMeans(n_clusters=1000)` | More clusters = finer microstate resolution but slower. 500-2000 is the usual range. |
 | `model.markovModel(25, 4, units="ns")` lag | Read off the ITS plot - shortest lag at which slow timescales plateau. |
-| `model.markovModel(... n_macro=4)` | PCCA macrostates. Look at the timescale gaps in the ITS plot to pick the number. |
+| `model.markovModel(..., macronum=4)` | PCCA macrostates. Look at the timescale gaps in the ITS plot to pick the number. |
 
 ## Gotchas
 

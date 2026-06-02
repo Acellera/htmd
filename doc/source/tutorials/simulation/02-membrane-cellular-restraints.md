@@ -134,6 +134,7 @@ equil_restraints = [
 setup_equilibration(
     "./build", "./equil",
     run="4ns",
+    barostatconstratio=True,           # XY scale together, Z relaxes independently - required for membrane systems
     extforces=equil_restraints,
 )
 print(open("./equil/input.yaml").read())
@@ -153,10 +154,10 @@ When the command exits, `./equil/` contains:
 
 - `output.coor` - the final equilibrated coordinates.
 - `output.xsc` - the final equilibrated box.
-- `output.vel` - the final velocities.
-- `output.xtc` + `log.txt` + restart files - the trajectory and run state.
+- `output.vel` - the final velocities (production regenerates its own at the requested temperature, so this isn't strictly needed downstream).
+- `output.xtc` + `restart.chk` - the trajectory and resume checkpoint. The bundled `./equil/run.sh` wrapper redirects ACEMD's stdout/stderr into `log.txt`; calling `acemd --input ./equil` directly sends it to the terminal.
 
-`setup_production` reads `output.coor` (as the starting coordinates for production) and `output.xsc` (as the production box) from this directory, so you must run equilibration *before* setting up production. The topology (`structure.prmtop`) and force-field parameter files are reused from the equilibration directory as-is.
+`setup_production` reads `output.coor` (starting coordinates) and `output.xsc` (the production box) from this directory, so you must run equilibration *before* setting up production. The topology (`structure.prmtop`) and force-field parameter files are reused from the equilibration directory as-is.
 
 ## Step 5 - Production setup (NVT) with cellular restraints
 
@@ -167,12 +168,11 @@ setup_production(
     "./equil", "./prod",
     run="100ns",
     temperature=300,
-    barostat=False,         # NVT - lipid restraints assume constant box
     extforces=restraints,   # the cellular restraints we computed above
 )
 ```
 
-`barostat=False` is the NVT switch. The `extforces` list flows straight from `get_cellular_restraints` into the production `input.yaml`.
+`setup_production` already defaults `barostat=False` (production is NVT by default), so we don't need to pass it — that's exactly the constant-box regime the cellular restraints assume. The `extforces` list flows straight from `get_cellular_restraints` into the production `input.yaml`.
 
 ## Step 6 - Run production
 
@@ -182,9 +182,10 @@ acemd --input ./prod
 
 ## Gotchas
 
-- `get_cellular_restraints` reads the box from `mol.box`, the lipid positions from `mol.coords`, and the membrane location from `membrane_rel_z`. Always compute `membrane_rel_z` from `mol.coords[mol.atomselect("lipid"), 2].mean() / mol.box[2]` rather than hardcoding `0.5` - the asymmetric water padding above and below the bilayer shifts the relative centre away from mid-box in practice.
+- `get_cellular_restraints` reads the box from `mol.box`, the lipid positions from `mol.coords`, and the membrane location from `membrane_rel_z`. Always compute `membrane_rel_z` from `mol.coords[mol.atomselect("lipid"), 2, 0].mean() / mol.box[2, 0]` rather than hardcoding `0.5` - the asymmetric water padding above and below the bilayer shifts the relative centre away from mid-box in practice. (`mol.box` is `(3, n_frames)`, so the `[2, 0]` indexing picks the box-z of the first frame.)
 - **NVT only.** The restraints are anchored to the lipid centre and to a fraction of the box height; an NPT run where the box rescales would silently misalign the free-zone with the lipids. Equilibrate the box dimensions under NPT with conventional positional restraints first, then switch to NVT for production.
-- `lipidsel` defaults to the standard AMBER lipid resnames. If you're using a custom lipid (or built with CHARMM-GUI conventions), pass `lipidsel="<your selection>"` explicitly.
+- `lipidsel` defaults to moleculekit's `"lipid"` macro plus a list of common lipid resnames (POPC, POPE, POPG, CHL1, etc.). If you're using a custom lipid that isn't in the macro, pass `lipidsel="<your selection>"` explicitly.
+- Use `barostatconstratio=True` on `setup_equilibration` for membrane systems - without it ACEMD warns that the box scaling will distort the bilayer (lateral pressure should scale isotropically in XY while Z relaxes independently).
 
 ## See also
 

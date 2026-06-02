@@ -90,8 +90,9 @@ setup_equilibration("./build", "./equil", run="4ns")
 
 - A short steepest-descent minimisation (`minimize: 500` steps).
 - An NPT ensemble: `thermostat: true` at `thermostattemperature: 300` K, `barostat: true` at the default 1 atm.
-- Maxwell-Boltzmann initial velocities at `velocities: 300` K and `restart: true` so the run can resume from its own restart files if interrupted.
-- Two `positionalRestraint` external forces in `extforces`: Cα atoms held with a strong force constant (`1@0`) and the rest of the protein heavy atoms with a tenth of that (`0.1@0`). Both decay linearly to zero by step `500000`, gradually releasing the protein into the equilibrated water box.
+- `velocities: 300` K - Maxwell-Boltzmann velocities seeded at this temperature when **no checkpoint exists**; on a resumed run the velocity field is loaded from the checkpoint instead.
+- `restart: true` - on re-invocation of `acemd --input ./equil`, the run resumes from `./equil/restart.chk` rather than starting over.
+- Default positional restraints in `extforces`: four entries by default - protein Cα with `1@0`, protein heavy atoms (non-Cα) with `0.1@0`, nucleic backbone with `1@0`, nucleic non-backbone heavy with `0.1@0`. Each decays linearly to zero by step `500000`, gradually releasing the system into the equilibrated water box. Pass `defaultrestraints=False` to drop them, or add your own via `extforces=[...]`.
 - The integration length you passed in (`run: 4ns`), and the periodic box size taken from the build (`boxsize: [...]`).
 
 Inspect the produced files:
@@ -114,7 +115,7 @@ Hand the equilibration directory to the `acemd` CLI from your shell. This is the
 acemd --input ./equil
 ```
 
-ACEMD reads `./equil/input.yaml`, runs minimisation + the requested ns of NPT, and writes the trajectory (`output.xtc`), log (`log.txt`), and restart files (`output.restart.chk`, `output.coor`, `output.vel`, `output.xsc`) back into `./equil/`. When the command exits, the system is ready for production.
+ACEMD reads `./equil/input.yaml`, runs minimisation + the requested ns of NPT, and writes the trajectory (`output.xtc`), the final state (`output.coor`, `output.vel`, `output.xsc`), and the checkpoint (`restart.chk`) back into `./equil/`. The bundled `./equil/run.sh` wrapper redirects ACEMD's stdout/stderr into `log.txt`; if you call `acemd --input ./equil` directly the log goes to your terminal instead. When the command exits, the system is ready for production.
 
 ## Step 4 - Set up production
 
@@ -124,7 +125,7 @@ Production reuses the last frame of the equilibration as its starting state.
 setup_production("./equil", "./prod", run="100ns", temperature=300)
 ```
 
-{py:func}`~acemd.protocols.setup_production` reads the final coordinates / box / velocities from `./equil/`, copies them into `./prod/`, and writes a production `input.yaml` configured for an unrestrained NVT/NPT run at the given temperature for the requested length.
+{py:func}`~acemd.protocols.setup_production` reads the final coordinates and box (`output.coor` + `output.xsc`) from `./equil/`, copies them into `./prod/`, and writes a production `input.yaml` configured for an unrestrained **NVT** run at the given temperature for the requested length. Velocities are **regenerated** at Maxwell-Boltzmann at `temperature` rather than copied from equilibration (set `barostat=True` to switch to NPT if you need pressure coupling in production).
 
 ## Step 5 - Run production
 
@@ -161,7 +162,7 @@ The queues run ACEMD on each directory you submit and stream the resulting traje
 ## Gotchas
 
 - The two `acemd` invocations dominate wall time; everything else (the build, the two `setup_*` calls) is seconds. Profile your run on a short equilibration before queuing up many production trajectories.
-- The output trajectory format is XTC by default (configurable via `setup_production(... output_format=...)`). MSM analysis through {py:class}`~htmd.simlist.Sim` and {py:class}`~htmd.projections.metric.Metric` reads XTC natively.
+- The output trajectory format follows the extension of `trajectoryfile` (default `output.xtc`); pass e.g. `setup_production(..., trajectoryfile="output.dcd")` to switch. MSM analysis through {py:class}`~htmd.simlist.Sim` and {py:class}`~htmd.projections.metric.Metric` reads both XTC and DCD natively.
 
 ## See also
 

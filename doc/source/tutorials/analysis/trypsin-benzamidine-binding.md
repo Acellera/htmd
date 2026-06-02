@@ -53,7 +53,7 @@ from sklearn.cluster import MiniBatchKMeans
 
 The trajectory bundle ships on Figshare ([HTMD tutorial data, DOI 10.6084/m9.figshare.32541291](https://doi.org/10.6084/m9.figshare.32541291)) as [ligand_binding_datasets.zip](https://ndownloader.figshare.com/files/65180823) (~3 GB).
 
-The dataset is split into several "epochs" (adaptive-sampling rounds). {py:func}`~htmd.simlist.simlist` builds one per-epoch list (it dedups by folder name within a single call), and {py:func}`~htmd.simlist.simmerge` stitches them into a combined list while preserving traj IDs:
+The dataset is split into several "epochs" (adaptive-sampling rounds). {py:func}`~htmd.simlist.simlist` builds one per-epoch list (duplicate folder basenames within a single call would raise), and {py:func}`~htmd.simlist.simmerge` stitches them into a combined list and renumbers the per-sim `simid` indices to be sequential across the merged whole:
 
 ```{code-cell} python
 DATASETS = Path(os.environ["HTMD_TUTORIAL_DATASETS"]) / "ligand_binding_datasets"
@@ -86,7 +86,7 @@ data.plotTrajSizes()
 data.dropTraj()
 ```
 
-`periodic="selections"` handles the case where the ligand has wrapped through PBC mid-trajectory; the wrapping is undone per frame so contact distances are correct across the periodic boundary.
+`periodic="selections"` makes the distance calculation use **minimum-image** distances between the two atom selections, so a ligand that has wrapped through PBC gets compared to the *closest* protein image - the original coordinates aren't modified, only the distances are computed correctly across the box.
 
 ## Step 3 - TICA
 
@@ -140,7 +140,7 @@ r = kin.getRates()
 print(r)
 ```
 
-Each row is `source → sink`: MFPT, rate, and (for the bulk → bound entry) k<sub>on</sub> / k<sub>off</sub> / K<sub>d</sub>. Match those against the experimental K<sub>d</sub> to validate the model.
+{py:meth}`~htmd.kinetics.Kinetics.getRates` returns a single `Rates` object for the auto-detected source → sink pair (bulk → bound here). It carries the MFPT, rate, and k<sub>on</sub> / k<sub>off</sub> / K<sub>d</sub>. Match against the experimental K<sub>d</sub> to validate the model. Use `kin.plotRates()` (below) for an all-pairs visualisation, or call `getRates(source=..., sink=...)` explicitly for other pairings.
 
 ```{code-cell} python
 kin.plotRates()
@@ -160,7 +160,7 @@ The flux pathways show which intermediates the ligand visits on the way from sol
 | `threshold` on `MetricDistance` | Default 8 Å. Lower (e.g. 5 Å) tightens what counts as "in contact" and emphasises tighter poses; higher dilates the bound basin. |
 | `concentration` on `Kinetics` | Critical for **k<sub>on</sub>** and **K<sub>d</sub>**. Compute it as (n<sub>ligands</sub> / n<sub>waters</sub>) · 55.4 mol/L - the water count tracks the real bulk volume more accurately than the box volume, which over-counts because it includes the protein's excluded volume. |
 | `periodic="selections"` on the projection | **Essential** when the ligand wraps through the box during the trajectory. Skipping it produces nonsense contacts at PBC crossings. |
-| `model.markovModel(lag, n_macro)` n_macro | More macrostates → more pathway resolution but harder to interpret. 4-6 is typical for binding. |
+| `model.markovModel(lag, macronum)` `macronum` | More macrostates → more pathway resolution but harder to interpret. 4-6 is typical for binding. |
 
 ## Gotchas
 

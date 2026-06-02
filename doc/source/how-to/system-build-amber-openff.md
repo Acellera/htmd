@@ -17,17 +17,16 @@ from openff.toolkit import Molecule as OFFMolecule
 
 ligand = OFFMolecule.from_smiles("[NH2+]=C(N)c1ccccc1")  # benzamidinium
 
-builder.build(
+molbuilt, system = builder.build(
     mol,                                    # the moleculekit Molecule with protein + ligand
     outdir="./build",
-    ff=["amber14-all.xml", "amber14/tip3p.xml"],
     small_molecule_ff="openff-2.3.0",       # SMIRNOFF force field for the ligand
     molecules=[ligand],                     # OpenFF Molecule object(s) for the ligand(s)
     ionize=True, saltconc=0.15,
 )
 ```
 
-The protein is parameterized with the standard AMBER XML force field; the ligand is matched against `mol`'s atoms and parameterized on-the-fly via the OpenFF SMIRNOFF template generator. The output `./build/structure.prmtop` is fully compatible with `acemd --input` or OpenMM's `app.AmberPrmtopFile`.
+`builder.build` returns a 2-tuple: the rebuilt `Molecule` (with bonds / charges from the OpenMM `ForceField`) and the parameterised OpenMM `System` object. The protein is parameterized with the default AMBER14 XML stack (protein.ff14SB + lipid17 + nucleic + tip3p, from {py:func}`~htmd.builder.openmm.defaultFf`); the ligand is matched against `mol`'s atoms and parameterized on-the-fly via the OpenFF SMIRNOFF template generator. The output `./build/structure.prmtop` is loadable by ACEMD (via the bundled `system.yaml` config) and by OpenMM (`app.AmberPrmtopFile`).
 
 ## Parameters that matter
 

@@ -5,7 +5,7 @@
 Tell tLeap to form a covalent bond between two specific atoms during the build - useful for disulfide bridges with non-standard cysteines, head-to-tail cyclic peptides, isopeptides, drug-protein covalent adducts, and any other crosslink that {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` can't infer on its own.
 
 ```{note}
-You usually don't need to write `custombonds` by hand. The canonical NCAA flow ({py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` + {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs`) detects inter-residue crosslinks from the input PDB's connectivity and emits the corresponding `custombonds` list automatically as `out.custombonds`. Reach for this recipe only when detect misses the bond, when the crosslink isn't in the PDB at all (e.g. you're modelling a covalent adduct that wasn't crystallised), or when you want to override what detect found.
+You usually don't need to write `custombonds` by hand. {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` walks the prepared molecule's `mol.bonds` graph and emits inter-residue crosslink entries as `out.custombonds` for you. Reach for this recipe only when the bond isn't in `mol.bonds` at all (e.g. you're modelling a covalent adduct that wasn't crystallised), or when you want to add bonds on top of what the canonical NCAA flow found.
 ```
 
 ## Minimal example
@@ -33,7 +33,7 @@ Each entry in `custombonds` is a tuple of two atom-selection strings (each must 
 | Parameter | What it does |
 | --- | --- |
 | `custombonds` | List of `(sel1, sel2)` atom-selection-string pairs. Each pair adds one `bond mol.<pos1>.<name1> mol.<pos2>.<name2>` to the generated `tleap.in`. |
-| `disulfide` | Separate list of disulfide bonds with the same shape. `amber.build` auto-detects S-S within 2.5 Å, so you only need this for non-standard cases. |
+| `disulfide` | Separate list of disulfide bonds with the same shape. `amber.build` auto-detects S-S within 3 Å on any pair of `CY*`-resname residues' `SG` atoms - you only need this for non-standard cases. |
 
 ## Common variations
 
@@ -79,7 +79,8 @@ When you use the canonical NCAA flow, `out.custombonds` already contains the rig
 
 - Each selection in a `custombonds` tuple must resolve to **exactly one atom**. If a selection matches zero or several atoms, `amber.build` raises a clear error. Use `mol.atomselect(sel).sum()` to debug.
 - The atoms named in a bond must already exist on the two residues - tLeap won't add atoms, only bonds. If your endpoint is a side-chain atom that's normally stripped (e.g. an `OXT` of a mid-chain residue), template the residue first so the right atoms are present.
-- For disulfides between residues `amber.build` already auto-detects (CYS pairs within 2.5 Å, both with free SG), you don't need a `custombonds` entry - it'll just add a duplicate `bond` directive. Use `disulfide=...` if you want to override the detection.
+- For disulfides between residues `amber.build` already auto-detects ({py:func}`~htmd.builder.builder.detectDisulfideBonds` matches any `CY*` resname with an `SG` atom within 3 Å), you don't need a `custombonds` entry - it'll just add a duplicate `bond` directive. Pass `disulfide=[...]` only when you want to override the auto-detection.
+- For a head-to-tail cyclic peptide whose **terminal N-C distance is already short** (< 1.35 Å in the input coordinates), `amber.build`'s cyclic-segment detector picks up the closure on its own and emits the appropriate `bond` directive without needing a `custombonds` entry. The minimal example above is only needed when the cyclising bond is implied by chemistry but not present in the input geometry.
 
 ## See also
 
