@@ -9,6 +9,25 @@ from acellera_docs_theme import apply
 # Drop the timestamp from HTMD / moleculekit log lines in rendered tutorial output.
 os.environ.setdefault("HTMD_LOG_FORMAT", "%(name)s - %(levelname)s - %(message)s")
 os.environ.setdefault("MOLECULEKIT_LOG_FORMAT", "%(name)s - %(levelname)s - %(message)s")
+# Suppress tqdm progress bars in rendered tutorial output - the staircase of
+# "X%|███" lines is noise in HTML, and most calls (simlist, projections) don't
+# need a progress indicator when the run is non-interactive.
+os.environ.setdefault("TQDM_DISABLE", "1")
+
+# Absolute path to vendored pre-built systems so simulation tutorials can load
+# them under nb_execution_in_temp=True (the notebooks run in a temp CWD).
+os.environ.setdefault(
+    "HTMD_TUTORIAL_SYSTEMS",
+    str(Path(__file__).resolve().parent / "tutorials" / "simulation" / "_systems"),
+)
+
+# Absolute path to the MSM analysis datasets (~5 GB, downloaded once from
+# pub.htmd.org as datasets.tar.gz). Override by exporting HTMD_TUTORIAL_DATASETS
+# if your local copy lives elsewhere.
+os.environ.setdefault(
+    "HTMD_TUTORIAL_DATASETS",
+    str(Path(__file__).resolve().parent.parent.parent / "datasets"),
+)
 
 # -- Project information -----------------------------------------------------
 
@@ -53,7 +72,13 @@ myst_enable_extensions = [
 myst_heading_anchors = 3
 
 nb_execution_mode = "auto"  # execute .md tutorials on first build; .ipynb tutorials ship with cached outputs
-nb_execution_excludepatterns = ["**/*.ipynb"]  # legacy notebooks carry their own outputs (and pop viewers if rerun)
+nb_execution_excludepatterns = [
+    "**/*.ipynb",  # legacy notebooks carry their own outputs (and pop viewers if rerun)
+]
+# MSM tutorials download multi-GB datasets and run for hours. Skip them by
+# default; run `make analysis-html` (sets BAKE_ANALYSIS=1) to bake outputs.
+if not os.environ.get("BAKE_ANALYSIS"):
+    nb_execution_excludepatterns.append("tutorials/analysis/*.md")
 nb_execution_in_temp = True  # run each notebook in a temp dir so build artefacts don't pollute source/
 nb_execution_timeout = 600  # antechamber + tLeap inside the system-prep tutorials can take minutes
 nb_execution_raise_on_error = True  # crashing tutorial cell -> failed build (instead of silent warning)

@@ -12,7 +12,17 @@ The headline capability. Each tutorial walks through building a real, simulation
 system-prep/index
 ```
 
-## Running simulations and MSM analysis
+## Running MD simulations
+
+Drive a built system through equilibration and production with the ACEMD MD engine. The tutorial uses the canonical Trp-cage build as input, walks the `setup_equilibration → acemd → setup_production → acemd` chain, and ends with the trajectory that downstream MSM analysis consumes.
+
+```{toctree}
+:maxdepth: 1
+
+simulation/index
+```
+
+## MSM analysis
 
 Three end-to-end MSM analyses on real systems - benchmark trypsin/benzamidine, villin folding, and CXCL12. Each tutorial walks the full simulation-list → projection → clustering → model → kinetics pipeline. The {doc}`MSM workflow concept page <../explanation/msm-workflow>` sketches that pipeline before you start.
 

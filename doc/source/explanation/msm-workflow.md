@@ -4,11 +4,11 @@ HTMD's analysis side is built around a fixed five-step pipeline. Each step has a
 
 ```{mermaid}
 flowchart LR
-    A[SimList] --> B[Projection<br/>(MetricDistance, MetricRmsd, ...)]
-    B --> C[Dimensionality<br/>reduction<br/>(TICA / GWPCA)]
-    C --> D[Clustering<br/>(MiniBatchKMeans,<br/>KCenters, RegularGrid)]
-    D --> E[Markov state model<br/>(Model)]
-    E --> F[Kinetics<br/>(rates, MFPTs)]
+    A[SimList] --> B["Projection<br/>(MetricDistance, MetricRmsd, ...)"]
+    B --> C["Dimensionality reduction<br/>(TICA / GWPCA)"]
+    C --> D["Clustering<br/>(MiniBatchKMeans, KCenters, RegularGrid)"]
+    D --> E["Markov state model<br/>(Model)"]
+    E --> F["Kinetics<br/>(rates, MFPTs)"]
 ```
 
 ## 1. SimList - enumerate trajectories

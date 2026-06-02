@@ -11,7 +11,7 @@ flowchart LR
     A[Structure input<br/>PDB / CIF / model] --> B[Preparation<br/>protonation, gaps, mutations]
     B --> C[Segmentation<br/>protein / lipid / ligand /<br/>water / ion segments]
     C --> D[Solvation &<br/>ionisation]
-    D --> E[Force-field build<br/>CHARMM / AMBER / OpenMM]
+    D --> E[Force-field build<br/>AMBER / CHARMM / OpenFF]
     E --> F[Topology + coords<br/>ready for MD]
 ```
 
@@ -68,7 +68,7 @@ The same prepared molecule can be built under multiple force fields without redo
 
 - **AMBER** ({py:func}`htmd.builder.amber.build`) via tLeap - the most fully featured backend, the one the NCAA flow is parameterized against (ff14SB anchors, GAFF2 atom types), and the recommended default for protein, protein-ligand, and crosslinked-NCAA systems.
 - **CHARMM** ({py:func}`htmd.builder.charmm.build`) via VMD/psfgen - for projects standardised on CHARMM force fields and CHARMM-GUI-style membrane setups.
-- **OpenMM** ({py:func}`htmd.builder.openmm.build`) for systems destined for OpenMM with custom XML force fields.
+- **OpenFF** ({py:func}`htmd.builder.openmm.build`) for systems where you want OpenFF / SMIRNOFF small-molecule parameters and protein parameters from `openmmforcefields`. The build is driven through OpenMM but the differentiator versus the AMBER / CHARMM backends is the OpenFF small-molecule force field, not the simulation engine - all three builders produce systems that any common engine (ACEMD, OpenMM, GROMACS) can run.
 
 Force-field-specific tooling lives in the same module as the build entry point; common topology surgery (insertions, mutations, cis-peptide detection, disulfide detection) is in {py:mod}`htmd.builder.builder`.
 
