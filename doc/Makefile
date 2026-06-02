@@ -25,16 +25,35 @@ ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
 $(error The '$(SPHINXBUILD)' command was not found. Make sure you have Sphinx installed, then set the SPHINXBUILD environment variable to point to the full path of the '$(SPHINXBUILD)' executable. Alternatively you can add the directory with the executable to your PATH. If you don\'t have Sphinx installed, grab it from http://sphinx-doc.org/)
 endif
 
-.PHONY: help clean html analysis-html tutorials rst publish
+.PHONY: help clean html bake-analysis tutorials rst publish
 
 html: Makefile rst
 	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
-# Bake the MSM analysis tutorials: lifts the default exclude on
-# tutorials/analysis/*.md so wget downloads run and cells execute. Expect
-# several hours and ~5 GB of disk.
-analysis-html: Makefile rst
-	BAKE_ANALYSIS=1 $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+# Bake outputs into the MSM analysis notebooks:
+#   1. sync any companion .md back to .ipynb via jupytext (so prose edits land)
+#   2. execute each notebook --inplace via nbconvert
+# Commit the resulting .ipynb files so plain `make html` (and CI) render
+# the cached outputs without re-executing. HTMD_TUTORIAL_DATASETS must point at
+# the extracted Figshare datasets (~5 GB total).
+bake-analysis:
+	@if [ -z "$$HTMD_TUTORIAL_DATASETS" ]; then \
+		echo "Set HTMD_TUTORIAL_DATASETS to the directory containing the extracted analysis datasets first."; \
+		exit 1; \
+	fi
+	@for src in $(SOURCEDIR)/tutorials/analysis/*.md; do \
+		[ -f "$$src" ] || continue; \
+		base=$$(basename $$src .md); \
+		echo "==> syncing $$base.md -> $$base.ipynb"; \
+		python -m jupytext --to ipynb "$$src" --output "$(SOURCEDIR)/tutorials/analysis/$$base.ipynb"; \
+	done
+	@for nb in $(SOURCEDIR)/tutorials/analysis/*.ipynb; do \
+		echo "==> executing $$nb"; \
+		HTMD_LOG_FORMAT="%(name)s - %(levelname)s - %(message)s" \
+		MOLECULEKIT_LOG_FORMAT="%(name)s - %(levelname)s - %(message)s" \
+		TQDM_DISABLE=1 \
+		jupyter nbconvert --to notebook --execute --inplace "$$nb"; \
+	done
 
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
