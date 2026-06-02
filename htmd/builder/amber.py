@@ -1418,7 +1418,11 @@ def _read_tleap_output(outdir, prefix, logpath):
     ):
         try:
             molbuilt = Molecule(prmtop_path, validateElements=False)
-            molbuilt.read(crd_path)
+            # Force the AMBER inpcrd reader - tLeap's `saveamberparm` produces
+            # an inpcrd-format file with a .crd extension, but moleculekit
+            # defaults to the CHARMM .crd reader on that extension and loses
+            # the periodic box stored on the file's last line.
+            molbuilt.read(crd_path, type="inpcrd")
         except Exception as e:
             raise RuntimeError(
                 f"Failed at reading {prefix}.prmtop/{prefix}.crd due to error: {e}"

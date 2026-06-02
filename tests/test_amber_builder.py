@@ -287,7 +287,7 @@ def test_protein_rna(tmp_path):
 
     mol = Molecule("3WBM")
     mol.filter("not water")
-    mol = autoSegment(mol, field="both")
+    mol = autoSegment(mol, fields=("chain", "segid"))
     pmol, _ = systemPrepare(mol, pH=7.0)
     smol = solvate(pmol)
 
@@ -581,10 +581,10 @@ def test_tleap_residue_positions_solute_then_water():
     # Two solute residues (4 atoms each) followed by two waters (3 atoms each).
     # Solute first -> positions 1 and 2 - this is the load-order in the
     # final combined unit, NOT the mol order which has waters interleaved.
-    ala0_pos = set(pos[mol.atomselect(f'resid 1')].tolist())
-    ala4_pos = set(pos[mol.atomselect(f'resid 4')].tolist())
-    hoh2_pos = set(pos[mol.atomselect(f'resid 2 and water')].tolist())
-    hoh3_pos = set(pos[mol.atomselect(f'resid 3 and water')].tolist())
+    ala0_pos = set(pos[mol.atomselect(f"resid 1")].tolist())
+    ala4_pos = set(pos[mol.atomselect(f"resid 4")].tolist())
+    hoh2_pos = set(pos[mol.atomselect(f"resid 2 and water")].tolist())
+    hoh3_pos = set(pos[mol.atomselect(f"resid 3 and water")].tolist())
     assert ala0_pos == {1}, "first solute residue must be at position 1"
     assert ala4_pos == {2}, "second solute residue must be at position 2"
     assert hoh2_pos == {3}, "waters must be appended after all solute"
@@ -605,8 +605,10 @@ def test_tleap_residue_positions_cyclic_appended_in_cyc_info_order():
 
     # cyc_info entries name the cyclic segs in the order they're combined.
     # See _write_tleap_script: `mol = combine {mol wat cyc_CYC1 cyc_CYC2}`.
-    cyc_info = [("cyc_CYC1", "cyclic_CYC1.pdb", 1, 1),
-                ("cyc_CYC2", "cyclic_CYC2.pdb", 1, 1)]
+    cyc_info = [
+        ("cyc_CYC1", "cyclic_CYC1.pdb", 1, 1),
+        ("cyc_CYC2", "cyclic_CYC2.pdb", 1, 1),
+    ]
     pos = _tleap_residue_positions(mol, cyc_info=cyc_info, include_water=True)
 
     solute_pos = set(pos[mol.atomselect("resid 1")].tolist())
@@ -642,8 +644,10 @@ def test_custombond_directive_matches_combined_unit_position(tmp_path):
 
     custombonds = [
         # User selection strings against the input mol's PDB resids.
-        ('segid "P0" and chain "A" and resid 1 and name "CA"',
-         'segid "P1" and chain "B" and resid 50 and name "CA"'),
+        (
+            'segid "P0" and chain "A" and resid 1 and name "CA"',
+            'segid "P1" and chain "B" and resid 50 and name "CA"',
+        ),
     ]
 
     # execute=False -> write tleap.in without running tleap.
@@ -670,4 +674,23 @@ def test_custombond_directive_matches_combined_unit_position(tmp_path):
         "Found mol.4.CA in tleap.in - that would point at a water residue, "
         "not the second solute residue. The bond-directive writer is using "
         f"the wrong residue index. tleap.in:\n{tleap_in}"
+    )
+
+
+def test_built_molecule_has_box_from_crd(tmp_path):
+    """`amber.build()` must propagate the box dimensions tLeap wrote into the
+    `.crd` onto the returned Molecule. Without this, downstream consumers
+    (e.g. ``acemd.protocols.get_cellular_restraints``) see ``mol.box == 0``
+    and fail even though periodicity information was available all along.
+    """
+    from htmd.builder.solvate import solvate
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    smol = solvate(mol)
+    built = build(smol, outdir=str(tmp_path), ionize=False)
+    assert not np.all(built.box == 0), (
+        f"amber.build() returned a Molecule with box={built.box[:, 0]}; "
+        "expected the periodic box tLeap wrote into structure.crd."
     )

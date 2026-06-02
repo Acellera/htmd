@@ -426,7 +426,7 @@ class TestOpenMMComparative:
 
         mol = Molecule("3WBM")
         mol.filter("not water")
-        mol = autoSegment(mol, field="both")
+        mol = autoSegment(mol, fields=("chain", "segid"))
         pmol, _ = systemPrepare(mol, pH=7.0)
 
         outdir = os.path.join(tmpdir, "openff")
@@ -852,9 +852,7 @@ def test_parameterize_ligands_openff_ben_nagl():
 
     # NAGL output is deterministic for a given model; tolerance covers
     # only float32 / torch round-off, not model drift.
-    for i, (actual, expected) in enumerate(
-        zip(charges, _BEN_NAGL_EXPECTED_CHARGES)
-    ):
+    for i, (actual, expected) in enumerate(zip(charges, _BEN_NAGL_EXPECTED_CHARGES)):
         assert (
             abs(actual - expected) < 1e-3
         ), f"NAGL charge mismatch at atom {i}: actual={actual:.6f} expected={expected:.6f}"
@@ -912,7 +910,9 @@ def test_parameterize_ligands_openff_multi_resname():
 # involvement). Lock the contract so a future refactor can't silently
 # swap which attribute gets populated.
 @pytest.mark.skipif(
-    not (_openmm_installed and _openff_installed and _tleap_installed and _nagl_installed),
+    not (
+        _openmm_installed and _openff_installed and _tleap_installed and _nagl_installed
+    ),
     reason="OpenMM + OpenFF Interchange + AmberTools + NAGL required",
 )
 def test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
@@ -941,9 +941,9 @@ def test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
     # GAFF emits a single combined OpenMM XML named ``gaff_combined.xml``
     # appended to ``xml_paths``. The filename encodes provenance so the
     # downstream caller can tell GAFF-derived XMLs from SMIRNOFF ones.
-    assert len(out_gaff.xml_paths) == 1, (
-        "GAFF2 should produce one combined XML appended to xml_paths"
-    )
+    assert (
+        len(out_gaff.xml_paths) == 1
+    ), "GAFF2 should produce one combined XML appended to xml_paths"
     assert out_gaff.xml_paths[0].endswith("gaff_combined.xml"), (
         f"GAFF combined XML should be named gaff_combined.xml, "
         f"got {out_gaff.xml_paths[0]}"
@@ -960,9 +960,9 @@ def test_parameterizeFromSpecs_output_artifacts_by_forcefield(tmp_path):
     )
     assert out_openff.topo_paths == [], "SMIRNOFF must not emit AMBER prepi"
     assert out_openff.frcmod_paths == [], "SMIRNOFF must not emit frcmod"
-    assert len(out_openff.xml_paths) >= 1, (
-        "SMIRNOFF must emit at least one per-cluster XML"
-    )
+    assert (
+        len(out_openff.xml_paths) >= 1
+    ), "SMIRNOFF must emit at least one per-cluster XML"
     # No GAFF involvement, so no gaff_combined.xml in the list.
     assert not any(
         p.endswith("gaff_combined.xml") for p in out_openff.xml_paths
@@ -2110,10 +2110,10 @@ def test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
 # Sage 2.3.0 + RDKit Gasteiger charges. Re-generate by running
 # ``scripts/probe_phase2_xml_emitter.py``.
 _BEN_REFERENCE_ENERGIES_KJ = {
-    "HarmonicBondForce":     16.1103,
-    "HarmonicAngleForce":    10.8101,
-    "PeriodicTorsionForce":  26.1109,
-    "NonbondedForce":       125.1611,
+    "HarmonicBondForce": 16.1103,
+    "HarmonicAngleForce": 10.8101,
+    "PeriodicTorsionForce": 26.1109,
+    "NonbondedForce": 125.1611,
 }
 
 
@@ -2179,14 +2179,17 @@ def test_emitted_xml_matches_interchange_energy(tmp_path):
     def _energy_by_class(system):
         integ = mm.VerletIntegrator(0.001 * ommunit.picoseconds)
         ctx = mm.Context(
-            system, integ, mm.Platform.getPlatformByName("Reference"),
+            system,
+            integ,
+            mm.Platform.getPlatformByName("Reference"),
         )
         ctx.setPositions(positions)
         out = {}
         for i, f in enumerate(system.getForces()):
             state = ctx.getState(getEnergy=True, groups={i})
-            out[f.__class__.__name__] = state.getPotentialEnergy(
-            ).value_in_unit(ommunit.kilojoule_per_mole)
+            out[f.__class__.__name__] = state.getPotentialEnergy().value_in_unit(
+                ommunit.kilojoule_per_mole
+            )
         return out
 
     e_native = _energy_by_class(sys_native)
@@ -2195,8 +2198,10 @@ def test_emitted_xml_matches_interchange_energy(tmp_path):
     # Both Systems must contain the same set of force classes (modulo
     # CMMotionRemover, which is a no-op zero-energy housekeeping force).
     real_forces = lambda d: {k: v for k, v in d.items() if k != "CMMotionRemover"}
-    assert set(real_forces(e_native)) == set(real_forces(e_xml)) == set(
-        _BEN_REFERENCE_ENERGIES_KJ
+    assert (
+        set(real_forces(e_native))
+        == set(real_forces(e_xml))
+        == set(_BEN_REFERENCE_ENERGIES_KJ)
     ), (
         f"force class set drift: native={sorted(real_forces(e_native))} "
         f"xml={sorted(real_forces(e_xml))} "
@@ -2227,3 +2232,107 @@ def test_emitted_xml_matches_interchange_energy(tmp_path):
             f"disagrees with Interchange.to_openmm_system "
             f"{e_n:.6f} by {abs(e_x - e_n):.6e} > {tol:.6e}"
         )
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _openff_installed),
+    reason="needs openmm + openff",
+)
+def test_setup_forcefield_emits_small_molecule_ffxml():
+    from htmd.builder.openmm import _setup_forcefield, defaultFf
+    from openff.toolkit import Molecule as OFFMolecule
+
+    offmol = OFFMolecule.from_smiles("c1ccccc1")  # benzene
+    ff, smallmol_ffxml = _setup_forcefield(defaultFf(), None, "openff-2.2.1", [offmol])
+    assert isinstance(smallmol_ffxml, list) and len(smallmol_ffxml) == 1
+    xml = smallmol_ffxml[0]
+    assert "<ForceField" in xml
+    assert "<Residues>" in xml
+    # charges are baked into the emitted ffxml (no re-derivation downstream)
+    assert "charge" in xml
+
+
+def _tiny_handoff_mol():
+    from moleculekit.molecule import Molecule
+    import numpy as np
+
+    m = Molecule().empty(2)
+    m.name[:] = ["C1", "C2"]
+    m.resname[:] = ["LIG", "LIG"]
+    m.resid[:] = [1, 1]
+    m.chain[:] = ["A", "A"]
+    m.segid[:] = ["L", "L"]
+    m.element[:] = ["C", "C"]
+    m.coords = np.array([[0, 0, 0], [1.5, 0, 0]], dtype=np.float32).reshape(2, 3, 1)
+    m.bonds = np.array([[0, 1]], dtype=np.uint32)
+    m.bondtype = np.array(["1"], dtype=object)
+    m.box = np.array([[30.0], [30.0], [30.0]], dtype=np.float32)
+    return m
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="needs openmm")
+def test_write_ff_handoff(tmpdir):
+    import yaml
+    from htmd.builder.openmm import _write_ff_handoff, defaultFf
+    from moleculekit.molecule import Molecule
+
+    m = _tiny_handoff_mol()
+    params = _write_ff_handoff(m, str(tmpdir), "structure", defaultFf(), None, [])
+
+    assert params[0].startswith("amber14")
+    assert os.path.exists(os.path.join(tmpdir, "structure.cif"))
+    assert os.path.exists(os.path.join(tmpdir, "structure.pdb"))  # moleculekit-written
+    assert not os.path.exists(os.path.join(tmpdir, "structure.system.xml"))
+    with open(os.path.join(tmpdir, "system.yaml")) as fh:
+        sy = yaml.safe_load(fh)
+    assert sy["structure"] == "structure.cif"
+    assert sy["coordinates"] == "structure.cif"
+    assert sy["parameters"] == params
+    assert sy["boxsize"] == [30.0, 30.0, 30.0]
+    rt = Molecule(os.path.join(tmpdir, "structure.cif"))
+    assert len(rt.bonds) == 1  # bond preserved through the cif
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="needs openmm")
+def test_write_ff_handoff_vacuum(tmpdir):
+    # A vacuum/non-solvated build has no box (molbuilt.box is shape (3, 0));
+    # the handoff must omit boxsize rather than crash.
+    import numpy as np
+    import yaml
+    from htmd.builder.openmm import _write_ff_handoff, defaultFf
+
+    m = _tiny_handoff_mol()
+    m.box = np.zeros((3, 0), dtype=np.float32)  # no box
+    _write_ff_handoff(m, str(tmpdir), "structure", defaultFf(), None, [])
+
+    with open(os.path.join(tmpdir, "system.yaml")) as fh:
+        sy = yaml.safe_load(fh)
+    assert "boxsize" not in sy  # omitted for vacuum
+    assert os.path.exists(os.path.join(tmpdir, "structure.cif"))
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="needs openmm")
+def test_build_emits_ffxml_handoff(tmpdir):
+    """Full build (membrane fixture, no small molecule / no tleap) emits the
+    ffxml handoff and no longer writes system.xml."""
+    import yaml
+    from htmd.builder.openmm import build as openff_build
+    from moleculekit.molecule import Molecule
+
+    homedir = os.path.join(curr_dir, "data", "test-amber-build", "membrane")
+    mol = Molecule(os.path.join(homedir, "structure.psf"))
+    mol.read(os.path.join(homedir, "structure.pdb"))
+
+    outdir = os.path.join(tmpdir, "openff")
+    molbuilt, _ = openff_build(mol.copy(), outdir=outdir, solvate=False, ionize=False)
+
+    assert not os.path.exists(os.path.join(outdir, "structure.system.xml"))
+    assert os.path.exists(os.path.join(outdir, "structure.cif"))
+    assert os.path.exists(os.path.join(outdir, "structure.pdb"))
+    with open(os.path.join(outdir, "system.yaml")) as fh:
+        sy = yaml.safe_load(fh)
+    assert sy["structure"] == "structure.cif"
+    assert sy["parameters"][0].startswith("amber14")
+    assert len(sy["boxsize"]) == 3
+    rt = Molecule(os.path.join(outdir, "structure.cif"))
+    assert len(rt.bonds) > 0

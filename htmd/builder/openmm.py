@@ -161,7 +161,9 @@ def build(
 
     topology, positions = _mol_to_openmm(mol, outdir, extra_xml=extra_xml)
 
-    forcefield = _setup_forcefield(ff, extra_xml, small_molecule_ff, molecules)
+    forcefield, smallmol_ffxml = _setup_forcefield(
+        ff, extra_xml, small_molecule_ff, molecules
+    )
 
     # Cyclic, disulfide, and custom bonds must be registered in the
     # topology *before* addHydrogens so that OpenMM's template matcher
@@ -272,29 +274,83 @@ def build(
 
     system = forcefield.createSystem(topology, **sys_kw)
 
-    # Serialize the OpenMM System as XML alongside the prmtop. The
-    # XML preserves the System exactly as the ForceField built it
-    # (per-instance parameters, full force-type info), so it can be
-    # round-tripped through ``openmm.XmlSerializer`` without going
-    # through ParmEd's atom-type bucketing. Useful for downstream
-    # energy comparisons and reproducibility.
-    system_xml_path = os.path.join(outdir, f"{prefix}.system.xml")
-    with open(system_xml_path, "w") as fh:
-        fh.write(openmm.XmlSerializer.serialize(system))
-    logger.info(f"Wrote {system_xml_path}")
-
     _export_amber(topology, system, positions, outdir, prefix, export_ff)
 
-    pdb_path = os.path.join(outdir, f"{prefix}.pdb")
-    with open(pdb_path, "w") as fh:
-        app.PDBFile.writeFile(topology, positions, fh)
-    logger.info(f"Wrote {pdb_path}")
-
-    molbuilt = _read_built_molecule(outdir, prefix)
+    # Topology + bonds from the prmtop; coordinates straight from the OpenMM
+    # positions (full precision, no PDB round-trip); box from the topology.
+    molbuilt = _read_built_molecule(outdir, prefix, topology, positions)
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
+
+    # ForceField-XML handoff for ACEMD: moleculekit writes the mmCIF (always)
+    # and the PDB (when it fits the serial limit), plus the parameter set and
+    # system.yaml. Replaces the old system.xml.
+    _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml)
 
     logger.info("Finished building.")
     return molbuilt, system
+
+
+PDB_SERIAL_LIMIT = 99999  # PDB 5-digit atom-serial / CONECT cap
+
+
+def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
+    """Write the self-contained ForceField-XML handoff for ACEMD.
+
+    Emits an *ordered* parameter set (stock FF names first, then copied
+    ``extra_xml`` fragments, then the frozen small-molecule ffxml), an mmCIF
+    topology (always; preserves all connectivity), a PDB (only when the system
+    fits PDB's serial limit — above that CONECT records overflow so we ship
+    only the mmCIF), and a partial ``system.yaml`` config. Returns the ordered
+    ``parameters`` list.
+    """
+    import shutil
+    import yaml
+
+    parameters = [ff] if isinstance(ff, str) else list(ff)  # stock names, ordered first
+
+    if extra_xml:
+        extra_xml = [extra_xml] if isinstance(extra_xml, str) else list(extra_xml)
+        for path in extra_xml:
+            dst = os.path.basename(path)
+            shutil.copy(path, os.path.join(outdir, dst))
+            parameters.append(dst)
+
+    for i, xml in enumerate(smallmol_ffxml):
+        fname = f"{prefix}.smallmol_{i}.xml"
+        with open(os.path.join(outdir, fname), "w") as fh:
+            fh.write(xml)
+        parameters.append(fname)
+
+    cif = f"{prefix}.cif"
+    molbuilt.write(os.path.join(outdir, cif))
+
+    # The PDB is a convenience carrier for other tools; moleculekit writes it
+    # (its CONECT writer caps at the PDB serial limit). Above the limit the
+    # bond records overflow, so we ship only the mmCIF (no such cap).
+    if molbuilt.numAtoms <= PDB_SERIAL_LIMIT:
+        molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"))
+    else:
+        logger.info(
+            f"System has {molbuilt.numAtoms} atoms (> {PDB_SERIAL_LIMIT}); "
+            "PDB CONECT serials overflow — shipping only the mmCIF."
+        )
+
+    system_yaml = {
+        "structure": cif,
+        "coordinates": cif,
+        "parameters": parameters,
+    }
+    # Periodic builds carry a box; vacuum / implicit-solvent builds do not.
+    # Omit boxsize when there is no box, so downstream (e.g. setup_equilibration)
+    # derives one from the coordinates instead of choking on an empty box.
+    if molbuilt.box is not None and molbuilt.box.shape[1] > 0:
+        box = [float(b) for b in molbuilt.box[:, molbuilt.frame]]
+        if any(box):
+            system_yaml["boxsize"] = box
+    with open(os.path.join(outdir, "system.yaml"), "w") as fh:
+        yaml.safe_dump(system_yaml, fh, sort_keys=False)
+    logger.info(f"Wrote ForceField-XML handoff to {outdir}")
+    return parameters
 
 
 # ====================================================================
@@ -1483,6 +1539,7 @@ def _setup_forcefield(ff, extra_xml, small_molecule_ff, molecules):
     if extra_xml:
         _register_extra_xml_template_matcher(forcefield, extra_xml)
 
+    smallmol_ffxml = []
     if small_molecule_ff and molecules:
         if not isinstance(molecules, (list, tuple)):
             molecules = [molecules]
@@ -1510,7 +1567,13 @@ def _setup_forcefield(ff, extra_xml, small_molecule_ff, molecules):
             )
         forcefield.registerTemplateGenerator(gen.generator)
 
-    return forcefield
+        # Emit a static ffxml per small molecule, with partial charges
+        # baked in, so the ACEMD handoff carries the parameters as files
+        # instead of a runtime template generator.
+        for offmol in off_mols:
+            smallmol_ffxml.append(gen.generate_residue_template(offmol))
+
+    return forcefield, smallmol_ffxml
 
 
 # ====================================================================
@@ -1931,23 +1994,43 @@ def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
         raise
 
 
-def _read_built_molecule(outdir, prefix):
+def _read_built_molecule(outdir, prefix, topology=None, positions=None):
     """Read back the built system as a ``Molecule``.
 
-    Reads topology from prmtop and coordinates from the PDB file
-    (ParmEd writes restart-format inpcrd that moleculekit cannot
-    always parse, so PDB is the reliable coordinate source).
+    Topology and bonds come from the prmtop. Coordinates come straight from
+    the OpenMM ``positions`` (full precision, no PDB round-trip) and the box
+    from the OpenMM ``topology`` when given; otherwise the PDB is used as the
+    coordinate source (legacy fallback).
     """
+    import numpy as np
+    from openmm import unit
+    from moleculekit.unitcell import box_vectors_to_lengths_and_angles
+
     prmtop = os.path.join(outdir, f"{prefix}.prmtop")
     pdb = os.path.join(outdir, f"{prefix}.pdb")
 
     if os.path.exists(prmtop) and os.path.getsize(prmtop) > 0:
         try:
             molbuilt = Molecule(prmtop, validateElements=False)
-            if os.path.exists(pdb):
-                pdb_mol = Molecule(pdb)
-                molbuilt.coords = pdb_mol.coords.copy()
-                molbuilt.box = pdb_mol.box.copy()
+            if positions is not None:
+                coords = np.array(
+                    positions.value_in_unit(unit.angstrom), dtype=np.float32
+                )
+                molbuilt.coords = coords.reshape(molbuilt.numAtoms, 3, 1)
+            elif os.path.exists(pdb):
+                molbuilt.coords = Molecule(pdb).coords.copy()
+
+            if topology is not None and topology.getPeriodicBoxVectors() is not None:
+                a, b, c = topology.getPeriodicBoxVectors()
+                la = box_vectors_to_lengths_and_angles(
+                    np.array(a.value_in_unit(unit.angstrom)),
+                    np.array(b.value_in_unit(unit.angstrom)),
+                    np.array(c.value_in_unit(unit.angstrom)),
+                )
+                molbuilt.box = np.array(la[:3], dtype=np.float32).reshape(3, 1)
+                molbuilt.boxangles = np.array(la[3:], dtype=np.float32).reshape(3, 1)
+            elif os.path.exists(pdb):
+                molbuilt.box = Molecule(pdb).box.copy()
             return molbuilt
         except Exception:
             logger.warning("Could not read prmtop — falling back to PDB.")
