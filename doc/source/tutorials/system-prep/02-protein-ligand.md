@@ -72,7 +72,7 @@ You should see one spec for `BEN` - a {py:class}`~moleculekit.tools.nonstandard_
 
 ## Step 3 - Template the non-canonical residues from SMILES
 
-`templateResidueFromSmiles` matches the SMILES against the atoms in the selection, sets correct bond orders and formal charges, and adds the missing hydrogens:
+`templateResidueFromSmiles` matches the SMILES against the atoms in the selection, sets correct bond orders and formal charges, and adds the missing hydrogens. It requires the input residue to already have **bonds** in `mol.bonds`; PDBs without CONECT records need `mol.guessBonds()` (or load with `guessBonds=True`) first:
 
 ```{code-cell} python
 BEN_SMILES = "[NH2+]=C(N)c1ccccc1"
@@ -115,9 +115,9 @@ For each unique `(resname, terminal-position)` bucket, `parameterizeFromSpecs` r
 - `out.topo_paths` - one topology file per unique non-canonical bucket. Free ligands like `BEN` get a `.cif`; chain-resident NCAAs get a `.prepi`.
 - `out.frcmod_paths` - the matching `BEN.frcmod` with bond / angle / dihedral parameters.
 - `out.custombonds` - atom-selection pairs naming the inter-residue bonds tLeap should add (empty here because `BEN` is a free ligand with no covalent connection to the protein).
-- `out.xml_paths` - OpenMM force-field XML(s) for the same residues, in case you later want to switch the build backend.
+- `out.xml_paths` - OpenMM force-field XML(s), in case you later want to switch the build backend. For free ligands with the default GAFF backend you get one combined `gaff_combined.xml`; for cluster-bonded residues you get a per-cluster XML.
 
-The default charge method is **AM1-BCC** - antechamber runs an AM1-BCC calculation per residue, producing standard GAFF-quality charges. We pass `charge_method="gasteiger"` here because it's much faster and good enough for a tutorial; for production builds drop the argument (or set it explicitly to `"am1-bcc"`) for higher-quality electrostatics.
+The default charge method is **AM1-BCC** - antechamber runs an AM1-BCC calculation per **parameterisation cluster** (a small model compound with `ACE`/`NME` caps that closes off the chemistry around each non-canonical residue); the resulting charges are then split back to the constituent residues. We pass `charge_method="gasteiger"` here because it's much faster and good enough for a tutorial; for production builds drop the argument (or set it explicitly to `"am1-bcc"`) for higher-quality electrostatics.
 
 ## Step 6 - Solvate
 
@@ -151,7 +151,7 @@ show3d(built)
 ## Gotchas
 
 - For ionisable ligands, template with the SMILES of the **protonation state at your pH** (e.g. `[NH2+]=C(N)c1ccccc1` for benzamidinium at 7.4). Templating the neutral form locks the wrong protonation state into the parameterization.
-- If a non-canonical residue is at the C-terminus and its template already carries `OXT`, pass `caps={"<segid>": ("ace", "none")}` to {py:func}`~htmd.builder.amber.build` so tLeap doesn't try to add an NME cap on top.
+- If a non-canonical residue is at the C-terminus and its template already carries `OXT`, pass `caps={"<segid>": ("ACE", "none")}` (uppercase `ACE`; cap files in HTMD's library are case-sensitive) to {py:func}`~htmd.builder.amber.build` so tLeap doesn't try to add an NME cap on top.
 - `parameterizeFromSpecs` dedupes by `(resname, is_n_term, is_c_term)`. Two MLE residues in the same chain-position bucket share one topology/parameter set; an N-terminal MLE plus a mid-chain MLE produce two distinct topology/parameter sets.
 
 ## See also

@@ -29,9 +29,12 @@ As the run progresses HTMD creates three more folders:
 
 ```text
 ├── data/        # Completed simulations (auto-created)
-├── filtered/    # Completed simulations with waters stripped (auto-created)
+├── filtered/    # Completed simulations with waters stripped (auto-created when filter=True,
+│                # the default; selection defaults to "not water" via filtersel=)
 ├── generators/  # Initial generators you provided
-└── input/       # Per-epoch starting configurations (auto-created)
+└── input/       # Per-epoch starting directories (auto-created). Each new sim's input dir
+                 # carries the coorname (default input.coor) and the boxname
+                 # (default input.xsc) written from the chosen respawn frame.
 ```
 
 ## Naming scheme
@@ -52,7 +55,7 @@ Per-simulation length is system-dependent. As a rule of thumb use **about twice 
 {py:class}`~htmd.adaptive.adaptiverun.AdaptiveMD` can run two ways:
 
 - **Asynchronous** (default): the script launches the next epoch when prerequisites are met, then exits. You re-launch it on a schedule (e.g. cron).
-- **Synchronous**: set `updateperiod` to a non-zero value. The script blocks, sleeping `updateperiod` seconds between adaptive iterations, and never exits while the run is in progress.
+- **Synchronous**: set `updateperiod` to a non-zero value. The script blocks, sleeping `updateperiod` seconds between adaptive iterations, and only exits once the run's stop condition fires (`nepochs` reached, `nframes` reached, or an error).
 
 For interactive notebook work, synchronous mode is usually easier. For long campaigns on a queue, async + cron is more robust to interruptions.
 

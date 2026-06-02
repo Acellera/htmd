@@ -13,7 +13,7 @@ flowchart LR
 
 ## 1. SimList - enumerate trajectories
 
-{py:func}`~htmd.simlist.simlist` walks a `data/` (or `filtered/`) directory tree and returns a list of {py:class}`~htmd.simlist.Sim` objects, each pointing at one trajectory together with its topology. This is the moral equivalent of `glob` plus topology matching, and it's the only object you carry through the rest of the pipeline.
+{py:func}`~htmd.simlist.simlist` takes an explicit list of trajectory directories and a matching list of topology files (or one shared topology), and returns a list of {py:class}`~htmd.simlist.Sim` objects, each pointing at one trajectory together with its topology. It's the moral equivalent of `glob` plus topology matching - you provide the globs - and it's the only object you carry through the rest of the pipeline.
 
 ```python
 from htmd.ui import *
@@ -30,24 +30,24 @@ metr.set(MetricDistance("name CA", "resname BEN", periodic="selections"))
 data = metr.project()
 ```
 
-The result is a {py:class}`~htmd.metricdata.MetricData` object: a `(n_simulations, n_frames_per_sim, n_features)` tensor plus the mapping back to individual frames.
+The result is a {py:class}`~htmd.metricdata.MetricData` object: a ragged list of per-trajectory `(n_frames_i, n_features)` arrays (different sims can have different lengths) plus the mapping back to individual frames.
 
 ## 3. Dimensionality reduction - keep what matters
 
 For all but the simplest systems, the raw projection has too many features for clustering to behave well. HTMD provides:
 
 - {py:class}`~htmd.projections.tica.TICA` - time-lagged independent component analysis, the default choice for MD.
-- {py:class}`~htmd.projections.gwpca.GWPCA` - generalised weighted PCA.
+- {py:class}`~htmd.projections.gwpca.GWPCA` - globally-weighted PCA.
 
-Both classes take a {py:class}`~htmd.metricdata.MetricData` and return a new {py:class}`~htmd.metricdata.MetricData` in the reduced space.
+Both classes take a {py:class}`~htmd.metricdata.MetricData` and a **lag time** (in frames or absolute time units) and return a new {py:class}`~htmd.metricdata.MetricData` in the reduced space. `TICA` can also wrap a `Metric` directly for on-the-fly projection without materialising the full feature array first.
 
 ## 4. Clustering - discretise the state space
 
 Clustering assigns each frame to one of `K` microstates. HTMD wraps several clustering schemes:
 
 - `MiniBatchKMeans` from scikit-learn (the usual default).
-- {py:class}`~htmd.clustering.kcenters.KCenters` - good for low-population states.
-- {py:class}`~htmd.clustering.regular.RegularGrid` - deterministic grid in feature space.
+- {py:class}`~htmd.clustering.kcenters.KCenter` - good for low-population states.
+- {py:class}`~htmd.clustering.regular.RegCluster` - radius-based assignment around precomputed centres.
 
 The result is a per-frame integer label stored on the same `MetricData` object.
 
@@ -58,11 +58,14 @@ The result is a per-frame integer label stored on the same `MetricData` object.
 {py:class}`~htmd.kinetics.Kinetics` consumes the `Model` and computes mean first-passage times, rate constants, and free energies between user-specified source and sink states.
 
 ```python
+data_clust.fstep = 0.1                          # ns per frame - Kinetics needs this
 model = Model(data_clust)
 model.markovModel(lag=20, macronum=4)
 kin = Kinetics(model, temperature=300, concentration=1e-3)
 kin.getRates()
 ```
+
+`Kinetics` raises if `model.data.fstep` is `None` - it needs the per-frame timestep to convert rates into wall-clock units.
 
 ## What this means in practice
 

@@ -78,7 +78,7 @@ print(f"prepared system has {prepared.numAtoms} atoms")
 solvated = solvate(prepared, pad=12)
 ```
 
-`pad=12` adds a 12 Å water buffer around the system. RNA backbones are flexible and need a bit more padding than a globular protein - `pad=10` would also work for a tutorial-sized system but `pad=12` is safer for the typical RNA breathing motions.
+`pad=12` extends the simulation box by 12 Å on each side of the solute's bounding box (waters that would clash with the solute are removed, so the *actual* water shell can be a bit thinner than 12 Å around bulges). RNA backbones are flexible and need a bit more padding than a globular protein - `pad=10` would also work for a tutorial-sized system but `pad=12` is safer for the typical RNA breathing motions.
 
 ## Step 5 - Build under AMBER
 
@@ -92,7 +92,7 @@ That single call:
 - Adds **Na⁺ counter-ions** to neutralise the RNA backbone. RNA carries -1 per nucleotide, so a 30-nt construct contributes -30 in total - expect ~20-25 neutralising Na⁺ (the protein also carries some net charge that offsets a few). Then enough NaCl is added on top to reach 0.15 M.
 - No disulfide bonds in 1AUD; auto-detection finds nothing and moves on.
 
-The output `./build/structure.prmtop` + `structure.pdb` is now ready for an equilibration protocol (e.g. {py:func}`acemd.protocols.setup_equilibration`).
+The output `./build/structure.prmtop` + `structure.pdb` (and `structure.crd`, the AMBER inpcrd that `setup_equilibration` actually reads) is now ready for an equilibration protocol (e.g. {py:func}`acemd.protocols.setup_equilibration`).
 
 ## Gotchas
 

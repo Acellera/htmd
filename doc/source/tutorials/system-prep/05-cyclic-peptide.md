@@ -19,17 +19,17 @@ kernelspec:
 - You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>` - this tutorial builds on the same five-step flow.
 
 ```{note}
-The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the SMILES dictionary you pass to `templateResidueFromSmiles`. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the input structure's connectivity to find the non-canonical residues and the ring-closing peptide bond on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` handles the cluster parameterization without any extra wiring.
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the SMILES dictionary you pass to `templateResidueFromSmiles`. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` finds the non-canonical residues; the ring-closing peptide bond is added separately by `amber.build`'s cyclic-segment detector, which spots head-to-tail N-C distances under 1.35 Å in the input geometry and emits the closing `bond` directive itself.
 ```
 
 ## What makes cyclic peptides interesting
 
 Cyclosporin A is a head-to-tail cyclic 11-residue peptide. Almost every residue is N-methylated or otherwise modified, and there are no canonical anchors - every residue is a non-canonical amino acid (NCAA), and the first and last residues are covalently joined to close the ring.
 
-For the build flow, the practical implication: {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` will return one {py:class}`~moleculekit.tools.nonstandard_residues.ChainResidueSpec` per NCAA, plus the inter-residue peptide bonds are added as `custombonds` so tLeap closes the ring correctly. **You don't have to wire the cyclisation by hand** - detect sees the existing peptide bond between the last and first residues and emits the corresponding custombond.
+For the build flow, the practical implication: {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` returns one {py:class}`~moleculekit.tools.nonstandard_residues.ChainResidueSpec` per NCAA — and that's it. The ring-closing peptide bond is **not** in `out.custombonds`; instead, {py:func}`~htmd.builder.amber.build` runs its own cyclic-segment detector at build time, sees the short head-to-tail N-C distance in the input coordinates, lifts the cyclic segment into its own tLeap unit, and writes an explicit `bond cyc_X.<first>.N cyc_X.<last>.C` to close the ring. **You don't have to wire the cyclisation by hand**, but it is the builder — not detect — that closes the loop.
 
 ```{note}
-This tutorial **skips solvation and ionisation** so the build runs in seconds and the focus stays on the cyclisation. For a production run, either solvate first with {py:func}`~htmd.builder.solvate.solvate` (and keep `ionize=True` on the build) or build with implicit solvent by passing `gbsa=True` to {py:func}`~htmd.builder.amber.build`.
+This tutorial **skips solvation and ionisation** so the build runs in seconds and the focus stays on the cyclisation. For a production run, solvate first with {py:func}`~htmd.builder.solvate.solvate` (and keep `ionize=True` on the build). For implicit-solvent dynamics downstream, pass `gbsa=True` to {py:func}`~htmd.builder.amber.build` — that sets GB-compatible radii on the prmtop; the GB model itself is enabled by the MD engine at run time.
 ```
 
 ## Setup
@@ -109,7 +109,7 @@ out = parameterizeFromSpecs(
 print(out)
 ```
 
-`parameterizeFromSpecs` dedupes by `(resname, is_n_term, is_c_term)`. Three `MLE` residues at mid-chain produce **one** `MLE.prepi`. The `out.custombonds` list carries every NCAA-NCAA peptide bond - including the closing bond between residue N and residue 1, which is what makes this a cycle.
+`parameterizeFromSpecs` dedupes singleton chain-NCAA entries by `(resname, is_n_term, is_c_term)`. Three `MLE` residues at mid-chain produce **one** `MLE.prepi`. `out.custombonds` is **empty for this purely-peptide-bonded cyclic peptide** - the closing N-C bond gets added by `amber.build` directly as a cyclic-segment directive (see the note above), not by `parameterizeFromSpecs`.
 
 ## Step 6 - Build
 
@@ -124,7 +124,7 @@ amber.build(
 )
 ```
 
-`ionize=False` skips ion placement because we haven't solvated; tLeap still adds `bond` directives for every entry in `custombonds`, including the head-to-tail closure, so the resulting `prmtop` carries a closed ring.
+`ionize=False` skips ion placement because we haven't solvated. The head-to-tail closure is written by `amber.build`'s cyclic-segment block (a dedicated `bond cyc_X.<first>.N cyc_X.<last>.C` directive emitted alongside `loadpdb` for the cyclic unit) rather than through `custombonds`, so the resulting `prmtop` carries a closed ring regardless of what's in `out.custombonds`.
 
 ## Gotchas
 

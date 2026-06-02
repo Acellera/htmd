@@ -91,17 +91,18 @@ out = parameterizeFromSpecs(
 print(out)
 ```
 
-`forcefield` strings that don't start with `gaff` are treated as SMIRNOFF offxml filenames and dispatched through OpenFF Interchange. The output `ClusterOutputs` will carry `.xml` files in `xml_paths` (per-cluster OpenMM force-field XML); `topo_paths` and `frcmod_paths` may be empty for the SMIRNOFF branch, since the XML is self-contained.
+`forcefield` strings that don't start with `gaff` are treated as SMIRNOFF offxml filenames and dispatched through OpenFF Interchange. The output `ClusterOutputs` carries `.xml` files in `xml_paths` - one `<resname>.xml` per **free ligand** (like the benzamidine here), and one `cluster_<idx>.xml` per cluster of covalently-bonded NCAAs. `topo_paths` and `frcmod_paths` may be empty for the SMIRNOFF branch, since the XML is self-contained.
 
-`charge_method="nagl"` runs the OpenFF NAGL GNN surrogate for AM1-BCC, which is the charge model Sage's vdW and torsion parameters were fit against. Mixing Sage with Gasteiger or any other model emits a mismatched-charges warning - it works, but you lose some of the consistency the Sage release was validated for.
+`charge_method="nagl"` runs the OpenFF NAGL GNN surrogate for the charge model Sage's vdW and torsion parameters were fit against (AM1-BCC for Sage 2.0–2.2, AshGC for Sage 2.3). Passing any non-`"nagl"` `charge_method` (`"am1-bcc"`, `"gasteiger"`, `"resp"`, …) emits a mismatched-charges warning - it works, but you lose some of the consistency the Sage release was validated for.
 
 ## Step 6 - Build under OpenMM
 
 ```{code-cell} python
-# 3PTB ships with crystallographic waters that systemPrepare keeps; strip
-# them so openmm.build's internal solvation step runs (otherwise it sees
-# the mol as already-solvated and skips it, leaving only the close-in
-# crystal waters that the ioniser can't safely swap for ions).
+# 3PTB ships with a handful of crystallographic waters that systemPrepare keeps.
+# openmm.build's internal solvation step sees them and treats the mol as already-
+# solvated, so it skips adding bulk water - which then leaves too few waters for
+# the ioniser to swap into Na+/Cl- and still reach 0.15 M. Strip the crystal
+# waters first so the builder solvates from scratch.
 prepared.remove("water", _logger=False)
 
 built, system = openmm.build(

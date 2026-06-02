@@ -19,7 +19,7 @@ kernelspec:
 - You've worked through {doc}`Build a stapled peptide <04-stapled-peptide>` - this tutorial extends the same scaffolded-NCAA pattern.
 
 ```{note}
-The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the single SMILES you pass to `templateResidueFromSmiles` (for the LFI scaffold). {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the three `SG-Cn` thioether bonds and the three CYS chain-positions from the input structure's connectivity on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` carries them through to the build without any extra wiring.
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the single SMILES you pass to `templateResidueFromSmiles` (for the LFI scaffold). {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the three `SG-Cn` thioether bonds and the three CYS chain-positions from the input structure's connectivity on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` emits a `custombonds` list and topology / parameter files which you still pass explicitly to {py:func}`~htmd.builder.amber.build` — same plumbing as tutorial 02.
 ```
 
 ## What the bicycle is
@@ -32,7 +32,7 @@ The combined topology makes the peptide **bicyclic**: the backbone plus the thre
 2. {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` produces one `LFI.cif` for the scaffold plus one `.prepi` per CYS bucket, and three entries in `custombonds` - one per `SG-Cn` thioether closure.
 
 ```{note}
-This tutorial **skips solvation and ionisation** so the build runs in seconds and the focus stays on the scaffolding. For a production run, either solvate first with {py:func}`~htmd.builder.solvate.solvate` (and keep `ionize=True` on the build) or build with implicit solvent by passing `gbsa=True` to {py:func}`~htmd.builder.amber.build`.
+This tutorial **skips solvation and ionisation** so the build runs in seconds and the focus stays on the scaffolding. For a production run, solvate first with {py:func}`~htmd.builder.solvate.solvate` (and keep `ionize=True` on the build). If you want implicit-solvent dynamics downstream, pass `gbsa=True` to {py:func}`~htmd.builder.amber.build` — this only sets the GB-compatible radii on the prmtop; the GB model itself is enabled by the MD engine at run time.
 ```
 
 ## Setup
@@ -75,9 +75,9 @@ for spec in specs:
 You should see one `ScaffoldSpec(resname='LFI', ...)` and three `ChainResidueSpec(resname='CYS', ..., new_resname='XX*')` entries. The three CYS residues each get a **different** `new_resname` so the downstream parameterization can write a distinct topology per residue. Two reasons for the rename:
 
 1. **They're not canonical anymore.** Each one carries an extra `SG-Cn` thioether bond to the scaffold, so the standard ff14SB `CYS` template no longer matches - the sulphur valence is different, and ff14SB wouldn't know what to do at the new bond. Renaming to a non-canonical bucket lifts these residues out of the built-in `CYS` library and lets `parameterizeFromSpecs` write a per-residue topology that combines ff14SB backbone types with GAFF2 sulphur-side typing.
-2. **Each sits in a different chain position.** `CYS11` is N-terminal, `CYS17` is mid-chain, `CYS22` is C-terminal - so the backbone hydrogen counts and formal charges differ between them. `parameterizeFromSpecs` buckets by `(resname, is_n_term, is_c_term)`, so giving the three CYS the same `new_resname` would collapse them into one bucket and lose the chain-position distinction.
+2. **Each sits in a different chain position.** `CYS11` is N-terminal, `CYS17` is mid-chain, `CYS22` is C-terminal - so the backbone hydrogen counts and formal charges differ between them. The detect step deduplicates by `(resname, anchor_atom, partner_resname, is_n_term, is_c_term)`; giving the three CYS the same `new_resname` would collapse them into one bucket and lose the chain-position distinction.
 
-Detect also drops the `HG` hydrogen on each CYS sulphur, since those positions are now occupied by the thioether bond.
+The `HG` hydrogen on each CYS sulphur is dropped at build time by `amber.build` (the CYS anchor variants that ship with HTMD's bond library have no `HG`); the rename plus the `custombonds` entry are what tell the builder which CYS variant to apply.
 
 ## Step 3 - Template the LFI scaffold from SMILES
 
@@ -154,7 +154,7 @@ print("SG-Cn thioether bonds:", n_thioether)        # should be 3
 ## Gotchas
 
 - Pass the **unbound** scaffold SMILES (with the leaving groups). `templateResidueFromSmiles` recognises the leaving-group atoms as terminal heavy atoms unmatched by the structure and strips them automatically; templating the *bound* form (no leaving groups) doesn't have enough atoms to disambiguate the MCS match.
-- `parameterizeFromSpecs` buckets canonical anchors by `(resname, is_n_term, is_c_term)`, so an N-terminal CYS, a mid-chain CYS, and a C-terminal CYS *each* get their own `.prepi`. Don't be surprised by three CYS-derived topology files - the cluster pipeline needs them distinct because the backbone protonation differs at each position.
+- `detectNonStandardResidues` buckets canonical anchors by `(resname, anchor_atom, partner_resname, is_n_term, is_c_term)`. With three CYS in three distinct chain positions you get **three** distinct buckets — and downstream `parameterizeFromSpecs` writes one `.prepi` per bucket. Don't be surprised by three CYS-derived topology files; the cluster pipeline needs them distinct because the backbone protonation differs at each position.
 - The same flow handles other "constrained peptide" scaffolds (TATA, TBMT, ...) - swap `LFI_SMILES` for the scaffold's SMILES and let detect emit the appropriate `ScaffoldSpec` + canonical-anchor renames.
 
 ## See also

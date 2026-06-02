@@ -41,7 +41,6 @@ This tutorial **skips solvation and ionisation** so the build runs in seconds an
 
 ```{code-cell} python
 from moleculekit.molecule import Molecule
-from moleculekit.tools.autosegment import autoSegment
 from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
 from moleculekit.tools.preparation import systemPrepare
 from htmd.builder import amber

@@ -21,8 +21,8 @@ kernelspec:
 
 For a protein containing only canonical residues, building is four steps after loading:
 
-1. {py:func}`~moleculekit.tools.autosegment.autoSegment` - automatically split the structure into independent segments by walking the residue connectivity and starting a new segment at every real chain break (residue-number gap validated by backbone distance for proteins).
-2. {py:func}`~moleculekit.tools.preparation.systemPrepare` - protonate at the chosen pH, fix protonation states, fill in missing sidechains and some missing backbone heavy atoms.
+1. {py:func}`~moleculekit.tools.autosegment.autoSegment` - automatically split the structure into independent segments by walking the residue connectivity and starting a new segment at every real chain break (decided from the backbone-atom distance between consecutive residues - resid numbering is not consulted).
+2. {py:func}`~moleculekit.tools.preparation.systemPrepare` - protonate at the chosen pH, fix protonation states, and patch a few missing heavy atoms (full missing-sidechain restoration is off by default; opt in with `restore_missing_sidechains=True`).
 3. {py:func}`~htmd.builder.solvate.solvate` - wrap a water box around the prepared structure.
 4. {py:func}`htmd.builder.amber.build` - run tLeap to produce a `prmtop` + `pdb` pair (and ionise to the requested salt concentration).
 
@@ -62,7 +62,7 @@ show3d(mol)
 mol = autoSegment(mol, fields=("segid", "chain"))
 ```
 
-{py:func}`~moleculekit.tools.autosegment.autoSegment` walks the structure residue-by-residue and starts a new segment whenever it sees a real chain break: a jump in residue numbers (e.g. resids 22 → 50 with no intermediate residues) that the spatial check confirms is a true gap in the backbone, *or* a transition from one chain identifier to another. Each contiguous run of bonded residues gets its own segid. This is what stops {py:func}`~htmd.builder.amber.build` from extending a protein chain through a HETATM ligand later, and from auto-capping the wrong terminus when a non-canonical residue sits at the chain end.
+{py:func}`~moleculekit.tools.autosegment.autoSegment` walks the structure residue-by-residue and starts a new segment whenever the backbone-atom distance between consecutive residues exceeds the chain-continuity threshold (a ~2.5 Å C–N for proteins, a ~3 Å O3'–P for nucleic acids). Residue-number jumps are ignored — only backbone geometry counts. Each contiguous run of bonded residues gets its own segid. This is what stops {py:func}`~htmd.builder.amber.build` from extending a protein chain through a HETATM ligand later, and from auto-capping the wrong terminus when a non-canonical residue sits at the chain end.
 
 For Trp-cage there's just one continuous chain, so autoSegment produces a single segment named `P0`.
 
@@ -90,7 +90,7 @@ solvated = solvate(prepared, pad=10)
 show3d(solvated)
 ```
 
-{py:func}`~htmd.builder.solvate.solvate` wraps a TIP3P water box around the prepared molecule. `pad=10` adds 10 Å of water in every direction beyond the molecule's bounding box. We keep the box small to keep the tutorial fast; for a production run you'd typically use a larger pad (15-20 Å) so that any local unfolding or large-scale motion can't reach across the periodic boundary and interact with the protein's own image.
+{py:func}`~htmd.builder.solvate.solvate` wraps a pre-equilibrated water box around the prepared molecule. The actual water model that tLeap parameterizes those atoms with is whatever the `leaprc.water.*` entry in `ff` selects (default TIP3P via `leaprc.water.tip3p`). `pad=10` adds 10 Å of water in every direction beyond the molecule's bounding box. We keep the box small to keep the tutorial fast; for a production run you'd typically use a larger pad (15-20 Å) so that any local unfolding or large-scale motion can't reach across the periodic boundary and interact with the protein's own image.
 
 ## Step 5 - Build under AMBER
 
@@ -111,7 +111,8 @@ build/
 ├── structure.pdb         # built coordinates as PDB
 ├── structure.crd         # built coordinates as CRD
 ├── tleap.in              # tLeap input we generated
-├── leap.log              # tLeap's log
+├── leap.log              # tLeap's own log
+├── log.txt               # tLeap stdout/stderr captured by HTMD
 └── ff*_leaprc.*          # force-field paths sourced by tLeap
 ```
 
@@ -124,7 +125,7 @@ The `structure.prmtop` + `structure.pdb` pair is what {py:func}`acemd.protocols.
 | Argument | Default | Format |
 | --- | --- | --- |
 | `ff` | {py:func}`amber.defaultFf() <htmd.builder.amber.defaultFf>` | tLeap `leaprc.*` files (the master force-field selectors). |
-| `topo` | {py:func}`amber.defaultTopo() <htmd.builder.amber.defaultTopo>` (empty) | Residue topology templates: `.prepi`, `.prep`, `.in`, `.cif`, or `.mol2` (the last two are converted to prepi via `prepgen` automatically). |
+| `topo` | {py:func}`amber.defaultTopo() <htmd.builder.amber.defaultTopo>` (empty) | Residue topology templates: `.prepi` / `.prep` / `.in` (loaded with `loadamberprep`), or `.cif` / `.mol2` (loaded with tLeap's `loadmol2` after an internal CIF→mol2 conversion - `prepgen` is not invoked). |
 | `param` | {py:func}`amber.defaultParam() <htmd.builder.amber.defaultParam>` (empty) | Parameter overlays: `.frcmod`. |
 
 Inspect the active defaults:
@@ -171,7 +172,7 @@ amber.listFiles()
 | `ionize` | Add counter-ions and salt. `True` by default. |
 | `saltconc` | NaCl concentration in mol/L when `ionize=True`. Defaults to `0` (counter-ions only). |
 | `disulfide` | `None` for auto-detect, or a list of `(sel1, sel2)` atom-selection pairs. |
-| `caps` | Per-segment caps as `{"P0": ("ace", "nme")}`. Auto by default; pass `("none", "none")` for a free terminus. |
+| `caps` | Per-segment caps as `{"P0": ("ACE", "NME")}` (the cap names are **uppercase** - they map to `ACE.pdb`/`NME.pdb` in HTMD's cap library, so lowercase raises `FileNotFoundError`). Auto by default; pass `("none", "none")` for a free terminus. |
 
 ## Gotchas
 
