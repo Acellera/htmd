@@ -12,7 +12,7 @@ kernelspec:
 
 # Run an MD simulation with ACEMD
 
-**You will learn:** how to take a built, solvated, ionised system and drive it through a complete MD protocol - equilibration then production - using ACEMD.
+**You will learn:** how to take a built, solvated, ionised system and drive it through a complete MD protocol - equilibration then production - using [ACEMD](https://software.acellera.com/acemd/).
 
 **Prerequisites:**
 - HTMD installed.

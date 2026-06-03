@@ -14,7 +14,7 @@ system-prep/index
 
 ## Running MD simulations
 
-Drive a built system through equilibration and production with the ACEMD MD engine. The tutorial uses the canonical Trp-cage build as input, walks the `setup_equilibration → acemd → setup_production → acemd` chain, and ends with the trajectory that downstream MSM analysis consumes.
+Drive a built system through equilibration and production with the [ACEMD](https://software.acellera.com/acemd/) MD engine. The tutorial uses the canonical Trp-cage build as input, walks the `setup_equilibration → acemd → setup_production → acemd` chain, and ends with the trajectory that downstream MSM analysis consumes.
 
 ```{toctree}
 :maxdepth: 1

@@ -22,7 +22,7 @@ sims = simlist(glob("data/*/"), glob("input/*/structure.pdb"))
 
 ## 2. Projection - per-frame features
 
-A **projection** maps each frame of each simulation to a feature vector. Projections come from moleculekit's `metric*` family - `MetricDistance`, `MetricRmsd`, `MetricDihedral`, `MetricSecondaryStructure`, ... - configured once and applied across the whole `SimList`:
+A **projection** maps each frame of each simulation to a feature vector. Projections come from moleculekit's `metric*` family - {py:class}`~moleculekit.projections.metricdistance.MetricDistance`, {py:class}`~moleculekit.projections.metricrmsd.MetricRmsd`, {py:class}`~moleculekit.projections.metricdihedral.MetricDihedral`, {py:class}`~moleculekit.projections.metricsecondarystructure.MetricSecondaryStructure`, ... - configured once and applied across the whole `SimList`:
 
 ```python
 metr = Metric(sims)
