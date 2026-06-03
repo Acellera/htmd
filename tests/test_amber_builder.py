@@ -622,6 +622,7 @@ def test_tleap_residue_positions_cyclic_appended_in_cyc_info_order():
     assert cyc2_pos == {4}
 
 
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_custombond_directive_matches_combined_unit_position(tmp_path):
     """Regression test: when waters sit between two solute residues in
     the htmd-internal mol order, the bond directive must reference the
@@ -677,6 +678,7 @@ def test_custombond_directive_matches_combined_unit_position(tmp_path):
     )
 
 
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_built_molecule_has_box_from_crd(tmp_path):
     """`amber.build()` must propagate the box dimensions tLeap wrote into the
     `.crd` onto the returned Molecule. Without this, downstream consumers
