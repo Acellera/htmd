@@ -2238,6 +2238,10 @@ def test_emitted_xml_matches_interchange_energy(tmp_path):
     not (_openmm_installed and _openff_installed),
     reason="needs openmm + openff",
 )
+@pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="AM1-BCC charge model unavailable on Windows",
+)
 def test_setup_forcefield_emits_small_molecule_ffxml():
     from htmd.builder.openmm import _setup_forcefield, defaultFf
     from openff.toolkit import Molecule as OFFMolecule
