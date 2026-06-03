@@ -19,7 +19,7 @@ kernelspec:
 - You've worked through {doc}`Build a stapled peptide <04-stapled-peptide>` - this tutorial extends the same scaffolded-NCAA pattern.
 
 ```{note}
-The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the single SMILES you pass to `templateResidueFromSmiles` (for the LFI scaffold). {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the three `SG-Cn` thioether bonds and the three CYS chain-positions from the input structure's connectivity on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` emits a `custombonds` list and topology / parameter files which you still pass explicitly to {py:func}`~htmd.builder.amber.build` — same plumbing as tutorial 02.
+The workflow below is **identical** to {doc}`Build a protein with a ligand <02-protein-ligand>` - the only change is the single SMILES you pass to {py:meth}`~moleculekit.molecule.Molecule.templateResidueFromSmiles` (for the LFI scaffold). {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` reads the three `SG-Cn` thioether bonds and the three CYS chain-positions from the input structure's connectivity on its own, and {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` emits a `custombonds` list and topology / parameter files which you still pass explicitly to {py:func}`~htmd.builder.amber.build` — same plumbing as tutorial 02.
 ```
 
 ## What the bicycle is
