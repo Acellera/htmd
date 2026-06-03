@@ -44,8 +44,12 @@ class AdaptiveBandit(AdaptiveBase):
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
     coorname : str, default='input.coor'
         Name of the file containing the starting coordinates for the new simulations
+    boxname : str, default='input.xsc'
+        Name of the file containing the starting box dimensions for the new simulations. Set to 'none' to disable box writing.
     lock : bool, default=False
         Lock the folder while adaptive is ongoing
+    mps : int, default=0
+        If mps > 0, it will run simulations using the Multi-Process Service (MPS) with the number of processes specified. If set to 0, mps is disabled
     datapath : str, default='data'
         The directory in which the completed simulations are stored
     filter : bool, default=True
@@ -60,7 +64,7 @@ class AdaptiveBandit(AdaptiveBase):
     goalfunction : function, default=None
         This function will be used to convert the goal-projected simulation data to a ranking whichcan be used for the
         directed component of FAST.
-    reward_method : str, default='max'
+    reward_method : str, default='mean'
         The reward method
     statetype : ('cluster', 'micro', 'macro'), str, default='micro'
         State type (cluster, micro, macro) to use for reward calculations.
@@ -68,7 +72,7 @@ class AdaptiveBandit(AdaptiveBase):
         Allows skipping of simulation frames to reduce data. i.e. skip=3 will only keep every third frame
     lag : int, default=1
         The lagtime used to create the Markov model. Units are in frames.
-    exploration : float, default=0.5
+    exploration : float, default=0.01
         Exploration is the coefficient used in UCB algorithm to weight the exploration value
     temperature : int, default=300
         Temperature used to compute the free energy

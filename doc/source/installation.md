@@ -17,7 +17,7 @@ We recommend Miniforge: <https://github.com/conda-forge/miniforge>. Once it's in
 ```bash
 conda create -n htmd
 conda activate htmd
-conda install python=3.10 htmd -c acellera -c conda-forge
+conda install htmd -c acellera -c conda-forge
 ```
 
 Some HTMD features (e.g. CHARMM building, [ACEMD](https://software.acellera.com/acemd/) integration) depend on tools that conda can install but pip cannot. If you hit a `FileNotFoundError` for an external binary, switch to the conda install.

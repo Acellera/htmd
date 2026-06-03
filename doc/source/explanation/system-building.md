@@ -24,7 +24,7 @@ flowchart LR
 
 Ionisation runs as the builder's `ionize=True` default in all three backends. **Solvation** is only built-in for {py:func}`htmd.builder.openmm.build` (default `solvate=True`); for {py:func}`htmd.builder.amber.build` and {py:func}`htmd.builder.charmm.build` you call {py:func}`~htmd.builder.solvate.solvate` explicitly before the build.
 
-The four [system-building tutorials](../tutorials/system-prep/index.md) walk this pipeline for protein-only, protein-ligand, protein-protein, and protein-in-membrane systems. The same pipeline handles every case below.
+The eight [system-building tutorials](../tutorials/system-prep/index.md) walk this pipeline for protein-only, protein-ligand (AMBER and OpenFF), stapled, cyclic, and bicyclic peptides, protein-in-membrane, and protein-RNA systems. The same pipeline handles every case below.
 
 ## Beyond canonical proteins
 
@@ -74,6 +74,6 @@ Force-field-specific tooling lives in the same module as the build entry point; 
 
 ## What to read next
 
-- The four [system-building tutorials](../tutorials/system-prep/index.md) for guided walk-throughs.
+- The eight [system-building tutorials](../tutorials/system-prep/index.md) for guided walk-throughs.
 - {doc}`Asymmetric bilayer how-to <../how-to/membrane-asymmetric-bilayer>` for per-leaflet membrane composition.
 - {py:mod}`htmd.builder` and {py:mod}`htmd.membranebuilder` in the [API reference](../reference/index.md) for full signatures.

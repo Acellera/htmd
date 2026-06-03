@@ -24,7 +24,7 @@ simulation/index
 
 ## MSM analysis
 
-Three end-to-end MSM analyses on real systems - benchmark trypsin/benzamidine, villin folding, and CXCL12. Each tutorial walks the full simulation-list → projection → clustering → model → kinetics pipeline. The {doc}`MSM workflow concept page <../explanation/msm-workflow>` sketches that pipeline before you start.
+Two end-to-end MSM analyses on real systems - benchmark trypsin/benzamidine and villin folding. Each tutorial walks the full simulation-list → projection → clustering → model → kinetics pipeline. The {doc}`MSM workflow concept page <../explanation/msm-workflow>` sketches that pipeline before you start.
 
 ```{toctree}
 :maxdepth: 1

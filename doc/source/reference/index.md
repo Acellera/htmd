@@ -20,6 +20,7 @@ htmd.config
 ```{toctree}
 :maxdepth: 1
 
+htmd.builder
 htmd.builder.builder
 htmd.builder.charmm
 htmd.builder.amber
@@ -35,6 +36,7 @@ htmd.builder.nonstandard
 ```{toctree}
 :maxdepth: 1
 
+htmd.membranebuilder
 htmd.membranebuilder.build_membrane
 htmd.membranebuilder.globalminimization
 htmd.membranebuilder.ljfluid
@@ -46,11 +48,13 @@ htmd.membranebuilder.ringpenetration
 ```{toctree}
 :maxdepth: 1
 
+htmd.adaptive
 htmd.adaptive.adaptive
 htmd.adaptive.adaptiverun
 htmd.adaptive.adaptivegoal
 htmd.adaptive.adaptivegoaleg
 htmd.adaptive.adaptivebandit
+htmd.adaptive.util
 ```
 
 ## Projections (HTMD-specific)
@@ -58,6 +62,7 @@ htmd.adaptive.adaptivebandit
 ```{toctree}
 :maxdepth: 1
 
+htmd.projections
 htmd.projections.metric
 htmd.projections.tica
 htmd.projections.gwpca
@@ -69,6 +74,7 @@ htmd.projections.kmeanstri
 ```{toctree}
 :maxdepth: 1
 
+htmd.clustering
 htmd.clustering.kcenters
 htmd.clustering.regular
 ```
@@ -92,6 +98,19 @@ htmd.pathplanning
 :maxdepth: 1
 
 htmd.dock
+```
+
+## Utilities / internal
+
+```{toctree}
+:maxdepth: 1
+
+htmd.decorators
+htmd.latest
+htmd.license
+htmd.parallelprogress
+htmd.session
+htmd.versionwarnings
 ```
 
 ```{toctree}

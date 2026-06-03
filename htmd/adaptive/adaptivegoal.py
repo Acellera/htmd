@@ -46,8 +46,12 @@ class AdaptiveGoal(AdaptiveMD):
         When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds
     coorname : str, default='input.coor'
         Name of the file containing the starting coordinates for the new simulations
+    boxname : str, default='input.xsc'
+        Name of the file containing the starting box dimensions for the new simulations. Set to 'none' to disable box writing.
     lock : bool, default=False
         Lock the folder while adaptive is ongoing
+    mps : int, default=0
+        If mps > 0, it will run simulations using the Multi-Process Service (MPS) with the number of processes specified. If set to 0, mps is disabled
     datapath : str, default='data'
         The directory in which the completed simulations are stored
     filter : bool, default=True
@@ -89,6 +93,14 @@ class AdaptiveGoal(AdaptiveMD):
         Spawn only from top DC conformations without sampling
     autoscale : bool, default=False
         Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a given goal score.
+    autoscalemult : float, default=1
+        Multiplier for the scaling factor.
+    autoscaletol : float, default=0.2
+        Tolerance for the scaling factor.
+    autoscalediff : int, default=10
+        Diff in epochs to use for scaling factor.
+    savegoal : str, default=None
+        Save the goal values to the specified file
 
     Example
     -------
