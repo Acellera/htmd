@@ -21,7 +21,7 @@ for s in sims[:5]:
           s.molfile)     # topology file(s) for this sim
 ```
 
-Each {py:class}`~htmd.simlist.Sim` records the path to its `input/` directory; the directory **name** is the parent-tracking key. For an epoch-1 sim it looks like `e1s3_<generator-name>` (epoch 1, spawn 3, descended from the named generator); for later epochs it looks like `e3s7_e1s2p0f120` (epoch 3 spawn 7, parent = the sim named `e1s2`, piece `p0`, frame `f120`). The `e<n>s<m>` prefix is the only part that's stable; everything after `_` encodes provenance and varies in shape.
+Each {py:class}`~htmd.simlist.Sim` records the path to its `input/` directory; the directory **name** is the parent-tracking key (e.g. `e3s7_e1s2p0f120`). The leading `e<n>s<m>` is the epoch / spawn, and everything after the `_` records which parent frame the sim spawned from. See {doc}`Adaptive sampling explanation <../explanation/adaptive-sampling>` ("Naming scheme") for the full breakdown of the pattern.
 
 ## Common variations
 

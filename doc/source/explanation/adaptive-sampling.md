@@ -44,6 +44,8 @@ Simulations are named with the pattern `e4s3_e2s1p0f45`. Parsed:
 - `e4s3` - generated in **epoch 4**, the **3rd simulation** of that batch.
 - `e2s1p0f45` - the starting conformation came from **epoch 2**, **simulation 1**, **piece 0**, **frame 45**.
 
+The `e<n>s<m>` prefix (epoch / spawn) is the only part that is always present; everything after the `_` records provenance and varies in shape. Epoch-1 sims descend directly from a generator rather than from another sim, so they take the form `e1s3_<generator-name>` (epoch 1, spawn 3, descended from the named generator) instead of the `e<n>s<m>p<piece>f<frame>` parent reference used from epoch 2 onward.
+
 Some MD engines split long simulations into pieces; the piece index is usually 0 and can be ignored.
 
 ## Simulation length

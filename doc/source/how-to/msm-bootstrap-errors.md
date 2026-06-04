@@ -33,7 +33,7 @@ print("std  top-3 timescales (ns):", slowest.std(axis=0))
 
 {py:meth}`~htmd.metricdata.MetricData.bootstrap(ratio)` returns a new `MetricData` containing a random `ratio` fraction of the trajectories (no replacement by default). The kept count is `int(floor(numtraj * ratio))` - on small N this rounds down (e.g. 7 trajs × 0.8 = 5 kept, not 5.6), so bootstrapping ratios are coarser than they look. Each bootstrap is independent - re-cluster + re-fit from scratch.
 
-`model.msm.timescales()` (deeptime API) returns the implied timescales in **the same units as `model.lag`** - and `markovModel(..., units="ns")` stores the lag in frames after the unit conversion, so the timescales come back in frames. Multiply by `model.data.fstep` to convert to whatever time unit you set `fstep` to (ns by convention).
+`model.msm.timescales()` returns timescales in frames, so each row above is multiplied by `model.data.fstep` to get ns - see {doc}`How to read off and interpret an ITS plot <msm-interpret-its-plot>` ("Compare lag times by direct call") for the full explanation.
 
 ## Parameters that matter
 
