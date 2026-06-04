@@ -20,7 +20,7 @@ kernelspec:
 
 ## The system
 
-PDB `5VBL` is the **apelin receptor** (a GPCR, chain B) bound to a **peptide agonist** (chain A) containing five chain-resident non-canonical amino acids - `200`, `ALC`, `HRG`, `NLE`, `OIC`. The structure also carries a co-crystallised free lipid (`OLC`). The receptor is membrane-embedded - OPM ships it with a fitted bilayer thickness of 33.4 Å - so we'll wrap a mixed **POPC / cholesterol** bilayer around it.
+PDB `5VBL` is the **apelin receptor** (a GPCR, chain B) bound to a **peptide agonist** (chain A) containing five chain-resident non-canonical amino acids - `200`, `ALC`, `HRG`, `NLE`, `OIC`. The structure also carries a co-crystallised `OLC` (monoolein, a monoacylglycerol lipid from crystallization), which we discard before wrapping our own bilayer. The receptor is membrane-embedded - OPM ships it with a fitted bilayer thickness of 33.4 Å - so we'll wrap a mixed **POPC / cholesterol** bilayer around it.
 
 ```{note}
 This tutorial sets `minimize=0` and `equilibrate=0` on {py:func}`~htmd.membranebuilder.build_membrane.buildMembrane` so the tutorial executes in seconds. The resulting membrane carries only the **initial lipid placement** - lipid tails will have clashes and the bilayer is not relaxed. For a production system, set `minimize` to a few hundred steps and `equilibrate` to a few nanoseconds (and run on `platform="CUDA"` if you have a GPU).
@@ -81,7 +81,14 @@ Look at what detect found:
 - **Two extra `ChainResidueSpec` entries for canonical residues** - `GLU` (resid 10) renamed to `XX1` with `anchor_atom='CD'`, and `LYS` (resid 13) renamed to `XX2` with `anchor_atom='NZ'`. Those are the canonical residues at the **two ends of an isopeptide bond**: the apelin agonist is a side-chain macrocycle closed by a `GLU.CD - LYS.NZ` γ-glutamyl / ε-lysyl crosslink. Detect saw the inter-residue bond on the side-chain atoms (not the backbone) and emitted the rename + anchor automatically, so the downstream parameterization gives each end of the isopeptide its own per-residue topology. The `custombonds` list emitted by {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` will close the ring at build time.
 - One `LigandSpec` for the free `OLC` lipid co-crystallised with the protein.
 
-So we need to template every chain-resident NCAA *and* the free lipid - but **not** `GLU` / `LYS` (they're canonical residues whose only modification is the inter-side-chain bond, which detect handles entirely from connectivity):
+`OLC` is monoolein, a crystallization lipid — not part of the system we want to simulate, and we're about to build our own POPC/cholesterol bilayer — so drop it from both the structure and the spec list:
+
+```{code-cell} python
+mol.remove("resname OLC", _logger=False)
+specs = [s for s in specs if s.resname != "OLC"]
+```
+
+Now template every chain-resident NCAA - but **not** `GLU` / `LYS` (they're canonical residues whose only modification is the inter-side-chain bond, which detect handles entirely from connectivity):
 
 ```{code-cell} python
 smiles = {
@@ -90,7 +97,6 @@ smiles = {
     "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
     "NLE": "CCCC[C@@H](C=O)N",
     "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
-    "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
 }
 for resname, smi in smiles.items():
     mol.templateResidueFromSmiles(f'resname "{resname}"', smi, addHs=True)
