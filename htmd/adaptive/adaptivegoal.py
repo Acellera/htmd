@@ -15,12 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class AdaptiveGoal(AdaptiveMD):
-    """Adaptive class which uses a Markov state model for respawning
+    """Adaptive sampling combining Markov state models with a goal function.
 
-    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
-    the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
-    the chosen criteria which will be used for starting new simulations.
+    Extends :class:`AdaptiveMD` by adding a directed component: a user-provided
+    goal function scores conformations, and the respawning probability is a
+    weighted sum of the undirected (MSM-based) and directed (goal-based) scores.
 
     Parameters
     ----------
@@ -102,8 +101,8 @@ class AdaptiveGoal(AdaptiveMD):
     savegoal : str, default=None
         Save the goal values to the specified file
 
-    Example
-    -------
+    Examples
+    --------
     >>> crystalSS = MetricSecondaryStructure().project(Molecule('crystal.pdb'))[0]
     >>>
     >>> # First argument of a goal function always has to be a Molecule object

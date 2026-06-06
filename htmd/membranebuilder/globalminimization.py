@@ -69,12 +69,45 @@ class _RandomDisplacementBounds(object):
         return xnew
 
 
-def minimize(lipids, box, stepxy=0.5, steprot=50, contactthresh=2.6):
+def minimize(
+    lipids: list,
+    box: list | np.ndarray,
+    stepxy: float = 0.5,
+    steprot: float = 50,
+    contactthresh: float = 2.6,
+) -> tuple:
+    """Minimize lipid packing by reducing inter-lipid contacts via basin-hopping.
+
+    Jointly optimizes the XY positions and Z-rotation angles of all lipids in
+    a single leaflet using SciPy's basin-hopping algorithm on an L-BFGS-B
+    inner minimizer. The objective function counts the number of inter-lipid
+    atom contacts within ``contactthresh`` Angstroms.
+
+    Parameters
+    ----------
+    lipids : list
+        List of ``_Lipid`` objects with ``mol``, ``xyz``, ``headname``,
+        and ``neighbours`` attributes.
+    box : list or np.ndarray
+        Periodic box dimensions used for minimum-image wrapping of
+        inter-lipid distances.
+    stepxy : float
+        Maximum XY displacement (Angstroms) per basin-hopping step.
+    steprot : float
+        Maximum rotation displacement (degrees) per basin-hopping step.
+    contactthresh : float
+        Distance threshold in Angstroms below which two atoms are counted
+        as in contact.
+
+    Returns
+    -------
+    newpos : np.ndarray
+        Optimized XY positions for each lipid, shape ``(N, 2)``.
+    newrot : np.ndarray
+        Optimized Z-rotation angles in degrees, shape ``(N,)``.
+    """
     from scipy.optimize import basinhopping
 
-    # rotate in 10deg increments
-    # translate in a 2x2 box in 0.25A increments
-    # swap lipid conformer?
     headnames = [ll.headname for ll in lipids]
     zpos = [ll.xyz[2] for ll in lipids]
     neighbours = [ll.neighbours for ll in lipids]

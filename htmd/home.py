@@ -10,23 +10,35 @@ import inspect
 import platform
 
 
-def home(dataDir=None, libDir=False, shareDir=False):
-    """Return the pathname of the HTMD root directory (or a data subdirectory).
+def home(
+    dataDir: str | None = None,
+    libDir: bool = False,
+    shareDir: bool = False,
+) -> str:
+    """Return the pathname of the HTMD root directory (or a subdirectory).
 
     Parameters
     ----------
-    dataDir : str
-        If not None, return the path to a specific data directory
-    libDir : bool
-        If True, return path to the lib directory
+    dataDir : str, optional
+        If provided, return the path to the named data subdirectory.
+    libDir : bool, optional
+        If True, return the path to the platform-specific lib directory.
+    shareDir : bool, optional
+        If True, return the path to the share directory.
 
     Returns
     -------
     dir : str
-        The directory
+        The requested directory path.
 
-    Example
-    -------
+    Raises
+    ------
+    FileNotFoundError
+        If ``libDir`` is True and the lib directory does not exist, or if
+        ``shareDir`` is True and the share directory does not exist.
+
+    Examples
+    --------
     >>> from htmd.home import home
     >>> home()                                 # doctest: +ELLIPSIS
     '.../htmd'

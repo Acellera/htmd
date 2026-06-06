@@ -3,15 +3,32 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
 import numpy as np
 import os
 import re
+
+if TYPE_CHECKING:
+    from htmd.metricdata import MetricData
 
 parentregex = re.compile(r"e\d+s\d+_(e\d+s\d+)p(\d+)f(\d+)")
 epochregex = re.compile(r"^e(\d+)s")
 
 
-def getEpochTrajectoryDictionary(simlist):
+def getEpochTrajectoryDictionary(simlist: list) -> dict:
+    """Build a mapping from epoch number to simulation indexes.
+
+    Parameters
+    ----------
+    simlist : list
+        A simulation list created using the :func:`simlist <htmd.simlist.simlist>` function.
+
+    Returns
+    -------
+    simepochs : dict
+        A dictionary mapping epoch number (int) to a list of simulation indexes
+        from ``simlist`` belonging to that epoch.
+    """
     from collections import defaultdict
 
     simepochs = defaultdict(list)
@@ -23,7 +40,22 @@ def getEpochTrajectoryDictionary(simlist):
     return simepochs
 
 
-def getEpochSimIdx(data, epoch):
+def getEpochSimIdx(data: "MetricData", epoch: int) -> np.ndarray:
+    """Return the simulation indexes in a MetricData object for a given epoch.
+
+    Parameters
+    ----------
+    data : MetricData
+        Projected simulation data whose ``simlist`` is searched.
+    epoch : int
+        The epoch number to select.
+
+    Returns
+    -------
+    idx : np.ndarray
+        Integer array of simulation indexes in ``data.simlist`` that belong to
+        the requested epoch.
+    """
     idx = []
     for i, sim in enumerate(data.simlist):
         name = os.path.basename(os.path.dirname(os.path.abspath(sim.trajectory[0])))
@@ -34,7 +66,27 @@ def getEpochSimIdx(data, epoch):
     return np.array(idx)
 
 
-def getParentSimIdxFrame(data, trajidx):
+def getParentSimIdxFrame(data: "MetricData", trajidx: int) -> tuple:
+    """Find the parent simulation index and frame for a given trajectory.
+
+    For a simulation that was spawned from a parent trajectory, returns the
+    index of the parent simulation within ``data.simlist`` and the frame
+    index within that parent simulation.
+
+    Parameters
+    ----------
+    data : MetricData
+        Projected simulation data containing the simlist to search.
+    trajidx : int
+        Index of the simulation in ``data.simlist`` for which to find the parent.
+
+    Returns
+    -------
+    parentidx : int
+        Index of the parent simulation in ``data.simlist``.
+    frameidx : int
+        Frame index within the parent simulation corresponding to the spawn point.
+    """
     name = os.path.basename(
         os.path.dirname(os.path.abspath(data.simlist[trajidx].trajectory[0]))
     )
@@ -72,7 +124,23 @@ def getParentSimIdxFrame(data, trajidx):
     return parentidx, frameidx
 
 
-def updatingMean(oldmean, oldcount, newdata):
+def updatingMean(oldmean: float, oldcount: int, newdata: np.ndarray) -> float:
+    """Compute a running mean incorporating new observations.
+
+    Parameters
+    ----------
+    oldmean : float
+        The previously accumulated mean value.
+    oldcount : int
+        The number of observations that produced ``oldmean``.
+    newdata : np.ndarray
+        Array of new observations to incorporate.
+
+    Returns
+    -------
+    mean : float
+        Updated mean over all observations (old and new combined).
+    """
     if oldcount == 0:
         assert oldmean == 0
         return np.mean(newdata)

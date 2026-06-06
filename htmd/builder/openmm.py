@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ====================================================================
 
 
-def defaultFf():
+def defaultFf() -> list:
     """Returns the default OpenMM XML force field files.
 
     The ``amber14/`` prefix ships with OpenMM itself.  If the
@@ -59,42 +59,42 @@ def defaultFf():
 
 
 def build(
-    mol,
-    ff=None,
-    extra_xml=None,
-    small_molecule_ff=None,
-    molecules=None,
-    prefix="structure",
-    outdir="./build",
-    caps=None,
-    ionize=True,
-    saltconc=0,
-    saltanion=None,
-    saltcation=None,
-    disulfide=None,
-    custombonds=None,
-    solvate=True,
-    padding=10.0,
-    water_model="tip3p",
-    boxsize=None,
-    gbsa=False,
+    mol: Molecule,
+    ff: list | None = None,
+    extra_xml: str | list | None = None,
+    small_molecule_ff: str | None = None,
+    molecules: list | None = None,
+    prefix: str = "structure",
+    outdir: str = "./build",
+    caps: dict | None = None,
+    ionize: bool = True,
+    saltconc: float = 0,
+    saltanion: str | None = None,
+    saltcation: str | None = None,
+    disulfide: list | None = None,
+    custombonds: list | None = None,
+    solvate: bool = True,
+    padding: float = 10.0,
+    water_model: str = "tip3p",
+    boxsize: float | list | None = None,
+    gbsa: bool = False,
 ):
     """Build a system using OpenMM force fields and export to AMBER format.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+    mol : Molecule
         The input molecular system.
     ff : list of str, optional
         OpenMM XML force field file names (see ``openmm.app.ForceField``).
-        Default: :func:`defaultFf`.
+        If None, uses :func:`defaultFf`.
     extra_xml : str or list of str, optional
         Paths to additional OpenMM XML files for non-standard residues.
     small_molecule_ff : str, optional
         Small-molecule force field for the template generator, e.g.
         ``"gaff-2.2.20"`` or ``"openff-2.3.0"``.  Requires *molecules*.
     molecules : list, optional
-        ``openff.toolkit.Molecule`` objects **or** paths to SDF files
+        ``openff.toolkit.Molecule`` objects or paths to SDF files
         describing the small molecules present in the system.
     prefix : str
         Prefix for output files.
@@ -103,10 +103,10 @@ def build(
     caps : dict, optional
         Terminal capping specification.  Accepts two formats:
 
-        * ``{segid: [nterm_cap, cterm_cap]}`` — e.g. ``{"P": ["ACE","NME"]}``
-        * ``{atomsel: cap}`` — e.g. ``{"chain A and resid 5": "ACE"}``
+        * ``{segid: [nterm_cap, cterm_cap]}`` - e.g. ``{"P": ["ACE","NME"]}``
+        * ``{atomsel: cap}`` - e.g. ``{"chain A and resid 5": "ACE"}``
 
-        Default: ACE/NME on every protein segment with >= 10 residues.
+        If None, ACE/NME caps are added to every protein segment with >= 10 residues.
     ionize : bool
         Neutralise the system (and add salt if *saltconc* > 0).
     saltconc : float
@@ -116,15 +116,15 @@ def build(
     saltcation : str, optional
         Cation type.  Accepts ``"Na+"``, ``"K+"``, ``"Cs+"`` and
         divalent ``"Mg2+"``, ``"Ca2+"``, ``"Zn2+"``.
-    disulfide : list of pairs of str, optional
+    disulfide : list, optional
         Manual disulfide bonds as pairs of atom-selection strings.
-        ``None`` triggers automatic detection.
-    custombonds : list of pairs of str, optional
+        If None, automatic detection is performed.
+    custombonds : list, optional
         Extra bonds as pairs of atom-selection strings.
     solvate : bool
         Add explicit water via ``Modeller.addSolvent()``.
     padding : float
-        Box padding in **Angstroms** (used when *solvate* is True).
+        Box padding in Angstroms (used when *solvate* is True).
     water_model : str
         Water model name for ``Modeller.addSolvent()``.
     boxsize : float or list of float, optional
@@ -135,9 +135,9 @@ def build(
 
     Returns
     -------
-    molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>`
+    molbuilt : Molecule
         The fully built system.
-    system : ``openmm.System``
+    system : openmm.System
         The parameterised OpenMM System object.
     """
     import openmm
@@ -211,7 +211,7 @@ def build(
         did_solvate = True
     elif solvate and has_water:
         logger.warning(
-            "Molecule already contains water — skipping solvation.  "
+            "Molecule already contains water - skipping solvation.  "
             "Pass solvate=False to silence this warning."
         )
 
@@ -299,7 +299,7 @@ def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
     Emits an *ordered* parameter set (stock FF names first, then copied
     ``extra_xml`` fragments, then the frozen small-molecule ffxml), an mmCIF
     topology (always; preserves all connectivity), a PDB (only when the system
-    fits PDB's serial limit — above that CONECT records overflow so we ship
+    fits PDB's serial limit - above that CONECT records overflow so we ship
     only the mmCIF), and a partial ``system.yaml`` config. Returns the ordered
     ``parameters`` list.
     """
@@ -332,7 +332,7 @@ def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
     else:
         logger.info(
             f"System has {molbuilt.numAtoms} atoms (> {PDB_SERIAL_LIMIT}); "
-            "PDB CONECT serials overflow — shipping only the mmCIF."
+            "PDB CONECT serials overflow - shipping only the mmCIF."
         )
 
     system_yaml = {
@@ -388,17 +388,17 @@ from htmd.builder._charge_helpers import (  # noqa: E402
 
 
 def parameterizeLigandsOpenFF(
-    mol,
-    ligand_ff="openff_unconstrained-2.3.0.offxml",
-    charge_method="nagl",
-    resnames=None,
+    mol: Molecule,
+    ligand_ff: str = "openff_unconstrained-2.3.0.offxml",
+    charge_method: str | None = "nagl",
+    resnames: list | None = None,
 ):
-    """Parameterise free ligand residues via OpenFF Interchange.
+    """Parameterize free ligand residues via OpenFF Interchange.
 
     Slices each ligand residue out of *mol*, assigns partial charges,
     applies the chosen SMIRNOFF force field via
     :func:`openff.interchange.Interchange.from_smirnoff`, and returns
-    one :class:`Interchange` per resname. The returned objects can be
+    one Interchange per resname. The returned objects can be
     combined with other Interchanges via ``ic.combine(other)`` and
     exported to OpenMM via ``ic.to_openmm()``.
 
@@ -417,12 +417,12 @@ def parameterizeLigandsOpenFF(
 
     Parameters
     ----------
-    mol : :class:`moleculekit.molecule.Molecule`
+    mol : Molecule
         Molecule containing one or more free ligand residues. Each ligand
         must already have explicit hydrogens and explicit integer bond
         orders, e.g. via
         :meth:`moleculekit.molecule.Molecule.templateResidueFromSmiles`.
-    ligand_ff : str, optional
+    ligand_ff : str
         Name of an OpenFF force field offxml. The default
         ``"openff_unconstrained-2.3.0.offxml"`` is the right choice for
         ``openmm.build``: the bond / angle / torsion / vdW / charge
@@ -436,21 +436,20 @@ def parameterizeLigandsOpenFF(
         consumed by a downstream tool that runs ``createSystem`` without
         passing ``constraints``.
     charge_method : str or None, optional
-        ``"nagl"`` (default, recommended) - AM1-BCC-equivalent partial
-        charges from the OpenFF NAGL graph neural network. Sage was fit
-        alongside this charge model. Needs PyTorch.
-        Other choices log a warning. ``"gasteiger"`` - RDKit PEOE.
-        ``"resp"`` / ``"resp-multiconf"`` - RESP via parameterize + Psi4.
-        ``None`` - let SMIRNOFF assign its own charges (e.g. AM1-BCC
-        via ToolkitAM1BCCHandler).
-    resnames : list[str] or None, optional
-        Subset of resnames to parameterise. ``None`` parameterises every
-        unique resname in *mol*.
+        ``"nagl"`` (recommended) - AM1-BCC-equivalent partial charges
+        from the OpenFF NAGL graph neural network. Sage was fit alongside
+        this charge model. Needs PyTorch. Other choices log a warning.
+        ``"gasteiger"`` - RDKit PEOE. ``"resp"`` / ``"resp-multiconf"``
+        - RESP via parameterize + Psi4. ``None`` - let SMIRNOFF assign its
+        own charges (e.g. AM1-BCC via ToolkitAM1BCCHandler).
+    resnames : list, optional
+        Subset of resnames to parameterize. If None, every unique resname
+        in *mol* is parameterized.
 
     Returns
     -------
-    dict[str, openff.interchange.Interchange]
-        One Interchange per resname.
+    dict
+        One ``openff.interchange.Interchange`` per resname.
     """
     _require_openff_python()
     from openff.toolkit import ForceField
@@ -1082,7 +1081,7 @@ def _defaultProteinCaps(mol):
         nres = len(np.unique(mol.resid[mol.segid == s]))
         if nres < 10:
             logger.warning(
-                f"Segment {s} has fewer than 10 residues — not capped by "
+                f"Segment {s} has fewer than 10 residues - not capped by "
                 "default.  Use the caps argument to override."
             )
             continue
@@ -1683,7 +1682,7 @@ def _apply_bond_specs(topology, specs):
             if key in existing:
                 logger.debug(
                     f"{kind} bond already present: "
-                    f"{a1.residue.name}:{a1.name} — "
+                    f"{a1.residue.name}:{a1.name} - "
                     f"{a2.residue.name}:{a2.name}"
                 )
                 continue
@@ -1692,7 +1691,7 @@ def _apply_bond_specs(topology, specs):
             if kind == "cyclic":
                 logger.info(
                     f"Added cyclic N-C bond: "
-                    f"{a1.residue.name}:{a1.name} — "
+                    f"{a1.residue.name}:{a1.name} - "
                     f"{a2.residue.name}:{a2.name}"
                 )
 
@@ -2033,6 +2032,6 @@ def _read_built_molecule(outdir, prefix, topology=None, positions=None):
                 molbuilt.box = Molecule(pdb).box.copy()
             return molbuilt
         except Exception:
-            logger.warning("Could not read prmtop — falling back to PDB.")
+            logger.warning("Could not read prmtop - falling back to PDB.")
 
     return Molecule(pdb)

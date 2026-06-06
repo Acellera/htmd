@@ -11,19 +11,21 @@ logger = logging.getLogger(__name__)
 
 
 class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
-    """Class to perform regular clustering of a given data set
+    """Class to perform regular clustering of a given data set.
 
-    RegCluster can be passed a radius or an approximate number of clusters. If a number of clusters is passed, KCenter
-    clustering is used to estimate the necessary radius. RegCluster randomly chooses a point and assigns all points
-    within the radius of this point to the same cluster. Then it proceeds with the nearest point, which is not yet
-    assigned to a cluster and puts all unassigned points within the radius of this point in the next cluster and so on.
+    RegCluster can be passed a radius or an approximate number of clusters. If a number of clusters
+    is passed, KCenter clustering is used to estimate the necessary radius. RegCluster randomly
+    chooses a point and assigns all points within the radius of this point to the same cluster. It
+    then proceeds with the nearest unassigned point and puts all unassigned points within the radius
+    of that point in the next cluster, and so on.
 
     Parameters
     ----------
-    radius: float
-        radius of clusters
-    n_clusters: int
-        desired number of clusters
+    radius : float, optional
+        Radius of clusters in the same units as the data.
+    n_clusters : int, optional
+        Desired approximate number of clusters. Used to estimate the radius via KCenter clustering
+        if ``radius`` is not provided.
 
     Examples
     --------
@@ -32,17 +34,11 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
 
     Attributes
     ----------
-    cluster_centers:  list
-        list with the points, which are the centers of the clusters
-    centerFrames : list
-        list of indices of center points in data array
-    labels_ : list
-        list with number of cluster of each frame
-    clusterSize_ : list
-        list with number of frames in each cluster
+    labels_ : np.ndarray
+        Array with the cluster index of each frame.
     """
 
-    def __init__(self, radius=None, n_clusters=None):
+    def __init__(self, radius: float | None = None, n_clusters: int | None = None):
         if radius is None and n_clusters is None:
             raise RuntimeError("radius or n_clusters needs to be set")
 
@@ -50,15 +46,13 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
         self.n_clusters = n_clusters
         self.labels_ = []
 
-    def fit(self, data):
-        """performs clustering of data
+    def fit(self, data: np.ndarray):
+        """Perform clustering of the data.
 
         Parameters
         ----------
-        data: np.ndarray
-                array of data points to cluster
-        merge: int
-                minimal number of frames within each cluster. Smaller clusters are merged into next big one
+        data : np.ndarray
+            A 2D array of data points to cluster. Rows are samples, columns are features.
         """
         # if n_clusters is given and no r, estimate n_clusters
         if self.radius is None:
@@ -75,11 +69,13 @@ class RegCluster(BaseEstimator, ClusterMixin, TransformerMixin):
         self.labels_ = self._reg.fit_fetch(data).transform(data).flatten()
 
     @property
-    def cluster_centers_(self):
+    def cluster_centers_(self) -> np.ndarray:
+        """Array with the points which are the centers of the clusters."""
         return self._reg.model.cluster_centers
 
     @property
-    def clusterSize(self):
+    def clusterSize(self) -> np.ndarray:
+        """Array with the number of frames in each cluster."""
         return np.bincount(self.labels_)
 
 

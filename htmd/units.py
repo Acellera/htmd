@@ -7,26 +7,38 @@ from pint import UnitRegistry
 import numpy as np
 
 
-def convert(fromunit, tounit, value, fstep=1, timestep=4):
-    """Converts values between units
+def convert(
+    fromunit: str,
+    tounit: str,
+    value: float | list | range | np.ndarray,
+    fstep: float = 1,
+    timestep: float = 4,
+):
+    """Convert values between units.
 
     Parameters
     ----------
     fromunit : str
-        Unit to convert from
+        Unit to convert from.
     tounit : str
-        Unit to convert to
-    value : scalar
-        The value to convert
-    fstep : float
-        The sampling frame step of the simulation in nanoseconds
-    timestep : int
-        The timestep of the simulation in femtoseconds
+        Unit to convert to.
+    value : scalar or list or range or numpy.ndarray
+        The value or array of values to convert.
+    fstep : float, optional
+        Sampling frame step of the simulation in nanoseconds.
+    timestep : float, optional
+        Timestep of the simulation in femtoseconds.
 
     Returns
     -------
-    conv : scalra
-        The converted value
+    conv : scalar or numpy.ndarray
+        The converted value. When converting to ``frame`` or ``step`` units,
+        the result is rounded to the nearest integer.
+
+    Examples
+    --------
+    >>> convert("ns", "frame", 100, fstep=0.1)
+    1000
     """
 
     ureg = UnitRegistry()

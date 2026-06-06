@@ -38,6 +38,40 @@ _IGNORE_EXTENSIONS = (
 
 
 class AdaptiveBase(abc.ABC, ProtocolInterface):
+    """Base class for adaptive sampling strategies.
+
+    Parameters
+    ----------
+    app : :class:`SimQueue <jobqueues.simqueue.SimQueue>` object, optional
+        A SimQueue class object used to retrieve and submit simulations.
+    project : str, optional
+        The name of the project.
+    nmin : int, optional
+        Minimum number of running simulations.
+    nmax : int, optional
+        Maximum number of running simulations.
+    nepochs : int, optional
+        Stop adaptive once we have reached this number of epochs.
+    nframes : int, optional
+        Stop adaptive once we have simulated this number of aggregate simulation frames.
+    inputpath : str, optional
+        The directory used to store input folders.
+    generatorspath : str, optional
+        The directory containing the generators.
+    dryrun : bool, optional
+        A dry run means that the adaptive will retrieve and generate a new epoch but not submit the simulations.
+    updateperiod : float, optional
+        When set to a value other than 0, the adaptive will run synchronously every `updateperiod` seconds.
+    coorname : str, optional
+        Name of the file containing the starting coordinates for the new simulations.
+    boxname : str, optional
+        Name of the file containing the starting box dimensions for the new simulations. Set to 'none' to disable box writing.
+    lock : bool, optional
+        Lock the folder while adaptive is ongoing.
+    mps : int, optional
+        If mps > 0, it will run simulations using the Multi-Process Service (MPS) with the number of processes specified. If set to 0, mps is disabled.
+    """
+
     def __init__(self):
         super().__init__()
         from jobqueues.simqueue import SimQueue
@@ -137,13 +171,16 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         self._running = None
 
     def run(self):
-        """Runs the adaptive
+        """Run the adaptive sampling loop.
 
-        Use this command to start the adaptive.
+        Starts the adaptive run, which iterates over epochs: retrieving completed
+        simulations, running the selection algorithm, writing new inputs, and
+        submitting them. When ``updateperiod`` is greater than 0 the loop repeats
+        synchronously at that interval; otherwise it runs a single epoch and returns.
 
-        Example
-        -------
-        >>> adapt = Adaptive()
+        Examples
+        --------
+        >>> adapt = AdaptiveMD()
         >>> adapt.run()
         """
         from natsort import natsorted
@@ -394,20 +431,22 @@ def _writeInputsFunction(i, f, epoch, inputpath, coorname, boxname):
         mol.write(path.join(newDir, boxname))
 
 
-def epochSimIndexes(simlist):
-    """Finds the simulation indexes for each epoch.
+def epochSimIndexes(simlist: list) -> dict:
+    """Find the simulation indexes for each epoch.
 
-    Creates a dictionary with the epoch number as key and values the simlist indexes of the simulations corresponding to
-    the given epoch.
+    Creates a dictionary with the epoch number as key and values the simlist
+    indexes of the simulations corresponding to the given epoch.
 
     Parameters
     ----------
     simlist : list
-        A simulation list created using the :func:`simlist <htmd.simlist.simlist>` function
+        A simulation list created using the :func:`simlist <htmd.simlist.simlist>` function.
 
     Returns
     -------
-
+    epochidx : dict
+        A dictionary mapping epoch number (int) to a list of simlist indexes
+        belonging to that epoch.
     """
     epochidx = {}
     for i, sl in enumerate(simlist):
@@ -418,18 +457,18 @@ def epochSimIndexes(simlist):
     return epochidx
 
 
-def getEpochFromName(name):
-    """Given a adaptive simulation name, tells you which epoch it belongs to.
+def getEpochFromName(name: str) -> int:
+    """Return the epoch number for a given adaptive simulation name.
 
     Parameters
     ----------
     name : str
-        Simulation name
+        Simulation name, e.g. the trajectory path produced by an adaptive run.
 
     Returns
     -------
     epoch : int
-        The epoch
+        The epoch number extracted from the simulation name.
     """
     import re
 
@@ -440,24 +479,29 @@ def getEpochFromName(name):
     return int(matches[0])
 
 
-def reconstructAdaptiveTraj(simlist, trajID):
-    """Reconstructs a long trajectory out of short adaptive runs.
+def reconstructAdaptiveTraj(simlist: np.ndarray, trajID: int) -> tuple:
+    """Reconstruct a long trajectory out of short adaptive simulation runs.
+
+    Walks back through the parent chain of an adaptive trajectory identified by
+    ``trajID`` and concatenates all ancestor trajectory segments into a single
+    continuous ``Molecule`` object.
 
     Parameters
     ----------
-    simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
-        A simulation list generated by the :func:`simlist <htmd.simlist.simlist>` function
+    simlist : np.ndarray
+        A simulation list generated by the :func:`simlist <htmd.simlist.simlist>` function,
+        containing :class:`Sim <htmd.simlist.Sim>` objects.
     trajID : int
-        The id of the trajectory from which to start going back.
+        The simulation ID of the trajectory from which to start the reconstruction.
 
     Returns
     -------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        A Molecule object containing the reconstructed trajectory
-    chain : np.ndarray
-        The simulation IDs of all simulations involved
-    pathlist : np.ndarray of str
-        The names of all simulations involved.
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        A Molecule object containing the full reconstructed trajectory.
+    chain : list
+        Tuples of ``(sim, piece, frame)`` for all simulations involved in order.
+    pathlist : list
+        Trajectory file paths for all simulations involved, in order.
 
     Examples
     --------

@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class AdaptiveBandit(AdaptiveBase):
-    """
+    """Adaptive sampling using a bandit algorithm for state selection.
+
+    Uses an Upper Confidence Bound (UCB) strategy over a Markov state model to
+    balance exploration and exploitation when choosing respawning conformations.
 
     Parameters
     ----------
@@ -402,15 +405,53 @@ class AdaptiveBandit(AdaptiveBase):
             sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
         return sims
 
-    def count_ucb(self, q_value, exploration, step, n_value):
+    def count_ucb(self, q_value: float, exploration: float, step: int, n_value: int) -> float:
+        """Compute the UCB value for a state.
+
+        Parameters
+        ----------
+        q_value : float
+            Current estimated reward for the state.
+        exploration : float
+            Exploration coefficient weighting the confidence bound.
+        step : int
+            Total number of steps taken so far.
+        n_value : int
+            Number of times the state has been visited.
+
+        Returns
+        -------
+        ucb : float
+            UCB score for the state.
+        """
         return q_value + (exploration * np.sqrt((np.log(step) / (n_value + 1))))
 
-    def count_pucb(self, q_value, exploration, predictor, step, n_value):
+    def count_pucb(self, q_value: float, exploration: float, predictor: float, step: int, n_value: int) -> float:
+        """Compute the predictive UCB value for a state.
+
+        Parameters
+        ----------
+        q_value : float
+            Current estimated reward for the state.
+        exploration : float
+            Exploration coefficient weighting the confidence bound.
+        predictor : float
+            Predictor value scaling the exploration bonus.
+        step : int
+            Total number of steps taken so far.
+        n_value : int
+            Number of times the state has been visited.
+
+        Returns
+        -------
+        pucb : float
+            Predictive UCB score for the state.
+        """
         return q_value + (
             exploration * predictor * np.sqrt((np.log(step) / (n_value + 1)))
         )
 
-    def getRewards(self, trajidx, data_q, confstatdist, numstates, rewardmethod):
+    def getRewards(self, trajidx: np.ndarray, data_q, confstatdist, numstates: int, rewardmethod: str) -> list:
         from htmd.kinetics import Kinetics
         import pandas as pd
 
@@ -450,7 +491,7 @@ class AdaptiveBandit(AdaptiveBase):
 
         return rewards
 
-    def conformationStationaryDistribution(self, model):
+    def conformationStationaryDistribution(self, model) -> list:
         statdist = np.zeros(model.data.numFrames)  # zero for disconnected set
         dataconcatSt = np.concatenate(model.data.St)
         if self.statetype == "macro":

@@ -3,10 +3,15 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from htmd.model import Model
 
 
 class Kinetics(object):
@@ -15,15 +20,17 @@ class Kinetics(object):
     Parameters
     ----------
     model : :class:`Model <htmd.model.Model>`
-        The model from which this class will calculate the kinetics
+        The model from which this class will calculate the kinetics.
+    temperature : float
+        The simulation temperature in Kelvin.
     concentration : float, optional
-        If a ligand is contained in the simulation, give the concentration of the ligand.
-    temperature : float, optional
-        The simulation temperature
+        If a ligand is contained in the simulation, give the concentration of the ligand in Molar.
     source : int, optional
-        The source macrostate. Default it will be detected as the most disassociated state or the most extended conformation.
+        The source macrostate. If None it will be detected as the most disassociated state or the
+        most extended conformation.
     sink : int, optional
-        The sink macrostate. Default it will be calculated as the macrostate with the highest equilibrium population.
+        The sink macrostate. If None it will be calculated as the macrostate with the highest
+        equilibrium population.
 
     Examples
     --------
@@ -39,7 +46,14 @@ class Kinetics(object):
 
     _kB = 0.0019872041  # Boltzman constant kcal/(mol K)
 
-    def __init__(self, model, temperature, concentration=1, source=None, sink=None):
+    def __init__(
+        self,
+        model: "Model",
+        temperature: float,
+        concentration: float = 1,
+        source: int | None = None,
+        sink: int | None = None,
+    ):
         self.concentration = concentration
         self.temperature = temperature
         self.model = model
@@ -140,30 +154,38 @@ class Kinetics(object):
             [nonsource[np.argmax(self.model.msm.stationary_distribution[nonsource])]]
         )
 
-    def getRates(self, source=None, sink=None, states="macro", _logger=True):
-        """Get the rates between two (sets of) states
+    def getRates(
+        self,
+        source: int | list | None = None,
+        sink: int | list | None = None,
+        states: str = "macro",
+        _logger: bool = True,
+    ) -> "Rates":
+        """Get the rates between two (sets of) states.
 
         Parameters
         ----------
-        source : int, optional
-            The state index to use as source
-        sink : int, optional
-            The state index to use as sink
-        states : ['macro','micro'], optional
-            The state type of the states given before
+        source : int or list, optional
+            The state index (or list of indices) to use as source. If None, uses the
+            source detected at construction time.
+        sink : int or list, optional
+            The state index (or list of indices) to use as sink. If None, uses the
+            sink detected at construction time.
+        states : str, optional
+            The state type of the states given. Either ``'macro'`` or ``'micro'``.
 
         Returns
         -------
-        rates : :class:`Rates` object
-            A Rates object containing the rates
+        rates : :class:`Rates <htmd.kinetics.Rates>`
+            A Rates object containing the computed rates.
 
-        Example
-        -------
+        Examples
+        --------
         >>> kin = Kinetics(model, temperature=300, concentration=0.015)
         >>> r = kin.getRates()
         >>> print(r)
         >>> dg = r.g0eq
-        >>> r = kin.getRates(source=4, sink=[0,1,2,3])
+        >>> r = kin.getRates(source=4, sink=[0, 1, 2, 3])
         """
         import numbers
         from deeptime.markov.tools.analysis import mfpt
@@ -251,13 +273,14 @@ class Kinetics(object):
         r.kdeq = np.exp(r.g0eq / self._kBT)
         return r
 
-    def plotRates(self, rates=("mfptoff", "mfpton", "g0eq")):
-        """Plot the MFPT on, off and DG of all the macrostates to the sink state
+    def plotRates(self, rates: tuple = ("mfptoff", "mfpton", "g0eq")):
+        """Plot the MFPT on, off and free energy of all macrostates to the sink state.
 
         Parameters
         ----------
-        rates : tuple
-            Specify which rates you want to plot. Options are ('mfptoff','mfpton','g0eq','kdeq','kon','koff')
+        rates : tuple, optional
+            Specify which rates to plot. Options are
+            ``('mfptoff', 'mfpton', 'g0eq', 'kdeq', 'kon', 'koff')``.
 
         Examples
         --------
@@ -314,15 +337,15 @@ class Kinetics(object):
             plt.ylim(ymin=1)
         plt.show()
 
-    def plotMarkovModel(self, plot=True, save=None):
-        """Plot graph of transition probabilities
+    def plotMarkovModel(self, plot: bool = True, save: str | None = None):
+        """Plot graph of transition probabilities.
 
         Parameters
         ----------
-        plot : bool
-            If set it False the plot will not show up in a figure
-        save : str
-            If a path is passed to save, the plot will be saved to the specified file
+        plot : bool, optional
+            If set to False the plot will not show up in a figure.
+        save : str, optional
+            If a path is passed, the plot will be saved to the specified file.
         """
         from deeptime.plots import plot_markov_model
         from matplotlib import pylab as plt
@@ -344,12 +367,12 @@ class Kinetics(object):
 
     def plotFluxPathways(
         self,
-        statetype="macro",
-        mode="net_flux",
-        fraction=1.0,
-        plot=True,
-        save=None,
-        results=False,
+        statetype: str = "macro",
+        mode: str = "net_flux",
+        fraction: float = 1.0,
+        plot: bool = True,
+        save: str | None = None,
+        results: bool = False,
     ):
         """Plot flux pathways between source and sink state.
 
@@ -357,18 +380,19 @@ class Kinetics(object):
 
         Parameters
         ----------
-        statetype : {'macro','coarse','micro'}
-            What type of states to plot
-        mode : {'net_flux', 'gross_flux'}
-            Type of fluxes to plot
-        fraction : float
-            Fraction of fluxes for which to report pathways. Doesn't change the plot, only the text output.
-        plot : bool
-            If set it False the plot will not show up in a figure
-        save : str
-            If a path is passed to save, the plot will be saved to the specified file
-        results : bool
-            Set to True to return fluxes, paths and path_fluxes
+        statetype : str, optional
+            What type of states to plot. One of ``'macro'``, ``'coarse'``, or ``'micro'``.
+        mode : str, optional
+            Type of fluxes to plot. Either ``'net_flux'`` or ``'gross_flux'``.
+        fraction : float, optional
+            Fraction of fluxes for which to report pathways. Does not change the plot, only the
+            text output.
+        plot : bool, optional
+            If set to False the plot will not show up in a figure.
+        save : str, optional
+            If a path is passed, the plot will be saved to the specified file.
+        results : bool, optional
+            Set to True to return fluxes, paths and path_fluxes.
         """
         # Make mode a radio button with interactive plot
         from deeptime.plots import plot_flux
@@ -440,7 +464,7 @@ class Kinetics(object):
 class Rates(object):
     """A class containing a set of rates
 
-    Attributes
+    Parameters
     ----------
     mfpton : float
         The mean first passage time of going from source to sink
@@ -457,7 +481,13 @@ class Rates(object):
     """
 
     def __init__(
-        self, mfpton=None, mfptoff=None, kon=None, koff=None, kdeq=None, g0eq=None
+        self,
+        mfpton: float | None = None,
+        mfptoff: float | None = None,
+        kon: float | None = None,
+        koff: float | None = None,
+        kdeq: float | None = None,
+        g0eq: float | None = None,
     ):
         if mfpton is None:
             self.mfpton = 0
@@ -499,5 +529,3 @@ class Rates(object):
         s += "kdeq = {:.2E} (M)\n".format(self.kdeq)
         s += "g0eq = {:.2f} (kcal/M)\n".format(self.g0eq)
         return s
-
-

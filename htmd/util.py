@@ -3,12 +3,16 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
 
 import tempfile
 import logging
 import os
 import sys
 import numpy as np
+
+if TYPE_CHECKING:
+    from moleculekit.molecule import Molecule
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +29,22 @@ def _getNjobs():
     return njobs
 
 
-def tempname(suffix="", create=False):
+def tempname(suffix: str = "", create: bool = False) -> str:
+    """Return a path to a temporary file, optionally creating it on disk.
+
+    Parameters
+    ----------
+    suffix : str, optional
+        File name suffix (including the dot, e.g. ``".pdb"``).
+    create : bool, optional
+        If True, the file is created on disk. If False, the name is reserved
+        but the file is not kept.
+
+    Returns
+    -------
+    name : str
+        Absolute path to the temporary file.
+    """
     if create:
         file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     else:
@@ -34,11 +53,24 @@ def tempname(suffix="", create=False):
     return file.name
 
 
-def ensurelist(tocheck, tomod=None):
+def ensurelist(tocheck, tomod=None) -> list:
     """Convert np.ndarray and scalars to lists.
 
     Lists and tuples are left as is. If a second argument is given,
-    the type check is performed on the first argument, and the second argument is converted.
+    the type check is performed on the first argument, and the second
+    argument is converted.
+
+    Parameters
+    ----------
+    tocheck : object
+        The value whose type is inspected to decide whether conversion is needed.
+    tomod : object, optional
+        The value to convert. If None, ``tocheck`` is converted instead.
+
+    Returns
+    -------
+    result : list
+        ``tomod`` (or ``tocheck``) as a list.
     """
     if tomod is None:
         tomod = tocheck
@@ -53,32 +85,37 @@ def ensurelist(tocheck, tomod=None):
     return tomod
 
 
-def diffMolecules(mol1, mol2, sel=None):
-    """Check that name, resname, resid, insertion codes match between two molecules.
+def diffMolecules(
+    mol1: "Molecule",
+    mol2: "Molecule",
+    sel: str | np.ndarray | None = None,
+) -> list:
+    """Check that name, resname, resid, and insertion codes match between two molecules.
 
     Coordinates are not checked.
 
     Parameters
     ----------
-    mol1 : Molecule
-        first structure to compare
-    mol2 : Molecule
-        second structure to compare
-    sel: str
-        compare only after filtering to this Atom selection string.
-        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
+        First structure to compare.
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
+        Second structure to compare.
+    sel : str or np.ndarray, optional
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`). If
+        provided, only the selected atoms are compared.
 
     Returns
     -------
-    diff: list
-        a list of differences, as human-readable strings (empty if structures are equal).
+    diff : list
+        A list of differences as human-readable strings. Empty if the structures
+        are equal.
 
     Examples
     --------
-    >>> m=Molecule("3PTB")
-    >>> m2=m.copy()
-    >>> m2.set("resname","HIE","resid 91")
-    >>> diffMolecules(m,m2,sel="name CA")
+    >>> m = Molecule("3PTB")
+    >>> m2 = m.copy()
+    >>> m2.set("resname", "HIE", "resid 91")
+    >>> diffMolecules(m, m2, sel="name CA")
     ['CA   HIS    91     vs   CA   HIE    91  ']
     """
 
@@ -115,18 +152,27 @@ def diffMolecules(mol1, mol2, sel=None):
     return diff
 
 
-def getPdbStrings(mol, sel=None, onlyAtom=True):
-    """Return the PDB corresponding to molecule and selection, as a list of strings.
+def getPdbStrings(
+    mol: "Molecule",
+    sel: str | np.ndarray | None = None,
+    onlyAtom: bool = True,
+) -> list:
+    """Return the PDB corresponding to a molecule and selection as a list of strings.
 
     Parameters
     ----------
     mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The Molecule object
-    sel : str
-        Atom selection string for what to be outputted.
-        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-    onlyAtom : bool
-        Only return ATOM/HETATM records (default True)
+        The Molecule object.
+    sel : str or np.ndarray, optional
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`) for
+        what to output.
+    onlyAtom : bool, optional
+        If True, only ATOM/HETATM records are returned.
+
+    Returns
+    -------
+    lines : list
+        PDB record lines as strings.
 
     Examples
     --------
@@ -157,10 +203,24 @@ def getPdbStrings(mol, sel=None, onlyAtom=True):
     return rl
 
 
-def assertSameAsReferenceDir(compareDir, outdir="."):
-    """Check if files in refdir are present in the directory given as second argument AND their content matches.
+def assertSameAsReferenceDir(compareDir: str, outdir: str = ".") -> None:
+    """Check that files in a reference directory match those in an output directory.
 
-    Subdirectories are compared recursively. Raise an exception if not."""
+    Subdirectories are compared recursively. Raises an exception if any file is
+    missing or its content differs.
+
+    Parameters
+    ----------
+    compareDir : str
+        Path to the reference directory.
+    outdir : str, optional
+        Path to the output directory to compare against the reference.
+
+    Raises
+    ------
+    Exception
+        If any file is missing, has differing content, or cannot be compared.
+    """
 
     import filecmp
     import os

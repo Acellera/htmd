@@ -7,8 +7,8 @@
 # Rapidly exploring random tree to find reaction coordinate for umbrella sampling!
 # Use VMD draw line to visualize! (dashed for failed, solid for connected)
 import numpy as np
-from moleculekit.util import maxDistance, uniformRandomRotation
 from moleculekit.molecule import Molecule
+from moleculekit.util import maxDistance, uniformRandomRotation
 from moleculekit.vmdviewer import getCurrentViewer
 from scipy.spatial.distance import cdist
 
@@ -180,15 +180,45 @@ def _randomPoint(min, max):
 
 
 def rrtstarsmart(
-    mol,
-    ligandsel,
-    step=1,
-    maxiter=int(1e6),
-    ligcom=False,
-    colldist=2,
-    outdist=8,
-    radius=2.5,
-):
+    mol: Molecule,
+    ligandsel: str | np.ndarray,
+    step: float = 1,
+    maxiter: int = int(1e6),
+    ligcom: bool = False,
+    colldist: float = 2,
+    outdist: float = 8,
+    radius: float = 2.5,
+) -> None:
+    """Run an RRT* SMART path planning algorithm to find a ligand exit path.
+
+    Uses a Rapidly-exploring Random Tree Star (RRT*) variant with smart
+    sampling to find a collision-free path for the ligand to exit the
+    binding pocket.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule containing the protein and ligand.
+    ligandsel : str or np.ndarray
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`)
+        identifying the ligand atoms.
+    step : float, optional
+        Step size in Angstroms for path extension.
+    maxiter : int, optional
+        Maximum number of iterations for the RRT* algorithm.
+    ligcom : bool, optional
+        If True, use the center of mass of the ligand instead of individual
+        ligand atoms as the starting point.
+    colldist : float, optional
+        Collision distance threshold in Angstroms. Points closer than this
+        to protein atoms are considered in collision.
+    outdist : float, optional
+        Distance threshold in Angstroms to determine if the ligand has
+        exited the pocket.
+    radius : float, optional
+        Radius in Angstroms for the neighbourhood search used in the RRT*
+        rewiring step.
+    """
     protcoor, ligcoor, translation = _getCoordinates(mol, ligandsel, ligcom)
     viewer = _prepareViewer(mol, ligandsel)
 
@@ -239,7 +269,42 @@ def rrtstarsmart(
     return
 
 
-def rrt(mol, ligandsel, step=1, maxiter=int(1e6), ligcom=False, colldist=2, outdist=8):
+def rrt(
+    mol: Molecule,
+    ligandsel: str | np.ndarray,
+    step: float = 1,
+    maxiter: int = int(1e6),
+    ligcom: bool = False,
+    colldist: float = 2,
+    outdist: float = 8,
+) -> None:
+    """Run a basic RRT path planning algorithm to find a ligand exit path.
+
+    Uses a Rapidly-exploring Random Tree (RRT) to find a collision-free
+    path for the ligand to exit the binding pocket by sampling points on a
+    surrounding sphere.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule containing the protein and ligand.
+    ligandsel : str or np.ndarray
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`)
+        identifying the ligand atoms.
+    step : float, optional
+        Step size in Angstroms for path extension.
+    maxiter : int, optional
+        Maximum number of iterations for the RRT algorithm.
+    ligcom : bool, optional
+        If True, use the center of mass of the ligand instead of individual
+        ligand atoms as the starting point.
+    colldist : float, optional
+        Collision distance threshold in Angstroms. Points closer than this
+        to protein atoms are considered in collision.
+    outdist : float, optional
+        Distance threshold in Angstroms to determine if the ligand has
+        exited the pocket.
+    """
     protcoor, ligcoor, translation = _getCoordinates(mol, ligandsel, ligcom)
     viewer = _prepareViewer(mol, ligandsel)
 
@@ -273,20 +338,20 @@ def rrt(mol, ligandsel, step=1, maxiter=int(1e6), ligcom=False, colldist=2, outd
 
 
 def raytracing(
-    mol,
-    ligandsel,
-    othersel="protein",
-    step=1,
-    colldist=2,
-    outdist=8,
-    ligcom=False,
-    numsamples=2000,
-    ratioexposed=0,
-    vmd=True,
-):
+    mol: Molecule,
+    ligandsel: str | np.ndarray,
+    othersel: str | np.ndarray = "protein",
+    step: float = 1,
+    colldist: float = 2,
+    outdist: float = 8,
+    ligcom: bool = False,
+    numsamples: int = 2000,
+    ratioexposed: float = 0,
+    vmd: bool = True,
+) -> tuple:
     """Find the escape vector of a ligand from a pocket.
 
-    This function creates a sphere of points around the `othersel` atoms and traces a
+    Creates a sphere of points around the `othersel` atoms and traces a
     line from each atom of the ligand to each point on the sphere. If the line does not
     hit any `othersel` atoms within `colldist` it is checked if it exits the pocket by
     checking if any point on the line is outside the pocket.
@@ -298,13 +363,14 @@ def raytracing(
 
     Parameters
     ----------
-    mol : Molecule
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
         The molecule to analyze.
-    ligandsel : str
-        The selection string to use to identify the ligand.
-    othersel : str, optional
-        The selection string to use to identify the other molecules which impede the
-        escape of the ligand.
+    ligandsel : str or np.ndarray
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`)
+        identifying the ligand.
+    othersel : str or np.ndarray, optional
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`)
+        identifying the other molecules which impede the escape of the ligand.
     step : float, optional
         The step size to use for the line tracing.
     colldist : float, optional
@@ -333,11 +399,17 @@ def raytracing(
         The escape vector, i.e. the vector which the ligand can use to reach the
         solvent without hitting any `othersel` atoms within `colldist`.
 
+    Raises
+    ------
+    RuntimeError
+        If no ligand atoms can exit the pocket without clashes, or if the
+        fraction of exposed ligand atoms is below `ratioexposed`.
+
     Examples
     --------
     >>> from moleculekit.util import rotation_matrix_from_vectors
     >>> translation, escape_vector = raytracing(mol, "resname LIG", "protein")
-    >>> rotmat = rotation_matrix_from_vectors(np.array([0, 0, 1]), escape_vector) # align z-axis with escape vector
+    >>> rotmat = rotation_matrix_from_vectors(np.array([0, 0, 1]), escape_vector)
     >>> mol.moveBy(translation)
     >>> mol.rotateBy(rotmat)
     """

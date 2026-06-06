@@ -3,6 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 import numpy as np
 from htmd.projections.metric import Metric, _projectionGenerator
 from htmd.units import convert as unitconvert
@@ -10,42 +12,40 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from htmd.metricdata import MetricData
+
 
 class TICA(object):
-    """Class for calculating the TICA projections of a MetricData  object
+    """Class for calculating the TICA projections of a MetricData object.
 
-    Time-based Independent Component Analysis
-    Projects your data on the slowest coordinates identified for a
-    given lagtime.
+    Time-based Independent Component Analysis projects your data on the slowest
+    coordinates identified for a given lagtime.
 
     Parameters
     ----------
-    data : :class:`MetricData <htmd.metricdata.MetricData>` object
-        The object whose data we wish to project onto the top TICA dimensions
-    lag : int
-        The correlation lagtime to use for TICA
-    units : str
-        The units of lag. Can be 'frames' or any time unit given as a string.
-    dimensions : list
-        A list of dimensions of the original data on which to apply TICA. All other dimensions will stay unaltered.
-        If None is given, it will apply on all dimensions.
-    njobs : int
-        Number of jobs to spawn for parallel computation of TICA components. If None it will use the default from htmd.config.
+    data : :class:`MetricData <htmd.metricdata.MetricData>` object or :class:`Metric <htmd.projections.metric.Metric>` object
+        The MetricData object whose data to project, or a Metric object for memory-efficient
+        streaming TICA (projects trajectories on the fly).
+    lag : float
+        The correlation lagtime to use for TICA. Units are controlled by ``units``.
+    units : str, optional
+        The units of ``lag``. Can be ``'frames'`` or any time unit given as a string.
+    dimensions : list, optional
+        A list of dimensions of the original data on which to apply TICA. All other dimensions
+        will stay unaltered. If None, TICA is applied on all dimensions.
+    njobs : int, optional
+        Number of jobs to spawn for parallel computation of TICA components. If None it will use
+        the default from htmd.config.
 
-    Example
-    -------
+    Examples
+    --------
     >>> from htmd.projections.tica import TICA
     >>> metr = Metric(sims)
     >>> metr.set(MetricSelfDistance('protein and name CA'))
     >>> data = metr.project()
     >>> tica = TICA(data, 20)
     >>> datatica = tica.project(3)
-    Alternatively you can pass a Metric object to TICA. Uses less memory but is slower.
-    >>> metr = Metric(sims)
-    >>> metr.set(MetricSelfDistance('protein and name CA'))
-    >>> slowtica = TICA(metr, 20)
-    >>> datatica = slowtica.project(3)
-
 
     References
     ----------
@@ -54,7 +54,14 @@ class TICA(object):
     for Markov model construction. J. Chem. Phys., 139 . 015102.
     """
 
-    def __init__(self, data, lag, units="frames", dimensions=None, njobs=None):
+    def __init__(
+        self,
+        data,
+        lag: float,
+        units: str = "frames",
+        dimensions: list | range | np.ndarray | None = None,
+        njobs: int | None = None,
+    ):
         from deeptime.decomposition import TICA as TICAdt
         from tqdm import tqdm
         from htmd.util import _getNjobs
@@ -99,25 +106,30 @@ class TICA(object):
             tic.fit(datalist)
         self.model = tic.fetch_model()
 
-    def project(self, ndim=None, var_cutoff=0.95):
-        """Projects the data object given to the constructor onto the top `ndim` TICA dimensions
+    def project(
+        self,
+        ndim: int | None = None,
+        var_cutoff: float = 0.95,
+    ) -> "MetricData":
+        """Project the data object given to the constructor onto the top TICA dimensions.
 
         Parameters
         ----------
-        ndim : int
-            The number of TICA dimensions we want to project the data on. If None is given it will use `var_cutoff`
-        var_cutoff : float
-            Variance cutoff used for automatically determining the number of dimensions
+        ndim : int, optional
+            The number of TICA dimensions to project the data on. If None, ``var_cutoff`` is used
+            to determine the number of dimensions automatically.
+        var_cutoff : float, optional
+            Variance cutoff used for automatically determining the number of dimensions.
 
         Returns
         -------
         dataTica : :class:`MetricData <htmd.metricdata.MetricData>` object
-            A new :class:`MetricData <htmd.metricdata.MetricData>` object containing the TICA projected data
+            A new MetricData object containing the TICA projected data.
 
-        Example
-        -------
+        Examples
+        --------
         >>> from htmd.projections.tica import TICA
-        >>> tica = TICA(data,20)
+        >>> tica = TICA(data, 20)
         >>> dataTica = tica.project(5)
         """
         from tqdm import tqdm

@@ -97,6 +97,19 @@ apply(
     github_repo="Acellera/htmd",
 )
 
+# Resolve htmd's own public classes (referenced by bare name in signatures and
+# docstrings) to their canonical paths, the same way the shared theme handles
+# moleculekit's Molecule. Merged defensively so it composes whether or not the
+# installed theme version pre-populates ``napoleon_type_aliases``.
+napoleon_type_aliases = {
+    **globals().get("napoleon_type_aliases", {}),
+    "MetricData": "htmd.metricdata.MetricData",
+    "Model": "htmd.model.Model",
+    "Trajectory": "htmd.metricdata.Trajectory",
+    "Sim": "htmd.simlist.Sim",
+    "Rates": "htmd.kinetics.Rates",
+}
+
 # -- LLM full-corpus artifact ------------------------------------------------
 
 

@@ -1,9 +1,37 @@
+from typing import TYPE_CHECKING
 import numpy as np
 from htmd.metricdata import MetricData
 
+if TYPE_CHECKING:
+    from htmd.model import Model
+
 
 class MetricDataGenerator:
-    def __init__(self, fulldata, model=None, is_adaptive=False):
+    """Generate synthetic trajectories from existing projected data.
+
+    Given a clustered :class:`MetricData <htmd.metricdata.MetricData>` object (and
+    optionally a Markov state model), this class produces new synthetic trajectories
+    by resampling frames from the clusters of the original data. The various
+    ``newTrajectories*`` methods implement different resampling strategies.
+
+    Parameters
+    ----------
+    fulldata : :class:`MetricData <htmd.metricdata.MetricData>` object
+        The clustered MetricData object from which to sample frames.
+    model : :class:`Model <htmd.model.Model>` object, optional
+        A Markov state model built on `fulldata`. Required for the MSM-based
+        sampling strategies.
+    is_adaptive : bool
+        If True, starting frames are drawn from the first epoch of an adaptive
+        sampling run.
+    """
+
+    def __init__(
+        self,
+        fulldata: MetricData,
+        model: "Model | None" = None,
+        is_adaptive: bool = False,
+    ):
         self.fulldata = fulldata
         if model:
             self.micronum = model.micronum
@@ -85,8 +113,32 @@ class MetricDataGenerator:
             )
         return startFrames
 
-    def newTrajectoriesSimple(self, simlen, ntraj, startFrames=None):
-        """TrajectoriesSimple selects a random trajectory from the conformations in the cluster of the respawning conformations"""
+    def newTrajectoriesSimple(
+        self,
+        simlen: int,
+        ntraj: int,
+        startFrames: list | np.ndarray | None = None,
+    ) -> list:
+        """Generate trajectories by sampling whole pieces from a cluster.
+
+        For each respawning conformation, selects a random trajectory from the
+        conformations in its cluster.
+
+        Parameters
+        ----------
+        simlen : int
+            The length (in frames) of each new trajectory.
+        ntraj : int
+            The number of new trajectories to generate.
+        startFrames : list or np.ndarray, optional
+            Starting frames as trajectory index-frame pairs. If None, starting frames
+            are picked automatically.
+
+        Returns
+        -------
+        ret : list of np.ndarray
+            One array per new trajectory, each row a trajectory index-frame pair.
+        """
         startFrames = self._startingFrames(ntraj, startFrames, simlen, maintainlen=True)
         ret = []
         for r in startFrames:
@@ -97,8 +149,32 @@ class MetricDataGenerator:
         self.reference += ret
         return ret
 
-    def newTrajectoriesFiller(self, simlen, ntraj, startFrames=None):
-        """"""
+    def newTrajectoriesFiller(
+        self,
+        simlen: int,
+        ntraj: int,
+        startFrames: list | np.ndarray | None = None,
+    ) -> list:
+        """Generate trajectories by chaining cluster pieces until the length is reached.
+
+        Starting from a frame, it appends pieces sampled from the corresponding clusters
+        until each trajectory reaches `simlen` frames.
+
+        Parameters
+        ----------
+        simlen : int
+            The length (in frames) of each new trajectory.
+        ntraj : int
+            The number of new trajectories to generate.
+        startFrames : list or np.ndarray, optional
+            Starting frames as trajectory index-frame pairs. If None, starting frames
+            are picked automatically.
+
+        Returns
+        -------
+        ret : list of np.ndarray
+            One array per new trajectory, each row a trajectory index-frame pair.
+        """
         startFrames = self._startingFrames(
             ntraj, startFrames, simlen, maintainlen=False
         )
@@ -125,9 +201,35 @@ class MetricDataGenerator:
         return ret
 
     def newTrajectoriesClusterJumping(
-        self, simlen, ntraj, startFrames=None, jumpprob=0.1
-    ):
-        """clusterJumping only jumps one frame ahead and uses random chance to change the cluster from where to obtain new frames"""
+        self,
+        simlen: int,
+        ntraj: int,
+        startFrames: list | np.ndarray | None = None,
+        jumpprob: float = 0.1,
+    ) -> list:
+        """Generate trajectories by advancing one frame at a time with random cluster jumps.
+
+        At each step the trajectory advances one frame ahead. With probability
+        `jumpprob` (or when the end of the current trajectory is reached) it jumps to a
+        random frame of the same cluster to continue sampling.
+
+        Parameters
+        ----------
+        simlen : int
+            The length (in frames) of each new trajectory.
+        ntraj : int
+            The number of new trajectories to generate.
+        startFrames : list or np.ndarray, optional
+            Starting frames as trajectory index-frame pairs. If None, starting frames
+            are picked automatically.
+        jumpprob : float
+            The per-frame probability of jumping to a new frame within the same cluster.
+
+        Returns
+        -------
+        ret : list of np.ndarray
+            One array per new trajectory, each row a trajectory index-frame pair.
+        """
         startFrames = self._startingFrames(ntraj, startFrames, 2)
         ret = []
         for r in startFrames:
@@ -146,8 +248,32 @@ class MetricDataGenerator:
         self.reference += ret
         return ret
 
-    def newTrajectoriesMSM(self, simlen, ntraj, startFrames=None):
-        """Generates new synthetic (fake) trajectories sampled from the Markov State Model"""
+    def newTrajectoriesMSM(
+        self,
+        simlen: int,
+        ntraj: int,
+        startFrames: list | np.ndarray | None = None,
+    ) -> list:
+        """Generate new synthetic trajectories sampled from the Markov state model.
+
+        At each step the next microstate is drawn from the transition probability matrix
+        of the model, and a random frame of the corresponding cluster is selected.
+
+        Parameters
+        ----------
+        simlen : int
+            The length (in frames) of each new trajectory.
+        ntraj : int
+            The number of new trajectories to generate.
+        startFrames : list or np.ndarray, optional
+            Starting frames as trajectory index-frame pairs. If None, starting frames
+            are picked automatically.
+
+        Returns
+        -------
+        ret : list of np.ndarray
+            One array per new trajectory, each row a trajectory index-frame pair.
+        """
         if startFrames is None:
             startFrames = self._startingFrames(ntraj, startFrames, simlen)
         else:
@@ -180,8 +306,31 @@ class MetricDataGenerator:
         self.reference += ret
         return ret
 
-    def newMetricData(self, datasource, trajectories=None, olddata=None):
-        """Converts trajectory indexes to a new MetricData object"""
+    def newMetricData(
+        self,
+        datasource: MetricData,
+        trajectories: list | None = None,
+        olddata: "MetricData | None" = None,
+    ) -> MetricData:
+        """Convert generated trajectory indexes into a new MetricData object.
+
+        Parameters
+        ----------
+        datasource : :class:`MetricData <htmd.metricdata.MetricData>` object
+            The MetricData object from which to collect projections and references for
+            the sampled frames.
+        trajectories : list, optional
+            A list of trajectories, each given as trajectory index-frame pairs (such as
+            those returned by the ``newTrajectories*`` methods).
+        olddata : :class:`MetricData <htmd.metricdata.MetricData>` object, optional
+            If given, the new data is appended to this object and the merged object is
+            returned.
+
+        Returns
+        -------
+        data : :class:`MetricData <htmd.metricdata.MetricData>` object
+            A MetricData object containing the generated trajectories.
+        """
         dat = []
         ref = []
         sim = []
@@ -204,7 +353,29 @@ class MetricDataGenerator:
         else:
             return newdata
 
-    def parallelTest(self, simlen, ntraj, startFrames=None):
+    def parallelTest(
+        self,
+        simlen: int,
+        ntraj: int,
+        startFrames: list | np.ndarray | None = None,
+    ) -> list:
+        """Generate MSM-sampled trajectories in parallel across multiple processes.
+
+        Parameters
+        ----------
+        simlen : int
+            The length (in frames) of each new trajectory.
+        ntraj : int
+            The number of new trajectories to generate.
+        startFrames : list or np.ndarray, optional
+            Starting frames as trajectory index-frame pairs. If None, starting frames
+            are picked automatically.
+
+        Returns
+        -------
+        ret : list of np.ndarray
+            One array per new trajectory, each row a trajectory index-frame pair.
+        """
         if startFrames is None:
             startFrames = self._startingFrames(ntraj, startFrames, simlen)
         else:
@@ -256,7 +427,23 @@ def _pickFromMicro(
     return traj
 
 
-def abs2rel(absFrames, trajLengths):  # trajLengths need to be summed up (np.cumsum())
+def abs2rel(
+    absFrames: int | list | np.ndarray, trajLengths: np.ndarray
+) -> np.ndarray:  # trajLengths need to be summed up (np.cumsum())
+    """Convert absolute frame indexes into trajectory index-frame pairs.
+
+    Parameters
+    ----------
+    absFrames : int or list or np.ndarray
+        An absolute frame index or a list of absolute frame indexes.
+    trajLengths : np.ndarray
+        The cumulative sum of the trajectory lengths (i.e. ``np.cumsum(trajLengths)``).
+
+    Returns
+    -------
+    relframe : np.ndarray
+        An array where each row is a trajectory index-frame pair.
+    """
     if not hasattr(absFrames, "__len__"):
         absFrames = [absFrames]
     endFrames = np.append(0, trajLengths)

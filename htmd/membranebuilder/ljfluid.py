@@ -128,17 +128,63 @@ def _subrandom_particle_positions(
 
 
 def distributeLipids(
-    boxsize,
-    resnames,
-    sigmas,
-    cutoff,
+    boxsize: list | np.ndarray,
+    resnames: list,
+    sigmas: np.ndarray,
+    cutoff: float,
     mass=39.9 * unit.amu,  # argon
     epsilon=0.238 * unit.kilocalories_per_mole,  # argon,
     switch_width=3.4 * unit.angstrom,  # argon
-    forbidden_xy=None,
-    forbidden_radii=None,
-    platform_name=None,
-):
+    forbidden_xy: np.ndarray | None = None,
+    forbidden_radii: np.ndarray | None = None,
+    platform_name: str | None = None,
+) -> tuple:
+    """Distribute lipid heads on a 2D plane using a short LJ-fluid simulation.
+
+    Lipid heads are modeled as Lennard-Jones spheres whose sigma values are
+    chosen to reproduce the target area-per-lipid in a hexagonally packed
+    monolayer. A Halton-sequence initial placement is followed by an OpenMM
+    Verlet simulation that relaxes the heads into a physical arrangement.
+    Obstacles (e.g. solute footprint atoms) can be provided to exclude lipids
+    from a forbidden XY region.
+
+    Parameters
+    ----------
+    boxsize : list or np.ndarray
+        Periodic box dimensions ``[Lx, Ly, Lz]`` in Angstroms. The Z extent
+        is used only to define the OpenMM box; lipids are confined to z=0.
+    resnames : list
+        Residue names for each lipid particle. Length determines the number
+        of particles.
+    sigmas : np.ndarray
+        Per-particle LJ sigma values in Angstroms. Length must match
+        ``resnames``.
+    cutoff : float
+        Lennard-Jones cutoff distance in Angstroms.
+    mass : openmm.unit.Quantity, optional
+        Particle mass. Defaults to argon mass (39.9 amu).
+    epsilon : openmm.unit.Quantity, optional
+        LJ well depth. Defaults to argon epsilon (0.238 kcal/mol).
+    switch_width : openmm.unit.Quantity, optional
+        LJ switching function width. Defaults to 3.4 Angstroms (argon).
+    forbidden_xy : np.ndarray, optional
+        XY coordinates of obstacle atoms, shape ``(K, 2)``. Halton candidates
+        inside any obstacle disk are excluded before the LJ simulation.
+    forbidden_radii : np.ndarray, optional
+        Per-obstacle exclusion radii in Angstroms, shape ``(K,)``. Required
+        when ``forbidden_xy`` is provided.
+    platform_name : str, optional
+        OpenMM platform name. If ``None``, OpenMM selects the fastest
+        available platform.
+
+    Returns
+    -------
+    final_positions : np.ndarray
+        Post-LJ-simulation XY head positions for each lipid, shape
+        ``(N, 3)``, in the caller's coordinate frame.
+    initial_positions : np.ndarray
+        Pre-simulation Halton-filtered positions, shape ``(N, 3)``.
+    """
     from moleculekit.periodictable import periodictable
 
     nparticles = len(resnames)

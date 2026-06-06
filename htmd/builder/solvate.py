@@ -38,76 +38,75 @@ def _segid_gen(prefix, mol, mode="decimal"):
 
 
 def solvate(
-    mol,
-    pad=None,
-    minmax=None,
-    centersel=None,
-    boxsize=None,
-    negx=0,
-    posx=0,
-    negy=0,
-    posy=0,
-    negz=0,
-    posz=0,
-    buffer=2.4,
-    watsize=65.4195,
-    prefix="W",
-    rotate=False,
-    spdb=None,
-):
-    """Solvates the system in a water box
+    mol: Molecule,
+    pad: float | None = None,
+    minmax: list | np.ndarray | None = None,
+    centersel: str | np.ndarray | None = None,
+    boxsize: float | list | np.ndarray | None = None,
+    negx: float = 0,
+    posx: float = 0,
+    negy: float = 0,
+    posy: float = 0,
+    negz: float = 0,
+    posz: float = 0,
+    buffer: float = 2.4,
+    watsize: float = 65.4195,
+    prefix: str = "W",
+    rotate: bool = False,
+    spdb: str | None = None,
+) -> Molecule:
+    """Solvate a molecular system in a water box.
 
+    Places water molecules around the input molecule by tiling a pre-built
+    water box and removing waters that clash with existing atoms or fall outside
+    the specified box boundaries.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The molecule object we want to solvate
-    pad : float
-        The padding to add to the minmax in all dimensions. You can specify different padding in each dimension using
-        the negx, negy, negz, posx, posy, posz options. This option will override any values in the neg and pos options.
-    minmax : list
-        Min and max dimensions. Should be a 2D matrix of the form [[minx, miny, minz], [maxx, maxy, maxz]]. If none is
-        given, it is calculated from the minimum and maximum coordinates in the mol.
-    centersel : str
-        An atom selection string defining the center of the solvation box. The geometric center of the selected atoms is
-        used. Must be combined with `boxsize`.
-    boxsize : float or list of 3 floats
-        The dimensions of the solvation box. If a single float, a cubic box of that side length is created. If a
-        3-element iterable [sx, sy, sz], an axis-aligned box of those dimensions is created. The box extends from
-        center - boxsize/2 to center + boxsize/2 in each dimension. Must be combined with `centersel`.
-    negx : float
-        The padding in the -x dimension
-    posx : float
-        The padding in the +x dimension
-    negy : float
-        The padding in the -y dimension
-    posy : float
-        The padding in the +y dimension
-    negz : float
-        The padding in the -z dimension
-    posz : float
-        The padding in the +z dimension
-    buffer : float
-        How much buffer space to leave empty between waters and other molecules
-    watsize : float
-        The size of the water box
-    prefix : str
-        The prefix used for water segments
-    keysel : str
-        The key selection for water atoms
-    rotate : bool
-        Enable automated rotation of molecule to fit best in box
-    rotsel : str
-        The selection of atoms to rotate
-    rotinc : float
-        The increment in degrees to rotate
-    spdb : str
-        The path to the water pdb file
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule to solvate.
+    pad : float, optional
+        Uniform padding in Angstroms to add around the molecule in all six
+        directions. Overrides `negx`, `posx`, `negy`, `posy`, `negz`, `posz`.
+    minmax : list or np.ndarray, optional
+        Explicit box boundaries as a 2D array of the form
+        ``[[minx, miny, minz], [maxx, maxy, maxz]]``. If None, derived from
+        the molecule's own coordinates.
+    centersel : str or np.ndarray, optional
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`)
+        defining the center of the solvation box. The geometric center of the
+        selected atoms is used. Must be combined with `boxsize`.
+    boxsize : float or list or np.ndarray, optional
+        Dimensions of the solvation box. A single float creates a cubic box;
+        a 3-element list ``[sx, sy, sz]`` creates an axis-aligned box. Must be
+        combined with `centersel`.
+    negx : float, optional
+        Padding in Angstroms in the -x direction.
+    posx : float, optional
+        Padding in Angstroms in the +x direction.
+    negy : float, optional
+        Padding in Angstroms in the -y direction.
+    posy : float, optional
+        Padding in Angstroms in the +y direction.
+    negz : float, optional
+        Padding in Angstroms in the -z direction.
+    posz : float, optional
+        Padding in Angstroms in the +z direction.
+    buffer : float, optional
+        Minimum distance in Angstroms between water molecules and other atoms.
+    watsize : float, optional
+        Edge length in Angstroms of the pre-built water box tile.
+    prefix : str, optional
+        Prefix string used for water segment names.
+    rotate : bool, optional
+        If True, rotate the molecule to minimize box volume (not yet implemented).
+    spdb : str, optional
+        Path to a custom water PDB file. If None, uses the built-in water box.
 
     Returns
     -------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        A solvated molecule
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        A copy of the input molecule with water molecules added.
 
     Examples
     --------

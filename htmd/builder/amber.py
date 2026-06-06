@@ -222,14 +222,22 @@ def _resolve_backend(teleap=None):
     )
 
 
-def defaultAmberHome(teleap=None):
-    """Returns the default AMBERHOME as defined by the location of teLeap binary,
-    or the tleap_pyodide package directory if running in pyodide.
+def defaultAmberHome(teleap: str | None = None) -> str:
+    """Return the default AMBERHOME directory.
 
-    Parameters:
-    -----------
-    teleap : str
-        Path to teLeap executable used to build the system for AMBER
+    Determined from the location of the teLeap binary, or the tleap_pyodide
+    package directory when running in a pyodide environment.
+
+    Parameters
+    ----------
+    teleap : str, optional
+        Path to the teLeap executable. If None, the executable is located
+        automatically from PATH.
+
+    Returns
+    -------
+    amberhome : str
+        The AMBERHOME directory path.
     """
     backend, value = _resolve_backend(teleap)
     if backend == "pyodide":
@@ -741,105 +749,106 @@ def _write_residue_mapping(molbuilt, mol_orig, outdir):
 
 
 def build(
-    mol,
-    ff=None,
-    topo=None,
-    param=None,
-    prefix="structure",
-    outdir="./build",
-    caps=None,
-    ionize=True,
-    saltconc=0,
-    saltanion=None,
-    saltcation=None,
-    disulfide=None,
-    teleap=None,
-    teleapimports=None,
-    execute=True,
-    atomtypes=None,
-    offlibraries=None,
-    gbsa=False,
-    igb=2,
-    custombonds=None,
-    remove=None,
-):
-    """Builds a system for AMBER
+    mol: Molecule,
+    ff: list | None = None,
+    topo: list | None = None,
+    param: list | None = None,
+    prefix: str = "structure",
+    outdir: str = "./build",
+    caps: dict | None = None,
+    ionize: bool = True,
+    saltconc: float = 0,
+    saltanion: str | None = None,
+    saltcation: str | None = None,
+    disulfide: list | None = None,
+    teleap: str | None = None,
+    teleapimports: list | None = None,
+    execute: bool = True,
+    atomtypes: list | None = None,
+    offlibraries: list | str | None = None,
+    gbsa: bool = False,
+    igb: int = 2,
+    custombonds: list | None = None,
+    remove: list | None = None,
+) -> Molecule:
+    """Build a system for AMBER.
 
-    Uses tleap to build a system for AMBER. Additionally it allows the user to ionize and add disulfide bridges.
+    Uses tleap to build a system for AMBER. Additionally allows for ionization
+    and adding disulfide bridges.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The Molecule object containing the system
-    ff : list of str
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The Molecule object containing the system.
+    ff : list, optional
         A list of leaprc forcefield files.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available forcefield files.
-        Default: :func:`amber.defaultFf <htmd.builder.amber.defaultFf>`
-    topo : list of str
-        A list of topology `prepi/prep/in/cif` files.
-        CIF and MOL2 files are automatically converted to prepi via prepgen.
+        If None, uses :func:`amber.defaultFf <htmd.builder.amber.defaultFf>`.
+    topo : list, optional
+        A list of topology ``prepi/prep/in/cif`` files.
+        CIF and MOL2 files are automatically converted to mol2 format.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available topology files.
-        Default: :func:`amber.defaultTopo <htmd.builder.amber.defaultTopo>`
-        When passing residues parameterized with the `parameterize` tool, please pass the .cif file.
-    param : list of str
-        A list of parameter `frcmod` files.
+        If None, uses :func:`amber.defaultTopo <htmd.builder.amber.defaultTopo>`.
+        When passing residues parameterized with the ``parameterize`` tool, pass the .cif file.
+    param : list, optional
+        A list of parameter ``frcmod`` files.
         Use :func:`amber.listFiles <htmd.builder.amber.listFiles>` to get a list of available parameter files.
-        Default: :func:`amber.defaultParam <htmd.builder.amber.defaultParam>`
+        If None, uses :func:`amber.defaultParam <htmd.builder.amber.defaultParam>`.
     prefix : str
-        The prefix for the generated pdb and psf files
+        The prefix for the generated pdb and prmtop files.
     outdir : str
-        The path to the output directory
-        Default: './build'
-    caps : dict
-        A dictionary specifying the caps. It accepts two different formats.
-        One with keys segids and values lists of strings describing the caps for a particular protein segment.
-        e.g. caps['P'] = ['ACE', 'NME'] or caps['P'] = ['none', 'none']. Default: will apply ACE and NME caps to every
-        protein segment.
-        The second format is more manual and uses as keys an atomselection of a residue and as values the cap
-        to apply to that residue. e.g. caps = {"chain A and resid 5": "ACE", "chain A and resid 10": "NME"}
+        The path to the output directory.
+    caps : dict, optional
+        A dictionary specifying the caps. Accepts two formats.
+        First format: keys are segids, values are lists of cap strings for that segment.
+        e.g. ``caps['P'] = ['ACE', 'NME']`` or ``caps['P'] = ['none', 'none']``.
+        If None, ACE and NME caps are applied to every protein segment.
+        Second format: keys are atom selection strings for a residue, values are the cap name.
+        e.g. ``caps = {"chain A and resid 5": "ACE", "chain A and resid 10": "NME"}``.
     ionize : bool
-        Enable or disable ionization
+        Enable or disable ionization.
     saltconc : float
-        Salt concentration to add to the system after neutralization.
-    saltanion : str
-        The anion type. Default: 'Cl-'. Available: 'Cl-'. Also accepts other formats such as 'CL',
-        'chloride', or 'CLA'.
-    saltcation : str
-        The cation type. Default: 'Na+'. Available: 'Na+', 'K+', 'Cs+', 'Mg2+', 'Ca2+', 'Zn2+'.
-        Also accepts other formats such as 'NA', 'sodium', or 'SOD'.
-    disulfide : list of pairs of atomselection strings
-        If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
-        residues forming the disulfide bridge.
-    teleap : str
-        Path to teLeap executable used to build the system for AMBER
-    teleapimports : list
-        A list of paths to pass to teLeap '-I' flag, i.e. directories to be searched
-        Default: determined from :func:`amber.defaultAmberHome <htmd.builder.amber.defaultAmberHome>` and
-        :func:`amber.htmdAmberHome <htmd.builder.amber.htmdAmberHome>`
+        Salt concentration (in Molar) to add to the system after neutralization.
+    saltanion : str, optional
+        The anion type. Available: ``'Cl-'``. Also accepts ``'CL'``, ``'chloride'``, ``'CLA'``.
+    saltcation : str, optional
+        The cation type. Available: ``'Na+'``, ``'K+'``, ``'Cs+'``, ``'Mg2+'``, ``'Ca2+'``, ``'Zn2+'``.
+        Also accepts formats such as ``'NA'``, ``'sodium'``, ``'SOD'``.
+    disulfide : list, optional
+        If None, disulfide bonds are guessed automatically. Otherwise provide a list of pairs
+        of atom selection strings for each pair of residues forming a disulfide bridge.
+    teleap : str, optional
+        Path to the teLeap executable. If None, located automatically from PATH.
+    teleapimports : list, optional
+        A list of directory paths to pass to teLeap via the ``-I`` flag.
+        If None, determined from :func:`amber.defaultAmberHome <htmd.builder.amber.defaultAmberHome>`
+        and :func:`amber.htmdAmberHome <htmd.builder.amber.htmdAmberHome>`.
     execute : bool
-        Disable building. Will only write out the input script needed by tleap. Does not include ionization.
-    atomtypes : list of triplets
-        Custom atom types defined by the user as ('type', 'element', 'hybrid') triplets
-        e.g. (('C1', 'C', 'sp2'), ('CI', 'C', 'sp3')). Check `addAtomTypes` in AmberTools docs.
-    offlibraries : str or list
-        A path or a list of paths to OFF library files. Check `loadOFF` in AmberTools docs.
+        If True, run the full build. If False, only write the tleap input script without building.
+        Ionization is skipped when False.
+    atomtypes : list, optional
+        Custom atom types as a list of ``('type', 'element', 'hybrid')`` triplets,
+        e.g. ``[('C1', 'C', 'sp2'), ('CI', 'C', 'sp3')]``. See ``addAtomTypes`` in AmberTools docs.
+    offlibraries : list or str, optional
+        A path or list of paths to OFF library files. See ``loadOFF`` in AmberTools docs.
     gbsa : bool
-        Modify radii for GBSA implicit water model
+        Modify radii for the GBSA implicit water model.
     igb : int
-        GB model. Select: 1 for mbondi, 2 and 5 for mbondi2, 7 for bondi and 8 for mbondi3.
-        Check section 4. The Generalized Born/Surface Area Model of the AMBER manual.
-    custombonds : list of pairs of atomselection strings
-        Add custom bonds between two atoms
-    remove : list of atomselection strings
-        Remove the specified atoms or residues from the system. This allows removing atoms which are added during building.
+        GB model: 1 for mbondi, 2 and 5 for mbondi2, 7 for bondi, 8 for mbondi3.
+        See section 4 of the AMBER manual on the Generalized Born/Surface Area model.
+    custombonds : list, optional
+        A list of pairs of atom selection strings specifying custom bonds to add.
+    remove : list, optional
+        A list of atom selection strings. Matching atoms or residues are removed from the
+        system. Useful for removing atoms added during building.
 
     Returns
     -------
-    molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The built system in a Molecule object
+    molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The built system as a Molecule object.
 
-    Example
-    -------
+    Examples
+    --------
     >>> from htmd.ui import *  # doctest: +SKIP
     >>> mol = Molecule("3PTB")
     >>> molbuilt = amber.build(mol, outdir='/tmp/build')  # doctest: +SKIP
@@ -982,7 +991,7 @@ def _build_load_mol2_commands(mol, mol2_path, unit_name="_lig"):
     lines = ["addAtomTypes {"]
     for at in sorted(np.unique(mol.atomtype)):
         el = mol.element[mol.atomtype == at][0]
-        # pick a sensible hybridization default — tleap only uses this
+        # pick a sensible hybridization default - tleap only uses this
         # for coordinate-building, which we never invoke for a ligand
         # whose geometry is already given.
         lines.append(f'    {{ "{at}"  "{el}" "sp3" }}')
@@ -1314,7 +1323,7 @@ def _prepare_build(
             mol2_path = f"{os.path.splitext(fname)[0]}.mol2"
             if ext == ".cif":
                 _resmol.write(mol2_path)
-            # Use the residue name as the tleap variable name — tleap's
+            # Use the residue name as the tleap variable name - tleap's
             # `loadpdb` looks up residue templates in the global variable
             # dictionary by residue name, so the unit must be registered
             # under that exact name.

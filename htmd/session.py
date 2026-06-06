@@ -9,15 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def htmdsave(fname, varnames=None):
-    """Saves the workspace to a file
+def htmdsave(fname: str, varnames: list | None = None) -> None:
+    """Save the workspace to a file.
 
     Parameters
     ----------
     fname : str
-        The file in which to save the workspace
-    varnames : list
-        A list of variables to save. Default: saves all variables.
+        The file in which to save the workspace.
+    varnames : list, optional
+        A list of variable names to save. If None, all non-private, non-module,
+        non-function variables are saved.
     """
     from types import ModuleType, FunctionType
     import __main__ as _main_module
@@ -63,8 +64,8 @@ def htmdsave(fname, varnames=None):
     f.close()
 
 
-def htmdload(fname):
-    """Loads a previously saved workspace from a file.
+def htmdload(fname: str) -> None:
+    """Load a previously saved workspace from a file.
 
     Parameters
     ----------

@@ -3,46 +3,51 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from htmd.metricdata import MetricData
+
 
 class KMeansTri(object):
-    """Class for calculating the Kmeans-triangle projections of a MetricData  object
+    """Class for calculating the KMeans-triangle projections of a MetricData object.
 
     Parameters
     ----------
     data : :class:`MetricData <htmd.metricdata.MetricData>` object
         The object whose data we wish to project.
 
-    Example
-    -------
+    Examples
+    --------
     >>> tri = KMeansTri(data)
     >>> dataproj = tri.project(50)
     """
 
-    def __init__(self, data):
+    def __init__(self, data: "MetricData"):
         self.data = data
 
-    def project(self, ndim=None):
-        """Projects the data object given to the constructor onto `ndim` dimensions
+    def project(self, ndim: int | None = None) -> "MetricData":
+        """Project the data object given to the constructor onto ``ndim`` dimensions.
 
         Parameters
         ----------
-        ndim : int
-            The number of dimensions we want to project the data on.
+        ndim : int, optional
+            The number of dimensions (cluster centers) to project the data on.
 
         Returns
         -------
-        dataTica : :class:`MetricData <htmd.metricdata.MetricData>` object
-            A new :class:`MetricData <htmd.metricdata.MetricData>` object containing the projected data
+        projdata : :class:`MetricData <htmd.metricdata.MetricData>` object
+            A new MetricData object containing the projected data.
 
-        Example
-        -------
+        Examples
+        --------
         >>> tri = KMeansTri(data)
-        >>> datatri = tri.project(5)
+        >>> datatri = tri.project(50)
         """
         import scipy.spatial.distance as scidist
         from sklearn.cluster import MiniBatchKMeans

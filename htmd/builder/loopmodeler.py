@@ -11,31 +11,41 @@ import shutil
 
 
 def loopModeller(
-    mol, segid, seq, startresid, movstart=None, movend=None, modellerexe="mod9.18"
-):
-    """Uses the Modeller software to predict missing loops in a Molecule.
+    mol: Molecule,
+    segid: str,
+    seq: str,
+    startresid: int,
+    movstart: "int | None" = None,
+    movend: "int | None" = None,
+    modellerexe: str = "mod9.18",
+) -> Molecule:
+    """Model missing loops in a Molecule using the Modeller software.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        A Molecule object.
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule containing the gap to fill.
     segid : str
         The name of the segment containing the gap.
     seq : str
-        The sequence of residues to be added by the loop modeller.
+        The one-letter amino acid sequence of residues to insert into
+        the gap.
     startresid : int
-        The resid of the residue before the gap.
-    movstart : int
-        The resid after which the residues will be allowed to move in modeller.
-    movend : int
-        The resid before which the residues will be allowed to move in modeller.
-    modellerexe : str
-        The path to the modeller executable.
+        The resid of the residue immediately before the gap.
+    movstart : int or None, optional
+        The resid after which residues are allowed to move during
+        Modeller refinement. If ``None``, defaults to ``startresid``.
+    movend : int or None, optional
+        The resid before which residues are allowed to move during
+        Modeller refinement. If ``None``, defaults to
+        ``movstart + len(seq) + 1``.
+    modellerexe : str, optional
+        Path or name of the Modeller executable on PATH.
 
     Returns
     -------
-    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        A new Molecule object containing the protein with the modelled loop.
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        A new Molecule containing the protein with the modelled loop.
 
     Examples
     --------

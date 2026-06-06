@@ -3,9 +3,14 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 from moleculekit.util import sequenceID
 import numpy as np
 import logging
+
+if TYPE_CHECKING:
+    from moleculekit.molecule import Molecule
 
 logger = logging.getLogger(__name__)
 
@@ -65,28 +70,30 @@ class MissingAtomTypeError(_MissingErrorType):
     pass
 
 
-def embed(mol1, mol2, gap=1.3):
-    """Embeds one molecule into another removing overlaps.
+def embed(mol1: "Molecule", mol2: "Molecule", gap: float = 1.3) -> "Molecule":
+    """Embed one molecule into another, removing overlapping residues.
 
-    Will remove residues of mol2 which have collisions with atoms of mol1.
+    Removes residues of mol2 that have collisions with atoms of mol1, then
+    appends mol1 into mol2.
 
     Parameters
     ----------
-    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The first Molecule object
-    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The second Molecule object
-    gap : float
-        Minimum space in A between atoms of the two molecules
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The first Molecule object (embedded into mol2).
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The second Molecule object (residues clashing with mol1 are removed).
+    gap : float, optional
+        Minimum distance in Angstroms between atoms of the two molecules below
+        which a residue is considered to clash.
 
-    Return
-    ------
-    newmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The resulting Molecule object
-
-    Example
+    Returns
     -------
-    >>> all = embed(memb, prot)
+    newmol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The resulting Molecule object with mol1 embedded into mol2.
+
+    Examples
+    --------
+    >>> merged = embed(memb, prot)
     """
     from scipy.spatial.distance import cdist
 
@@ -118,20 +125,32 @@ def convertDisulfide(mol, disu):
     return newdisu
 
 
-def detectDisulfideBonds(mol, thresh=3):
-    """Automatically detects disulfide bonds in a molecule
+def detectDisulfideBonds(mol: "Molecule", thresh: float = 3) -> list:
+    """Automatically detect disulfide bonds in a molecule.
+
+    Finds all SG atoms in cysteine-like residues (resnames starting with "CY")
+    and returns pairs whose inter-sulfur distance is below `thresh`.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The molecule for which to detect disulfide bonds
-    thresh : float
-        The threshold under which two sulfurs are considered as bonded
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule for which to detect disulfide bonds.
+    thresh : float, optional
+        Distance threshold in Angstroms below which two sulfur atoms are
+        considered bonded.
 
     Returns
     -------
-    disubonds : np.ndarray
-        A list of :class:`UniqueResidueID <moleculekit.molecule.UniqueResidueID>` objects
+    disubonds : list
+        A list of pairs of
+        :class:`UniqueResidueID <moleculekit.molecule.UniqueResidueID>` objects
+        representing the detected disulfide bonds, sorted by residue ID.
+
+    Raises
+    ------
+    RuntimeError
+        If segment names are not defined, if multiple SG atoms are found in the
+        same residue, or if a sulfur atom has more than one possible bond partner.
     """
     from scipy.spatial.distance import pdist, squareform
     from moleculekit.molecule import UniqueResidueID
@@ -267,28 +286,33 @@ def removeLipidsInProtein(prot, memb, lipidsel="lipids"):
     return removeAtomsInHull(prot, memb, "name CA", lipidsel)
 
 
-def removeAtomsInHull(mol1, mol2, hullsel, removesel):
-    """Calculates the convex hull of an atom selection in mol1 and removes atoms within that hull in mol2.
+def removeAtomsInHull(
+    mol1: "Molecule",
+    mol2: "Molecule",
+    hullsel: str | np.ndarray,
+    removesel: str | np.ndarray,
+) -> tuple:
+    """Calculate the convex hull of an atom selection in mol1 and remove atoms within that hull in mol2.
 
     Parameters
     ----------
-    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        Molecule for which to calculate the convex hull
-    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        Molecule which contains the atoms which we check if they are within the hull
-    hullsel : str
-        Atom selection string for atoms in mol1 from which to calculate the convex hull.
-        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-    removesel : str
-        Atom selection string for atoms in mol2 from which to remove the ones which are within the hull.
-        See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+    mol1 : :class:`Molecule <moleculekit.molecule.Molecule>`
+        Molecule for which to calculate the convex hull.
+    mol2 : :class:`Molecule <moleculekit.molecule.Molecule>`
+        Molecule containing atoms to check for hull membership.
+    hullsel : str or np.ndarray
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`) for
+        atoms in mol1 from which to calculate the convex hull.
+    removesel : str or np.ndarray
+        An atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`) for
+        atoms in mol2 from which to remove those located within the hull.
 
     Returns
     -------
-    newmol2 : Molecule
-        mol2 but without any atoms located within the convex hull
+    newmol2 : :class:`Molecule <moleculekit.molecule.Molecule>`
+        mol2 without atoms located within the convex hull.
     numrem : int
-        Number of fragments removed
+        Number of fragments removed.
     """
     # TODO: Look into Morphological Snakes
     from scipy.spatial import ConvexHull
@@ -332,28 +356,35 @@ def removeHET(prot):
     return prot
 
 
-def tileMembrane(memb, xmin, ymin, xmax, ymax, buffer=1.5):
+def tileMembrane(
+    memb: "Molecule",
+    xmin: float,
+    ymin: float,
+    xmax: float,
+    ymax: float,
+    buffer: float = 1.5,
+) -> "Molecule":
     """Tile a membrane in the X and Y dimensions to reach a specific size.
 
     Parameters
     ----------
-    memb : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The membrane to be tiled
+    memb : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The membrane to be tiled.
     xmin : float
-        Minimum x coordinate
+        Minimum x coordinate.
     ymin : float
-        Minimum y coordinate
+        Minimum y coordinate.
     xmax : float
-        Maximum x coordinate
+        Maximum x coordinate.
     ymax : float
-        Maximum y coordinate
-    buffer : float
-        Buffer distance between tiles
+        Maximum y coordinate.
+    buffer : float, optional
+        Buffer distance in Angstroms between tiles.
 
     Returns
     -------
-    megamemb :
-        A big membrane Molecule
+    megamemb : :class:`Molecule <moleculekit.molecule.Molecule>`
+        A tiled membrane Molecule covering the specified dimensions.
     """
     from tqdm import tqdm
 

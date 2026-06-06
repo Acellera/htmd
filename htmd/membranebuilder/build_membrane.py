@@ -58,14 +58,16 @@ class _Lipid:
 
 
 def listLipids():
-    """Lists all available lipids
+    """List all available lipids in the htmd lipid library.
+
+    Prints the path to the lipid library folder, the name of each available
+    lipid, and the path to the ``lipiddb.csv`` database file.
 
     Examples
     --------
-    >>> from htmd.membranebuilder.build_membrane import buildMembrane
-    >>> build_membrane.listLipids()
+    >>> from htmd.membranebuilder.build_membrane import listLipids
+    >>> listLipids()  # doctest: +ELLIPSIS
     ---- Lipids list: ...
-
     """
 
     from htmd.home import home
@@ -295,7 +297,23 @@ def _detectRings(mol):
     return fivesix
 
 
-def wrapping_dist_python(coor1, coor2, box):
+def wrapping_dist_python(coor1: np.ndarray, coor2: np.ndarray, box: np.ndarray) -> np.ndarray:
+    """Compute minimum-image wrapped distances between a point and an array of points.
+
+    Parameters
+    ----------
+    coor1 : np.ndarray
+        Coordinates of the reference point or array of points.
+    coor2 : np.ndarray
+        Coordinates of the target points.
+    box : np.ndarray
+        Periodic box dimensions used to apply the minimum-image convention.
+
+    Returns
+    -------
+    distances : np.ndarray
+        Array of wrapped Euclidean distances.
+    """
     assert (coor1.ndim == 1) or (coor2.ndim == 1)
     dist = coor1 - coor2
     dist = dist - box * np.round(dist / box)
@@ -533,68 +551,70 @@ def _headAnchorsFromMolecule(mol, head_atoms=None, head_z=None, midplane_z=None)
 
 
 def equilibrateMembrane(
-    mol,
-    minimize=0,
-    equilibrate_ns=0,
-    platform_name="CUDA",
-    forcefield_files=None,
-    temperature=300,
-    timestep_fs=2.0,
-    solute=None,
-    head_anchors=None,
-    head_restraint_k=0.0,
-    head_atoms=None,
-    water_resname="HOH",
-    water_oxygen_name="O",
+    mol: Molecule,
+    minimize: int = 0,
+    equilibrate_ns: float = 0,
+    platform_name: str = "CUDA",
+    forcefield_files: list | None = None,
+    temperature: float = 300,
+    timestep_fs: float = 2.0,
+    solute: Molecule | None = None,
+    head_anchors: list | None = None,
+    head_restraint_k: float = 0.0,
+    head_atoms: dict | None = None,
+    water_resname: str = "HOH",
+    water_oxygen_name: str = "O",
 ):
-    """Minimize and/or equilibrate a solvated membrane ``mol`` with OpenMM.
+    """Minimize and/or equilibrate a solvated membrane with OpenMM.
 
     Works both for membranes built by :func:`buildMembrane` and for
     user-supplied membranes (e.g. from CHARMM-GUI or another tool). The
     function detects the water naming used by ``mol`` and renames it to
     match the chosen force field XMLs. When ``head_restraint_k > 0`` and
-    no explicit ``head_anchors`` are given, anchors are auto-derived via
-    :func:`_headAnchorsFromMolecule`.
+    no explicit ``head_anchors`` are given, anchors are auto-derived from
+    the lipid head atoms in ``mol``.
 
     Equilibrated coordinates and the final box are written back into
     ``mol`` in place.
 
     Parameters
     ----------
-    mol : moleculekit.molecule.Molecule
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
         Solvated membrane. Modified in place.
     minimize : int
-        Conjugate-gradient minimization steps before L-BFGS. 0 to skip.
+        Conjugate-gradient minimization steps before L-BFGS. Pass 0 to skip.
     equilibrate_ns : float
-        Length of NPT equilibration in nanoseconds. 0 to skip.
+        Length of NPT equilibration in nanoseconds. Pass 0 to skip.
     platform_name : str
-        OpenMM platform name (``CUDA``, ``OpenCL``, ``CPU``, ``Reference``).
-    forcefield_files : list of str, optional
-        Force field XMLs. Defaults to ``["amber14/lipid17.xml",
-        "amber14/tip3p.xml"]``.
+        OpenMM platform name. One of ``'CUDA'``, ``'OpenCL'``,
+        ``'CPU'``, or ``'Reference'``.
+    forcefield_files : list, optional
+        Force field XML files passed to ``openmm.app.ForceField``. Defaults
+        to ``["amber14/lipid17.xml", "amber14/tip3p.xml"]``.
     temperature : float
-        Temperature in kelvin.
+        Simulation temperature in kelvin.
     timestep_fs : float
-        Integrator timestep in fs.
-    solute : moleculekit.molecule.Molecule, optional
-        If given, heavy atoms of its membrane-spanning slab are added to
-        the OpenMM System as frozen ``mass=0`` particles so the lipids
-        relax around the solute. The solute Molecule itself is not
-        modified and ghost atoms are discarded before writing back.
-    head_anchors : list of (int, float), optional
-        Explicit ``(atom_idx, z_target_A)`` anchors. If ``None`` and
-        ``head_restraint_k > 0``, anchors are auto-derived from ``mol``.
+        Integrator timestep in femtoseconds.
+    solute : :class:`Molecule <moleculekit.molecule.Molecule>`, optional
+        If given, heavy atoms in the membrane-spanning slab are added to the
+        OpenMM System as frozen (``mass=0``) particles so that lipids relax
+        around the solute. The solute Molecule is not modified.
+    head_anchors : list, optional
+        Explicit ``[(atom_idx, z_target_A), ...]`` anchors for the harmonic
+        Z-restraint. When ``None`` and ``head_restraint_k > 0``, anchors are
+        auto-derived from the lipid head atoms in ``mol``.
     head_restraint_k : float
-        Harmonic z-restraint constant (kcal/mol/A^2) on head atoms.
-        0 disables the restraint.
+        Harmonic Z-restraint constant in kcal/mol/A^2 applied to lipid head
+        atoms. 0.0 disables the restraint.
     head_atoms : dict, optional
-        ``{resname: head_atom_name}`` used when auto-deriving anchors.
+        ``{resname: head_atom_name}`` mapping used when auto-deriving anchors.
         Defaults to the htmd lipid library map.
-    water_resname, water_oxygen_name : str
-        Target water resname and oxygen atom name expected by the chosen
-        force field XML. Defaults match AMBER ``tip3p.xml`` (``HOH``/``O``).
-        Whatever water naming is detected in ``mol`` is renamed to these
-        on a working copy; ``mol`` itself is not renamed.
+    water_resname : str
+        Water residue name expected by the force field XML. Water found in
+        ``mol`` is renamed to this value on a working copy.
+    water_oxygen_name : str
+        Water oxygen atom name expected by the force field XML. Water oxygen
+        atoms found in ``mol`` are renamed on the working copy.
     """
     import os
     import openmm
@@ -806,75 +826,88 @@ def equilibrateMembrane(
 
 
 def buildMembrane(
-    xysize,
-    ratioupper,
-    ratiolower,
-    waterbuff=20,
-    platform="CUDA",
-    minimize=0,
-    equilibrate=0,
-    outdir=None,
-    lipidf=None,
-    forcefield_files=None,
-    seed=None,
-    solute=None,
-    timestep_fs=2.0,
-    head_z=15.0,
-    head_restraint_k=0.0,
-):
-    """Construct a membrane containing arbitrary lipids and ratios of them.
+    xysize: list | np.ndarray,
+    ratioupper: dict,
+    ratiolower: dict,
+    waterbuff: float = 20,
+    platform: str = "CUDA",
+    minimize: int = 0,
+    equilibrate: float = 0,
+    outdir: str | None = None,
+    lipidf: str | None = None,
+    forcefield_files: list | None = None,
+    seed: int | None = None,
+    solute: Molecule | None = None,
+    timestep_fs: float = 2.0,
+    head_z: float = 15.0,
+    head_restraint_k: float = 0.0,
+) -> Molecule:
+    """Construct a membrane bilayer containing arbitrary lipid species and ratios.
+
+    Lipids are placed using a Lennard-Jones fluid simulation that distributes
+    heads on a 2D plane before full 3D assembly. The upper and lower leaflets
+    are built independently so they can carry different lipid compositions.
+    An optional solute (typically a transmembrane protein) can be provided;
+    the membrane is then built around it and lipids near the protein are
+    rotationally optimized to avoid clashes. After assembly the system is
+    solvated and, optionally, minimized and equilibrated with OpenMM.
 
     Parameters
     ----------
-    xysize : list
-        A list containing the size in x and y dimensions of the membrane in Angstroms
+    xysize : list or np.ndarray
+        XY dimensions of the membrane in Angstroms, e.g. ``[100, 100]``.
     ratioupper : dict
-        A dict with keys the molecule names and the ratio of that molecule for the upper layer
+        Lipid composition of the upper leaflet. Keys are lipid residue names
+        (matching entries in the lipid library) and values are relative
+        molar ratios, e.g. ``{'POPC': 10, 'CHL1': 1}``.
     ratiolower : dict
-        Same as ratioupper but for the lower layer
+        Lipid composition of the lower leaflet, same format as ``ratioupper``.
     waterbuff : float
-        The z-dimension size of the water box above and below the membrane
+        Thickness in Angstroms of the water layer added above and below the
+        membrane along the Z axis.
     platform : str
-        OpenMM platform on which to run the LJ-fluid lipid placement and the
-        minimization/equilibration ('CUDA', 'OpenCL', 'CPU', or 'Reference')
+        OpenMM platform used for the LJ-fluid lipid placement and any
+        minimization or equilibration. One of ``'CUDA'``, ``'OpenCL'``,
+        ``'CPU'``, or ``'Reference'``.
     minimize : int
-        If not 0 it minimizes the membrane for the given number of steps
+        Number of conjugate-gradient minimization steps to run before the
+        L-BFGS minimizer. Pass 0 to skip minimization entirely.
     equilibrate : float
-        If not 0 it equilibrates the membrane for the given number of nanoseconds
-    outdir : str
-        A folder in which to store the output PDB files
-    lipidf : str
-        The path to the folder containing the single-lipid PDB structures as well as the lipid DB file
-    forcefield_files : list[str] or None
-        OpenMM ForceField XML files used to parameterize the membrane during
-        minimization/equilibration. Defaults to AMBER Lipid17 + TIP3P
-        (``["amber14/lipid17.xml", "amber14/tip3p.xml"]``).
-    seed : int or None
-        Seed for the numpy global RNG. If provided, the build is reproducible
-        (lipid conformer choice, initial rotations, and the LJ-fluid Halton
-        shuffle). The OpenMM minimization/dynamics step is not seeded here.
-    solute : :class:`Molecule <moleculekit.molecule.Molecule>` or None
-        Optional pre-positioned solute (typically a protein) around which the
-        membrane is built. The solute must be aligned with bilayer center at
-        z=0; the membrane is shifted in XY to follow the solute's
-        membrane-embedded COM. The user's Molecule is not modified.
+        Length of NPT equilibration in nanoseconds. Pass 0 to skip.
+    outdir : str, optional
+        Directory in which to write output PDB files. A temporary directory
+        is created if not provided.
+    lipidf : str, optional
+        Path to the folder containing per-lipid CIF structures and the
+        ``lipiddb.csv`` database file. Defaults to the htmd built-in library.
+    forcefield_files : list, optional
+        OpenMM ForceField XML files used during minimization and equilibration.
+        Defaults to ``["amber14/lipid17.xml", "amber14/tip3p.xml"]``.
+    seed : int, optional
+        Seed for the numpy random number generator. When provided the build
+        is reproducible (conformer selection, initial rotations, and the
+        Halton position shuffle). The OpenMM dynamics step is not seeded.
+    solute : :class:`Molecule <moleculekit.molecule.Molecule>`, optional
+        Pre-positioned solute around which the membrane is built. The solute
+        must be centered at z=0 (bilayer midplane). Lipids are packed around
+        the solute footprint and are rotationally optimized to minimize
+        clashes. The input Molecule is not modified.
     timestep_fs : float
-        Integrator timestep in femtoseconds for the OpenMM equilibration.
-        Default 2.0 (compatible with ``constraints=HBonds``).
+        Integrator timestep in femtoseconds for OpenMM equilibration.
+        2.0 fs is compatible with ``constraints=HBonds``.
     head_z : float
-        Half-bilayer head-plane Z (Angstrom). Every lipid head is placed at
-        ``+head_z`` (upper leaflet) or ``-head_z`` (lower) regardless of
-        species, so a mixed bilayer starts with a flat head plane that NPT
-        relaxes to per-species depths. Default 15.0.
+        Half-bilayer head-plane position in Angstroms. Every lipid head is
+        initially placed at ``+head_z`` (upper leaflet) or ``-head_z``
+        (lower leaflet) to start from a flat bilayer geometry.
     head_restraint_k : float
-        If > 0, apply a harmonic z-restraint of strength ``head_restraint_k``
-        (kJ/mol/A^2) to each lipid head atom toward its initial head plane
-        during minimization and equilibration. Default 0.0 (no restraint).
+        Harmonic Z-restraint strength in kcal/mol/A^2 applied to lipid head
+        atoms toward their initial head plane during minimization and
+        equilibration. 0.0 disables the restraint.
 
     Returns
     -------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule`
-        The resulting membrane including surrounding waters
+    smemb : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The assembled membrane system including surrounding water molecules.
 
     Examples
     --------

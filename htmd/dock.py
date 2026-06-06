@@ -21,41 +21,43 @@ logger = logging.getLogger(__name__)
 
 
 def dock(
-    protein,
-    ligand,
-    center=None,
-    extent=None,
-    numposes=20,
-    babelexe="obabel",
-    vinaexe=None,
+    protein: "Molecule",
+    ligand: "Molecule",
+    center: list | tuple | np.ndarray | None = None,
+    extent: list | tuple | np.ndarray | None = None,
+    numposes: int = 20,
+    babelexe: str = "obabel",
+    vinaexe: str | None = None,
 ):
-    """Molecular docking, using Vina
+    """Perform molecular docking using AutoDock Vina.
 
-    If centre and extent are not provided, docking will be performed over the whole protein
+    If ``center`` and ``extent`` are not provided, docking is performed over
+    the whole protein.
 
     Parameters
     ----------
     protein : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        Molecule object representing the receptor
+        Molecule object representing the receptor.
     ligand : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        Molecule object representing the ligand to dock
-    center : list
-        3-vec centre of of the search bounding box (optional)
-    extent : list
-        3-vec linear extent of the search bounding box (optional)
-    numposes : int
+        Molecule object representing the ligand to dock.
+    center : list or tuple or np.ndarray, optional
+        3-element vector for the centre of the search bounding box.
+    extent : list or tuple or np.ndarray, optional
+        3-element vector for the linear extent of the search bounding box.
+    numposes : int, optional
         Number of poses to return. Vina cannot return more than 20 poses.
-    babelexe : str
-        Path to babel executable.
-    vinaexe : str
-        Path to AutoDock Vina executable.
+    babelexe : str, optional
+        Path to the babel executable.
+    vinaexe : str, optional
+        Path to the AutoDock Vina executable.
 
     Returns
     -------
-    poses
-        Molecule object representing the N<10 best poses
-    scores
-        3x num_poses matrix containing kcal, rmsd lb, rmsd ub
+    poses : list of :class:`Molecule <moleculekit.molecule.Molecule>` objects
+        The docked poses.
+    scores : numpy.ndarray
+        A (num_poses, 3) array containing kcal, rmsd lb, and rmsd ub for
+        each pose.
 
     Examples
     --------

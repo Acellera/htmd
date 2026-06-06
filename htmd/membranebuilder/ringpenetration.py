@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def least_square_fit_plane(coords):
+def least_square_fit_plane(coords: np.ndarray):
     com = coords.mean(axis=0)
     numatm = coords.shape[0]
 
@@ -26,7 +26,7 @@ def least_square_fit_plane(coords):
     return v[0], com
 
 
-def getAllNeighbours(lipids, idx):
+def getAllNeighbours(lipids: list, idx: int) -> list:
     neigh = list(lipids[idx].neighbours)
     for j, l in enumerate(lipids):
         if idx in l.neighbours:
@@ -34,7 +34,7 @@ def getAllNeighbours(lipids, idx):
     return neigh
 
 
-def wrap(coor, com2, box):
+def wrap(coor: np.ndarray, com2: np.ndarray, box: np.ndarray) -> np.ndarray:
     com1 = coor.mean(axis=0)
     for i in range(2):
         if (com1[i] - com2[i]) > (box[i] / 2):
@@ -144,7 +144,27 @@ def _detectRingPenetration(l1, lipids, box):
     return False
 
 
-def resolveRingPenetrations(lipids, box, max_iterations=50):
+def resolveRingPenetrations(lipids: list, box: list | np.ndarray, max_iterations: int = 50):
+    """Iteratively resolve ring penetrations between neighboring lipids.
+
+    Detects pairs of lipids where one lipid's chain atoms thread through
+    another's aromatic or aliphatic ring (e.g. cholesterol). When a
+    penetration is found, the offending lipid is rotated by 10 degrees around
+    the Z-axis and the check is repeated. If all penetrations are resolved
+    before ``max_iterations``, the function returns normally; otherwise a
+    warning is logged.
+
+    Parameters
+    ----------
+    lipids : list
+        List of ``_Lipid`` objects with ``mol``, ``xyz``, ``rot``,
+        ``headname``, ``rings``, and ``neighbours`` attributes.
+    box : list or np.ndarray
+        Periodic box dimensions (XY) used for minimum-image wrapping when
+        checking neighbor distances.
+    max_iterations : int
+        Maximum number of rotation-and-recheck cycles before giving up.
+    """
     lipids = np.array(lipids)
     penetrators = []
     for _ in range(max_iterations):

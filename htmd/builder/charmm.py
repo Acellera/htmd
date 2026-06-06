@@ -74,19 +74,19 @@ def listFiles():
         print(s)
 
 
-def search(key, name):
-    """Searches for CHARMM files containing a given definition.
+def search(key: str, name: str) -> None:
+    """Search CHARMM files for entries containing a given definition.
 
     Parameters
     ----------
     key : str
-        A key
+        The keyword to search for (e.g. ``'RESI'``, ``'ATOM'``).
     name : str
-        The corresponding name
+        The name associated with the keyword (e.g. a residue or atom name).
 
     Examples
     --------
-    >>> charmm.search(key='RESI', name = 'CHL1')  # doctest: +SKIP
+    >>> charmm.search(key='RESI', name='CHL1')  # doctest: +SKIP
     """
     os.system(
         'find {} -type f -exec grep -n "{} {}" {{}} +'.format(
@@ -107,80 +107,86 @@ def defaultTopo():
 
 
 def build(
-    mol,
-    topo=None,
-    prefix="structure",
-    outdir="./build",
-    caps=None,
-    ionize=True,
-    saltconc=0,
-    saltanion=None,
-    saltcation=None,
-    disulfide=None,
-    regenerate=["angles", "dihedrals"],
-    patches=None,
-    noregen=None,
-    aliasresidues=None,
-    psfgen=None,
-    execute=True,
-    _clean=True,
-):
-    """Builds a system for CHARMM
+    mol: Molecule,
+    topo: list | None = None,
+    prefix: str = "structure",
+    outdir: str = "./build",
+    caps: dict | None = None,
+    ionize: bool = True,
+    saltconc: float = 0,
+    saltanion: str | None = None,
+    saltcation: str | None = None,
+    disulfide: list | None = None,
+    regenerate: list | None = ["angles", "dihedrals"],
+    patches: list | str | None = None,
+    noregen: list | None = None,
+    aliasresidues: dict | None = None,
+    psfgen: str | None = None,
+    execute: bool = True,
+    _clean: bool = True,
+) -> Molecule:
+    """Build a system for CHARMM.
 
-    Uses VMD and psfgen to build a system for CHARMM. Additionally it allows for ionization and adding of disulfide bridges.
+    Uses psfgen to build a system for CHARMM. Additionally allows for
+    ionization and adding disulfide bridges.
 
     Parameters
     ----------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The Molecule object containing the system
-    topo : list of str
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The Molecule object containing the system.
+    topo : list, optional
         A list of topology files (``.rtf`` or CHARMM ``.str`` stream files).
-        Stream files are passed straight to psfgen's ``topology`` command —
-        psfgen parses the RTF portion and ignores the ``PARAMETER`` sections.
-        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a list of available topology/stream files.
-        Default: :func:`defaultTopo <htmd.builder.charmm.defaultTopo>`
+        Stream files are passed to psfgen's ``topology`` command; psfgen parses
+        the RTF portion and ignores the ``PARAMETER`` sections.
+        Use :func:`charmm.listFiles <htmd.builder.charmm.listFiles>` to get a
+        list of available topology/stream files.
+        If None, uses :func:`defaultTopo <htmd.builder.charmm.defaultTopo>`.
     prefix : str
-        The prefix for the generated pdb and psf files
+        The prefix for the generated pdb and psf files.
     outdir : str
-        The path to the output directory
-        Default: './build'
-    caps : dict
-        A dictionary with keys segids and values lists of strings describing the caps of that segment.
-        e.g. caps['P'] = ['first ACE', 'last CT3'] or caps['P'] = ['first none', 'last none'].
-        Default: will apply ACE and CT3 caps to proteins and none caps to the rest.
+        The path to the output directory.
+    caps : dict, optional
+        A dictionary with keys as segids and values as lists of strings
+        describing the caps of that segment.
+        e.g. ``caps['P'] = ['first ACE', 'last CT3']`` or
+        ``caps['P'] = ['first none', 'last none']``.
+        If None, ACE and CT3 caps are applied to proteins and none to the rest.
     ionize : bool
-        Enable or disable ionization
+        Enable or disable ionization.
     saltconc : float
         Salt concentration (in Molar) to add to the system after neutralization.
-    saltanion : {'CLA'}
-        The anion type. Please use only CHARMM ion atom names.
-    saltcation : {'SOD', 'MG', 'POT', 'CES', 'CAL', 'ZN2'}
-        The cation type. Please use only CHARMM ion atom names.
-    disulfide : list of pairs of atomselection strings
-        If None it will guess disulfide bonds. Otherwise provide a list pairs of atomselection strings for each pair of
-        residues forming the disulfide bridge.
-    regenerate : None or list of strings of: ['angles', 'dihedrals']
-        Disable angle/dihedral regeneration with `regenerate=None`, or enable it with `regenerate=['angles', 'diheldrals']`
-        or just one of the two options with `regenerate=['angles']` or `regenerate=['diheldrals']`.
-    patches : list of str
-        Any further patches the user wants to apply
-    noregen : list of str
-        A list of patches that must not be regenerated (angles and dihedrals)
-        Default: ['FHEM', 'PHEM', 'PLOH', 'PLO2', 'PLIG', 'PSUL']
-    aliasresidues : dict of aliases
-        A dictionary of key: value pairs of residue names we want to alias
-    psfgen : str
-        Path to psfgen executable used to build for CHARMM
+    saltanion : str, optional
+        The anion type. Use CHARMM ion atom names (e.g. ``'CLA'``).
+    saltcation : str, optional
+        The cation type. Use CHARMM ion atom names
+        (e.g. ``'SOD'``, ``'MG'``, ``'POT'``, ``'CES'``, ``'CAL'``, ``'ZN2'``).
+    disulfide : list, optional
+        If None, disulfide bonds are guessed automatically. Otherwise provide a
+        list of pairs of atom selection strings for each pair of residues
+        forming a disulfide bridge.
+    regenerate : list, optional
+        Angle/dihedral regeneration control. Pass ``None`` to disable, or a
+        list of ``'angles'`` and/or ``'dihedrals'`` to enable selectively.
+    patches : list or str, optional
+        Additional psfgen patches to apply.
+    noregen : list, optional
+        A list of patch names that must not have angles/dihedrals regenerated.
+        If None, uses ``['FHEM', 'PHEM', 'PLOH', 'PLO2', 'PLIG', 'PSUL']``.
+    aliasresidues : dict, optional
+        A dictionary of ``{old_name: new_name}`` residue name aliases.
+    psfgen : str, optional
+        Path to the psfgen executable. If None, located automatically from PATH.
     execute : bool
-        Disable building. Will only write out the input script needed by psfgen. Does not include ionization.
+        If True, run the full build. If False, only write the psfgen input
+        script without building. Ionization is skipped when False.
 
     Returns
     -------
-    molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The built system in a Molecule object
+    molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The built system as a Molecule object.
 
-    Example
-    -------
+    Examples
+    --------
     >>> from htmd.ui import *
     >>> mol = Molecule("3PTB")
     >>> mol.filter("not resname BEN")
@@ -223,7 +229,7 @@ def build(
         patches = [patches]
 
     # Stage topology/stream files for psfgen. Stream files are handed to
-    # psfgen directly via its `topology` command — psfgen parses the RTF
+    # psfgen directly via its `topology` command - psfgen parses the RTF
     # section and ignores the parameter section. Parameter files are *not*
     # staged here; the user is responsible for copying the parameter/stream
     # files they need into their simulation directory afterwards.

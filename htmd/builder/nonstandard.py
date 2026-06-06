@@ -30,8 +30,6 @@ one) with the canonical-side atom types rewritten from antechamber's
 GAFF2 to ff14SB.
 """
 
-from __future__ import annotations
-
 import copy
 import logging
 import math
@@ -39,7 +37,6 @@ import os
 import tempfile
 import warnings
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 from parmed.amber import AmberParameterSet
@@ -72,7 +69,7 @@ class ModelAtom:
     compatibility."""
 
     role: str
-    ff_type: Optional[str] = None
+    ff_type: str | None = None
 
 
 @dataclass
@@ -1666,16 +1663,16 @@ def _parameterize_free_residue_openff(
 
 
 def prepareClusterResidues(
-    typed_path,
-    frcmod_path,
-    model,
-    outdir=None,
-    use_pyodide=None,
-    residue_templates=None,
-    parameter_sets=None,
-    pin_backbone_charges=True,
-    normalize="cluster",
-):
+    typed_path: str,
+    frcmod_path: str,
+    model: ClusterModel,
+    outdir: "str | None" = None,
+    use_pyodide: "bool | None" = None,
+    residue_templates: "list | None" = None,
+    parameter_sets: "list | None" = None,
+    pin_backbone_charges: bool = True,
+    normalize: "str | None" = "cluster",
+) -> ClusterOutputs:
     """Split antechamber output for a cluster model compound into per-
     residue topology files and emit the matching custombonds list.
 
@@ -1703,22 +1700,37 @@ def prepareClusterResidues(
     frcmod_path : str
         parmchk2 output for the same model compound.
     model : :class:`ClusterModel`
-        Cluster model returned by ``buildClusterModel``.
-    outdir : str or None
-        Output directory; created if missing. If ``None``, a fresh tempdir
-        is used.
-    residue_templates : list or None
+        Cluster model returned by :func:`buildClusterModel`.
+    outdir : str or None, optional
+        Output directory; created if missing. If ``None``, a fresh
+        temporary directory is used.
+    use_pyodide : bool or None, optional
+        Force Pyodide dispatch (``True``), native subprocess
+        (``False``), or auto-detect (``None``).
+    residue_templates : list or None, optional
         If provided, every per-residue typed-mol slice this function
-        writes is appended as a :class:`_ResidueTemplateData` for the
-        downstream OpenMM XML emitter.
-    parameter_sets : list or None
+        writes is appended as a :class:`_ResidueTemplateData` entry for
+        the downstream OpenMM XML emitter.
+    parameter_sets : list or None, optional
         If provided, the cluster's final :class:`AmberParameterSet`
-        (post junction-term injection and backbone-rename duplication,
-        pre clean-up) is appended for the downstream XML emitter.
+        (post junction-term injection and backbone-rename duplication)
+        is appended for the downstream XML emitter.
+    pin_backbone_charges : bool, optional
+        If ``True``, pin backbone partial charges of chain-resident
+        residues to ff14SB values before writing topology files. Set
+        ``False`` to keep cluster-computed backbone charges.
+    normalize : str or None, optional
+        Charge normalization mode applied after backbone pinning.
+        ``"cluster"`` distributes any residual across the whole
+        cluster; ``"per_residue"`` normalizes each residue
+        independently to its integer formal charge; ``None`` leaves
+        charges as-is.
 
     Returns
     -------
-    :class:`ClusterOutputs`
+    out : :class:`ClusterOutputs`
+        Per-residue topology paths, frcmod paths, and custombonds for
+        this cluster.
     """
     if outdir is None:
         outdir = tempfile.mkdtemp(prefix="cluster_params_")
@@ -2337,18 +2349,18 @@ def _check_specs_protonated(mol, spec_by_res_idx, groups):
 
 
 def parameterizeFromSpecs(
-    specs,
-    mol,
-    outdir,
-    forcefield="gaff2",
-    charge_method="am1-bcc",
-    am1_path_length=15,
-    pin_backbone_charges=True,
-    normalize="cluster",
-    use_pyodide=None,
-):
-    """Parameterize every non-canonical residue in ``specs`` and return
-    paths plus custombonds ready to feed :func:`htmd.builder.amber.build`.
+    specs: list,
+    mol: Molecule,
+    outdir: str,
+    forcefield: "str | dict" = "gaff2",
+    charge_method: str = "am1-bcc",
+    am1_path_length: "int | None" = 15,
+    pin_backbone_charges: bool = True,
+    normalize: "str | None" = "cluster",
+    use_pyodide: "bool | None" = None,
+) -> ClusterOutputs:
+    """Parameterize every non-canonical residue in ``specs`` and return paths
+    plus custombonds ready to feed :func:`htmd.builder.amber.build`.
 
     The function recovers cluster grouping by walking ``mol.bonds`` for
     non-peptide inter-residue bonds and unioning the touching residues.
@@ -2362,79 +2374,68 @@ def parameterizeFromSpecs(
     specs : list
         Per-residue specs from
         :func:`moleculekit.tools.nonstandard_residues.detectNonStandardResidues`.
-    mol : :class:`moleculekit.molecule.Molecule`
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
         The molecule the specs describe. Must already carry covalent
         bonds (typically the post-``systemPrepare`` molecule).
     outdir : str
         Output directory for all generated CIF / frcmod / XML files.
     forcefield : str or dict, optional
-        Force field for the non-canonical atoms. Default ``"gaff2"``.
-        A name starting with ``"gaff"`` dispatches through antechamber
-        + parmchk2 and emits prepi + frcmod (consumable by
-        :func:`amber.build`) plus a combined OpenMM XML; any other
-        string is treated as a SMIRNOFF offxml filename
-        (e.g. ``"openff_unconstrained-2.3.0.offxml"``) and dispatches
-        through OpenFF Interchange, emitting only per-cluster OpenMM
-        XML (consumable by :func:`openmm.build`). A dict
-        ``{resname: ff_name, "default": ff_name}`` lets different
+        Force field for the non-canonical atoms. A name starting with
+        ``"gaff"`` dispatches through antechamber + parmchk2 and emits
+        prepi + frcmod (consumable by :func:`amber.build`) plus a
+        combined OpenMM XML; any other string is treated as a SMIRNOFF
+        offxml filename (e.g. ``"openff_unconstrained-2.3.0.offxml"``)
+        and dispatches through OpenFF Interchange, emitting only
+        per-cluster OpenMM XML (consumable by :func:`openmm.build`). A
+        dict ``{resname: ff_name, "default": ff_name}`` lets different
         residues use different force fields; mixing within a single
-        cluster is not supported (the cluster compound is parameterised
+        cluster is not supported (the cluster compound is parameterized
         as one molecule).
     charge_method : str, optional
         Charge model for the non-canonical atoms. Orthogonal to
         ``forcefield`` - every model works with both GAFF and SMIRNOFF
-        typing (the externally-fit methods pre-compute charges, then
-        the engine only types). ``"am1-bcc"`` (default) is the most
-        accurate and honours the net charge. ``"gasteiger"`` is faster,
-        computed via RDKit so it also honours the net charge, and is
-        the automatic fallback under Pyodide where AM1-BCC's SQM
-        backend is unavailable. ``"nagl"`` uses the OpenFF NAGL graph
-        neural network as an AM1-BCC surrogate - much faster on
-        medium-to-large molecules. Requires PyTorch. ``"resp"`` /
+        typing. ``"gasteiger"`` is the recommended choice: fast,
+        computed via RDKit, honours the net charge, and is the
+        automatic fallback under Pyodide where AM1-BCC's SQM backend is
+        unavailable. ``"am1-bcc"`` is more expensive but highly
+        accurate. ``"nagl"`` uses the OpenFF NAGL graph neural network
+        as an AM1-BCC surrogate (requires PyTorch). ``"resp"`` /
         ``"resp-multiconf"`` fit RESP charges to a Psi4-computed QM
-        ESP. Most accurate option but requires the private Acellera
-        ``parameterize`` package + Psi4. ``resp-multiconf`` averages
-        over up to 10 conformers (free ligands only; cluster path
-        downgrades to single-conformer RESP since RDKit's ETKDG isn't
-        appropriate for clusters with ACE/NME caps). ``"abcg2"`` is
-        AM1-BCC v2, only meaningful with GAFF.
+        ESP; requires the private Acellera ``parameterize`` package +
+        Psi4. ``"abcg2"`` is AM1-BCC v2, only meaningful with GAFF.
     am1_path_length : int or None, optional
-        Maximum path length for AM1-BCC charge equivalence determination,
-        passed to antechamber's ``-pl`` flag. Caps antechamber's atom-
-        equivalence search so it doesn't hang on cyclic or large
-        molecules. Only used for ``charge_method="am1-bcc"`` /
-        ``"abcg2"``; ignored for Gasteiger. ``None`` keeps antechamber's
-        own default.
+        Maximum path length for AM1-BCC charge equivalence
+        determination, passed to antechamber's ``-pl`` flag. Caps
+        antechamber's atom-equivalence search so it does not hang on
+        cyclic or large molecules. Only used for
+        ``charge_method="am1-bcc"`` / ``"abcg2"``; ignored for
+        Gasteiger. ``None`` keeps antechamber's own default.
     pin_backbone_charges : bool, optional
-        If ``True`` (default), the backbone partial charges of every
+        If ``True``, the backbone partial charges of every
         chain-resident residue are pinned to ff14SB (residue-specific
         for canonical residues, charge-class fallback for NCAAs).
         Matches the Robin Betz / R.E.D. / Carlos Ramos tutorial
         convention. Set ``False`` to keep the cluster-computed
         backbone charges (the Forcefield_PTM / Khoury et al. 2014
-        convention, which argues backbone freezing can hurt fit
-        quality).
-    normalize : {"cluster", "per_residue", None}, optional
+        convention).
+    normalize : str or None, optional
         How to absorb the small per-residue drift left by slicing one
-        residue out of a jointly-charged cluster (RDKit Gasteiger PEOE
-        or antechamber AM1-BCC) and any shift the backbone pin
-        introduces on the cluster total. Default ``"cluster"``: only
-        the cluster total is normalised to integer; per-residue totals
-        are left at their natural (fractional) values, preserving the
-        per-atom charges the charge method computed. ``"per_residue"``:
-        each emitted unit is integer-charged - AMBER's tLeap
-        convention, used by Betz / R.E.D. / Ramos, the safer choice if
+        residue out of a jointly-charged cluster and any shift the
+        backbone pin introduces on the cluster total. ``"cluster"``
+        (default): only the cluster total is normalized to integer;
+        per-residue totals are left at their natural (fractional)
+        values. ``"per_residue"``: each emitted unit is
+        integer-charged - AMBER's tLeap convention, the safer choice if
         the same residue might recur in different bonding contexts.
-        ``None``: no rebalance at all (charges are exactly what the
-        charge method produced, modulo the backbone pin).
+        ``None``: no rebalance at all.
     use_pyodide : bool or None, optional
-        Force the AmberTools dispatch path (``True`` -> dispatch via
-        ``antechamber_pyodide.run``; ``False`` -> native subprocess).
+        Force the AmberTools dispatch path. ``True`` dispatches via
+        ``antechamber_pyodide.run``; ``False`` uses a native subprocess.
         ``None`` (default) auto-detects Pyodide via ``sys.platform``.
 
     Returns
     -------
-    :class:`ClusterOutputs`
+    out : :class:`ClusterOutputs`
         Aggregated topology / parameter files and custombonds for the
         whole system. The ``forcefield`` choice determines what is
         populated:
@@ -2486,8 +2487,11 @@ def parameterizeFromSpecs(
         #    displaced-H drops in one step.
         pmol, _ = systemPrepare(mol, detect_specs=specs)
 
-        # 4. Run antechamber per cluster and split per-residue.
-        out = parameterizeFromSpecs(specs, pmol, outdir="./params")
+        # 4. Run antechamber per cluster and split per-residue using
+        #    Gasteiger charges (fast and reliable).
+        out = parameterizeFromSpecs(
+            specs, pmol, outdir="./params", charge_method="gasteiger"
+        )
 
         # 5. Build.
         built = amber.build(
@@ -3127,10 +3131,31 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
     return model, atom_map, atom_to_residue, atom_to_orig_name
 
 
-def buildClusterModel(mol, spec, outdir):
-    """Build the combined model compound for a :class:`ClusterSpec`: full
-    residues + ACE/NME-style backbone caps derived from the live mol's
-    chain neighbours, written as a CIF ready to feed to antechamber."""
+def buildClusterModel(mol: Molecule, spec: ClusterSpec, outdir: str) -> ClusterModel:
+    """Build the combined model compound for a :class:`ClusterSpec`.
+
+    Assembles full cluster residues plus ACE/NME-style backbone caps
+    derived from the live molecule's chain neighbours, then writes the
+    result as a CIF ready to feed to antechamber.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule containing the cluster residues and their chain
+        neighbours. Must carry covalent bonds.
+    spec : :class:`ClusterSpec`
+        Specification of the cluster to model (residues, chain
+        residency flags, canonical flags, inter-residue bonds).
+    outdir : str
+        Output directory where the model CIF will be written.
+
+    Returns
+    -------
+    model : :class:`ClusterModel`
+        Cluster model compound with atom-name maps needed by
+        :func:`prepareClusterResidues` to split antechamber output back
+        into per-residue topology files.
+    """
     os.makedirs(outdir, exist_ok=True)
     nc_resnames = "_".join(
         sorted(r.resname for r, c in zip(spec.residues, spec.is_canonical) if not c)

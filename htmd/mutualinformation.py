@@ -3,6 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
 from htmd.projections.metric import Metric
 from moleculekit.molecule import Molecule
@@ -10,22 +12,32 @@ from joblib import delayed
 import numpy as np
 import pandas as pd
 
+if TYPE_CHECKING:
+    from htmd.model import Model
+    from htmd.metricdata import MetricData
+
 
 class MutualInformation:
-    def __init__(self, model, mol=None, fstep=0.1, skip=1):
+    def __init__(
+        self,
+        model: "Model",
+        mol: "Molecule | None" = None,
+        fstep: float = 0.1,
+        skip: int = 1,
+    ):
         """Class that calculates the mutual information of protein residues.
 
         Parameters
         ----------
         model : :class:`Model <htmd.model.Model>` object
-            A Model object with a calculated MSM
-        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-            A reference molecule from which to obtain structural information. By default model.data.simlist[0].molfile
-            will be used.
-        fstep : float
-            The frame step of the simulations
-        skip : int
-            Frame skipping
+            A Model object with a calculated MSM.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object, optional
+            A reference molecule from which to obtain structural information. If None,
+            ``model.data.simlist[0].molfile`` will be used.
+        fstep : float, optional
+            The frame step of the simulations in nanoseconds.
+        skip : int, optional
+            Frame skipping interval.
 
         Examples
         --------
@@ -76,12 +88,13 @@ class MutualInformation:
         self.graph_array = None
         self.graph = None
 
-    def calculate(self, njobs=1):
-        """
+    def calculate(self, njobs: int = 1):
+        """Calculate the mutual information matrix.
+
         Parameters
         ----------
-        njobs : int
-            Number of parallel jobs to spawn for the calculation of MI
+        njobs : int, optional
+            Number of parallel jobs to spawn for the calculation of MI.
         """
         from htmd.parallelprogress import ParallelExecutor
 
@@ -208,13 +221,43 @@ class MutualInformation:
                     mi[i][j] = 0
         return mi
 
-    def saveMI(self, path):
+    def saveMI(self, path: str):
+        """Save the mutual information matrix to a file.
+
+        Parameters
+        ----------
+        path : str
+            Path of the ``.npy`` file to save the matrix to.
+        """
         np.save(path, self.mi_matrix)
 
-    def loadMI(self, path):
+    def loadMI(self, path: str):
+        """Load the mutual information matrix from a file.
+
+        Parameters
+        ----------
+        path : str
+            Path of the ``.npy`` file to load the matrix from.
+        """
         self.mi_matrix = np.load(path)
 
-    def weightGraph(self, datacontacts, mi_threshold, time_treshold=0.6):
+    def weightGraph(
+        self,
+        datacontacts: "MetricData",
+        mi_threshold: float,
+        time_treshold: float = 0.6,
+    ):
+        """Build a weighted graph from the MI matrix filtered by contact frequency.
+
+        Parameters
+        ----------
+        datacontacts : :class:`MetricData <htmd.metricdata.MetricData>` object
+            A MetricData object containing contact data used to filter MI edges.
+        mi_threshold : float
+            Only edges with MI value above this threshold are kept.
+        time_treshold : float, optional
+            Fraction of total frames a contact must be present to be included.
+        """
         if len(self.mol.get("resid", "name CA")) != len(self.resids):
             raise Exception(
                 "The length of the protein doesn't match the Mutual Information data"
@@ -283,7 +326,14 @@ class MutualInformation:
         nx.set_node_attributes(G, spectral_dict, "spectral")
         self.graph = G
 
-    def save_graphml(self, path):
+    def save_graphml(self, path: str):
+        """Save the weighted graph to a GraphML file.
+
+        Parameters
+        ----------
+        path : str
+            Path of the GraphML file to write.
+        """
         import networkx as nx
 
         nx.write_graphml(self.graph, path)

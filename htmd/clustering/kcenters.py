@@ -12,38 +12,38 @@ logger = logging.getLogger(__name__)
 
 
 class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
-    """Class to perform KCenter clustering of a given data set
+    """Class to perform KCenter clustering of a given data set.
 
-    KCenter randomly picks one point from the data, which is now the center of the first cluster. All points are put
-    into the first cluster. In general the furthest point from its center is chosen to be the new center. All points,
-    which are closer to the new center than the old one are assigned to the new cluster. This goes on, until K clusters
-    have been created.
+    KCenter randomly picks one point from the data, which is now the center of the first cluster.
+    All points are put into the first cluster. In general the furthest point from its center is
+    chosen to be the new center. All points which are closer to the new center than the old one
+    are assigned to the new cluster. This continues until K clusters have been created.
 
     Parameters
     ----------
-    n_clusters: int
-        desired number of clusters
+    n_clusters : int
+        Desired number of clusters.
 
     Examples
     --------
-    >>> cluster = KCenter(n_cluster=200)
+    >>> cluster = KCenter(n_clusters=200)
     >>> cluster.fit(data)
 
     Attributes
     ----------
-    cluster_centers : list
-        list with the points, which are the centers of the clusters
+    cluster_centers_ : list
+        List with the points which are the centers of the clusters.
     centerFrames : list
-        list of indices of center points in data array
+        List of indices of center points in the data array.
     labels_ : list
-        list with number of cluster of each frame
-    clusterSize_ : list
-        list with number of frames in each cluster
+        List with the cluster index of each frame.
+    clusterSize : list
+        List with the number of frames in each cluster.
     distance : list
-        list with the distance of each frame from the nearest center
+        List with the distance of each frame from the nearest center.
     """
 
-    def __init__(self, n_clusters):
+    def __init__(self, n_clusters: int):
         self.n_clusters = n_clusters
         self.cluster_centers_ = []
         self.centerFrames = []
@@ -51,8 +51,8 @@ class KCenter(BaseEstimator, ClusterMixin, TransformerMixin):
         self.clusterSize = []
         self.distance = []
 
-    def fit(self, data):
-        """Compute the centroids of data.
+    def fit(self, data: np.ndarray):
+        """Compute the cluster centers of the data.
 
         Parameters
         ----------

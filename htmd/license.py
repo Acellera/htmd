@@ -11,7 +11,8 @@ from subprocess import call
 import sys
 
 
-def htmd_show_news():
+def htmd_show_news() -> None:
+    """Fetch and print the latest HTMD news from the project website."""
     try:
         res = requests.get("https://www.htmd.org/news/content", timeout=3)
         print(res.text)
@@ -99,7 +100,18 @@ def _show_licence(product):
         print(fh.read())
 
 
-def check_for_license():
+def check_for_license() -> bool:
+    """Check whether a valid Acellera license is present on this machine.
+
+    Checks environment variables and standard file locations for a license
+    file or license server configuration, then validates it by running the
+    bundled license-checker binary.
+
+    Returns
+    -------
+    valid : bool
+        True if a valid license was found and confirmed, False otherwise.
+    """
     from pathlib import Path
 
     envvars = [
@@ -138,7 +150,14 @@ def check_for_license():
     return False
 
 
-def htmd_registration(product="htmd"):
+def htmd_registration(product: str = "htmd") -> None:
+    """Check HTMD registration and display the license if not registered.
+
+    Parameters
+    ----------
+    product : str, optional
+        The product name to check registration for.
+    """
     if not _check_registration(product):
         if check_for_license():
             return
@@ -159,7 +178,18 @@ def _ask(prompt):
     return value
 
 
-def htmd_register(product="htmd"):
+def htmd_register(product: str = "htmd") -> None:
+    """Interactively register HTMD with the Acellera registration server.
+
+    Prompts for user details (name, email, institution, city, country) and
+    submits them to the registration server. Stores the registration
+    confirmation locally on success.
+
+    Parameters
+    ----------
+    product : str, optional
+        The product name to register.
+    """
 
     print(
         """

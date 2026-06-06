@@ -15,12 +15,11 @@ logger = logging.getLogger(__name__)
 
 
 class AdaptiveGoalEG(AdaptiveGoal):
-    """Adaptive class which uses a Markov state model for respawning
+    """Adaptive goal-directed sampling with epsilon-greedy state selection.
 
-    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
-    the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
-    the chosen criteria which will be used for starting new simulations.
+    Extends :class:`AdaptiveGoal` by splitting simulation budget between the
+    undirected component (exploration) and the directed component (exploitation)
+    using an epsilon-greedy policy rather than a fixed scale factor.
 
     Parameters
     ----------
@@ -89,9 +88,11 @@ class AdaptiveGoalEG(AdaptiveGoal):
         Spawn only from top DC conformations without sampling
     autoscale : bool, default=False
         Automatically scales exploration and exploitation ratios depending on how stuck the adaptive is at a given goal score.
+    epsilon : float, default=0.5
+        The epsilon for epsilon-greedy selection, where epsilon is the exploration ratio.
 
-    Example
-    -------
+    Examples
+    --------
     >>> crystalSS = MetricSecondaryStructure().project(Molecule('crystal.pdb'))[0]
     >>>
     >>> # First argument of a goal function always has to be a Molecule object

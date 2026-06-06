@@ -13,11 +13,16 @@ References
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 import numpy as np
 import random
 from moleculekit.molecule import Molecule
 from htmd.units import convert as unitconvert
 import logging
+
+if TYPE_CHECKING:
+    from htmd.metricdata import MetricData
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +32,13 @@ class Model(object):
 
     Parameters
     ----------
-    data : :class:`MetricData <htmd.metricdata.MetricData>` object
+    data : :class:`MetricData <htmd.metricdata.MetricData>` object, optional
         A :class:`MetricData <htmd.metricdata.MetricData>` object containing the discretized trajectories
+    file : str, optional
+        Path to a previously saved Model file to load. Provide either `data` or `file`.
 
-    Example
-    -------
+    Examples
+    --------
     >>> model = Model(data)
 
     .. rubric:: Methods
@@ -42,7 +49,7 @@ class Model(object):
         :attributes:
     """
 
-    def __init__(self, data=None, file=None):
+    def __init__(self, data: "MetricData | None" = None, file: str | None = None):
         if data is None:
             if file is not None:
                 self.load(file)
@@ -81,12 +88,18 @@ class Model(object):
                 allow_disconnected=False, use_lcc=False
             ).fit_fetch(counts.submodel_largest())
 
-    def markovModel(self, lag, macronum, units="frames", sparse=False):
+    def markovModel(
+        self,
+        lag: float,
+        macronum: int,
+        units: str = "frames",
+        sparse: bool = False,
+    ):
         """Build a Markov model at a given lag time and calculate metastable states
 
         Parameters
         ----------
-        lag : int
+        lag : float
             The lag time at which to calculate the Markov state model. The units are specified with the `units` argument.
         macronum : int
             The number of macrostates (metastable states) to produce
@@ -144,7 +157,11 @@ class Model(object):
             self.data.simlist,
         )
 
-    def createState(self, microstates=None, indexpairs=None):
+    def createState(
+        self,
+        microstates: list | np.ndarray | None = None,
+        indexpairs: list | None = None,
+    ):
         """Creates a new state. Works both for new clusters and macrostates.
 
         If creating a new cluster, it just reassigns the given frames to the new cluster.
@@ -153,7 +170,7 @@ class Model(object):
 
         Parameters
         ----------
-        microstates : list
+        microstates : list or np.ndarray
             The microstates to split out into a new macrostate.
         indexpairs : list
             List of lists. Each row is a simulation index-frame pair which should be added to a new cluster.
@@ -210,12 +227,12 @@ class Model(object):
         return self.msm.count_model.state_symbols
 
     @property
-    def P(self):
+    def P(self) -> np.ndarray:
         """The transition probability matrix"""
         return self.msm.transition_matrix
 
     @property
-    def micro_ofcluster(self):
+    def micro_ofcluster(self) -> np.ndarray:
         """Mapping of clusters to microstates
 
         Numpy array which at index i has the index of the microstate corresponding to cluster i.
@@ -227,7 +244,7 @@ class Model(object):
         return micro_ofcluster
 
     @property
-    def cluster_ofmicro(self):
+    def cluster_ofmicro(self) -> np.ndarray:
         """Mapping of microstates to clusters
 
         Numpy array which at index i has the index of the cluster corresponding to microstate i.
@@ -236,19 +253,19 @@ class Model(object):
         return self._active_set
 
     @property
-    def micronum(self):
+    def micronum(self) -> int:
         """Number of microstates"""
         self._integrityCheck(postmsm=True)
         return len(self._active_set)
 
     @property
-    def macronum(self):
+    def macronum(self) -> int:
         """Number of macrostates"""
         self._integrityCheck(postmsm=True)
         return len(set(self.coarsemsm.assignments))
 
     @property
-    def macro_ofmicro(self):
+    def macro_ofmicro(self) -> np.ndarray:
         """Mapping of microstates to macrostates
 
         Numpy array which at index i has the index of the macrostate corresponding to microstate i.
@@ -260,8 +277,8 @@ class Model(object):
         return mask[self.coarsemsm.assignments]
 
     @property
-    def macro_ofcluster(self):
-        """Mapping of clusters to microstates
+    def macro_ofcluster(self) -> np.ndarray:
+        """Mapping of clusters to macrostates
 
         Numpy array which at index i has the index of the macrostate corresponding to cluster i.
         Clusters which were not connected and thus are not in the model have a macrostate value of -1.
@@ -403,37 +420,37 @@ class Model(object):
 
     def plotTimescales(
         self,
-        lags=None,
-        minlag=None,
-        maxlag=None,
-        numlags=25,
-        units="frames",
-        errors=None,
-        nits=None,
-        results=False,
-        plot=True,
-        save=None,
-        njobs=1,
-        ylog=True,
+        lags: list | range | np.ndarray | None = None,
+        minlag: float | None = None,
+        maxlag: float | None = None,
+        numlags: int = 25,
+        units: str = "frames",
+        errors: int | None = None,
+        nits: int | None = None,
+        results: bool = False,
+        plot: bool = True,
+        save: str | None = None,
+        njobs: int = 1,
+        ylog: bool = True,
     ):
         """Plot the implied timescales of MSMs of various lag times
 
         Parameters
         ----------
-        lags : list
+        lags : list or range or np.ndarray
             Specify explicitly at which lag times to compute the timescales.
-        minlag: float
+        minlag : float
             The minimum lag time for the timescales. Used in combination with `maxlag` and `numlags`.
-        maxlag: float
+        maxlag : float
             The maximum lag time for the timescales. If None will default to the mode length of the trajectories.
-        numlags: int
+        numlags : int
             The number of points to place between `minlag` and `maxlag`.
         units : str
             The units of lag. Can be 'frames' or any time unit given as a string.
-        errors : errors
-            Calculate errors using Bayesian MSMs
+        errors : int
+            Number of Bayesian samples used to calculate errors with Bayesian MSMs. If None, no errors are calculated.
         nits : int
-            Number of implied timescales to calculate. Default: all
+            Number of implied timescales to calculate. If None, all are calculated.
         results : bool
             If the method should return the calculated implied timescales
         plot : bool
@@ -503,7 +520,7 @@ class Model(object):
         if results:
             return its_data._its, its_data.lagtimes
 
-    def maxConnectedLag(self, lags, njobs=1):
+    def maxConnectedLag(self, lags: list | np.ndarray, njobs: int = 1):
         """Heuristic for getting the lagtime before a timescale drops.
 
         It calculates the last lagtime before a drop occurs in the first implied timescale due to disconnected states.
@@ -512,8 +529,10 @@ class Model(object):
 
         Parameters
         ----------
-        lags : np.ndarray or list
+        lags : list or np.ndarray
             A list of lag times for which to calculate the implied timescales
+        njobs : int
+            Number of parallel jobs (currently unused).
 
         Returns
         -------
@@ -551,31 +570,31 @@ class Model(object):
 
     def sampleStates(
         self,
-        states=None,
-        frames=20,
-        statetype="macro",
-        replacement=False,
-        samplemode="random",
-        allframes=False,
+        states: list | int | range | np.ndarray | None = None,
+        frames: int | list | np.ndarray | None = 20,
+        statetype: str = "macro",
+        replacement: bool = False,
+        samplemode: str = "random",
+        allframes: bool = False,
     ):
         """Samples frames from a set of states
 
         Parameters
         ----------
-        states : Union[list, int]
+        states : list or int
             A list of state indexes from which we want to sample
-        frames : Union[None, int, list]
+        frames : int or list
             An integer with the number of frames we want to sample per state or a list of same length as
             `states` which contains the number of frames we want from each of the states.
             If set to None it will return all frames of the states.
-        statetype : ['micro','macro','cluster'], optional
-            The type of state we want to sample from.
+        statetype : str
+            The type of state we want to sample from. Can be 'micro', 'macro' or 'cluster'.
         replacement : bool
             If we want to sample with or without replacement.
-        samplemode : ['random','even','weighted']
-            What sampling strategy to use. For `statetype` == 'macro' this can be set to 'even' to sample evenly from
-            all microstates in the macrostate or to 'weighted' to sample proportional to the equilibium probability of
-            each microstate in the macrostate.
+        samplemode : str
+            What sampling strategy to use. Can be 'random', 'even' or 'weighted'. For `statetype` == 'macro' this can be
+            set to 'even' to sample evenly from all microstates in the macrostate or to 'weighted' to sample
+            proportional to the equilibrium probability of each microstate in the macrostate.
         allframes : bool
             Deprecated. Use frames=None instead.
 
@@ -659,19 +678,19 @@ class Model(object):
             relFrames.append(self.data.abs2rel(absFrames[-1]))
         return absFrames, relFrames
 
-    def eqDistribution(self, plot=True, save=None):
+    def eqDistribution(self, plot: bool = True, save: str | None = None) -> np.ndarray:
         """Obtain and plot the equilibrium probabilities of each macrostate
 
         Parameters
         ----------
-        plot : bool, optional, default=True
+        plot : bool, optional
             Disable plotting of the equilibrium distribution by setting it to False
         save : str
             Path of the file in which to save the figure
 
         Returns
         -------
-        eq : ndarray
+        eq : np.ndarray
             An array of equilibrium probabilities of the macrostates
 
         Examples
@@ -720,33 +739,35 @@ class Model(object):
 
     def getStates(
         self,
-        states=None,
-        statetype="macro",
-        wrapsel="protein",
-        alignsel="name CA",
-        alignmol=None,
-        samplemode="weighted",
-        numsamples=50,
-        simlist=None,
-    ):
+        states: list | int | range | np.ndarray | None = None,
+        statetype: str = "macro",
+        wrapsel: str | np.ndarray | None = "protein",
+        alignsel: str | np.ndarray | None = "name CA",
+        alignmol: "Molecule | None" = None,
+        samplemode: str = "weighted",
+        numsamples: int = 50,
+        simlist: np.ndarray | None = None,
+    ) -> list:
         """Get samples of MSM states in Molecule classes
 
         Parameters
         ----------
-        states : ndarray, optional
+        states : list or np.ndarray, optional
             A list of states to visualize
-        statetype : ['macro','micro','cluster'], optional
-            The type of state to visualize
-        wrapsel : str, optional, default='protein'
-            Atom selection string to use for wrapping.
+        statetype : str, optional
+            The type of state to visualize. Can be 'macro', 'micro' or 'cluster'.
+        wrapsel : str or np.ndarray, optional
+            Atom selection used for wrapping, as an atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`).
+            Set to None to disable wrapping.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        alignsel : str, optional, default='name CA'
-            Atom selection string used for aligning all frames. Set to None to disable aligning.
+        alignsel : str or np.ndarray, optional
+            Atom selection used for aligning all frames, as an atom selection string, a boolean mask, or an integer
+            index array. Set to None to disable aligning.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
         alignmol : :class:`Molecule <moleculekit.molecule.Molecule>` object
             A reference molecule onto which to align all others
-        samplemode : ['weighted','random'], optional, default='weighted'
-            How to obtain the samples from the states
+        samplemode : str, optional
+            How to obtain the samples from the states. Can be 'weighted' or 'random'.
         numsamples : int
             Number of samples (conformations) for each state.
         simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
@@ -754,7 +775,7 @@ class Model(object):
 
         Returns
         -------
-        mols : ndarray of :class:`Molecule <moleculekit.molecule.Molecule>` objects
+        mols : list of :class:`Molecule <moleculekit.molecule.Molecule>` objects
             A list of :class:`Molecule <moleculekit.molecule.Molecule>` objects containing the samples of each state
 
         Examples
@@ -813,40 +834,44 @@ class Model(object):
 
     def viewStates(
         self,
-        states=None,
-        statetype="macro",
-        protein=None,
-        ligand=None,
-        mols=None,
-        numsamples=50,
-        wrapsel="protein",
-        alignsel="name CA",
-        gui=False,
-        simlist=None,
+        states: list | int | range | np.ndarray | None = None,
+        statetype: str = "macro",
+        protein: bool | None = None,
+        ligand: str | np.ndarray | None = None,
+        mols: list | None = None,
+        numsamples: int = 50,
+        wrapsel: str | np.ndarray | None = "protein",
+        alignsel: str | np.ndarray | None = "name CA",
+        gui: bool = False,
+        simlist: np.ndarray | None = None,
     ):
         """Visualize macro/micro/cluster states in VMD
 
         Parameters
         ----------
-        states : ndarray, optional
+        states : list or np.ndarray, optional
             A list of states to visualize
-        statetype : ['macro','micro','cluster'], optional
-            The type of state to visualize
+        statetype : str, optional
+            The type of state to visualize. Can be 'macro', 'micro' or 'cluster'.
         protein : bool, optional
             Set to True to enable pure protein system visualization
-        ligand : str, optional
-            Atom selection string for the ligand.
+        ligand : str or np.ndarray, optional
+            Atom selection for the ligand, as an atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`).
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        mols : ndarray, optional
-            An array of :class:`Molecule <moleculekit.molecule.Molecule>` objects to visualize
+        mols : list, optional
+            A list of :class:`Molecule <moleculekit.molecule.Molecule>` objects to visualize
         numsamples : int
             Number of samples (conformations) for each state.
-        wrapsel : str, optional, default='protein'
-            Atom selection string to use for wrapping.
+        wrapsel : str or np.ndarray, optional
+            Atom selection used for wrapping, as an atom selection string, a boolean mask, or an integer index array (see :meth:`Molecule.atomselect <moleculekit.molecule.Molecule.atomselect>`).
+            Set to None to disable wrapping.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
-        alignsel : str, optional, default='name CA'
-            Atom selection string used for aligning all frames. See to None to disable aligning.
+        alignsel : str or np.ndarray, optional
+            Atom selection used for aligning all frames, as an atom selection string, a boolean mask, or an integer
+            index array. Set to None to disable aligning.
             See more `here <http://www.ks.uiuc.edu/Research/vmd/vmd-1.9.2/ug/node89.html>`__
+        gui : bool
+            Set to True to enable the GUI in the NGL viewer.
         simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
             Optionally pass a different (but matching, i.e. filtered) simlist for visualizing the states.
 
@@ -993,7 +1018,7 @@ class Model(object):
         hb = ipywidgets.HBox(container)
         display(hb)
 
-    def save(self, filename):
+    def save(self, filename: str):
         """Save a :class:`Model <htmd.model.Model>` object to disk
 
         Parameters
@@ -1026,7 +1051,7 @@ class Model(object):
         if self.data.parent is not None:
             self.data.parent = tmpparentdata
 
-    def load(self, filename):
+    def load(self, filename: str):
         """Load a :class:`MetricData <htmd.metricdata.MetricData>` object from disk
 
         Parameters
@@ -1063,7 +1088,7 @@ class Model(object):
             else:
                 self.__dict__[k] = z[k]
 
-    def copy(self):
+    def copy(self) -> "Model":
         """Produces a deep copy of the object
 
         Returns
@@ -1081,25 +1106,25 @@ class Model(object):
 
     def cktest(
         self,
-        lags=None,
-        minlag=None,
-        maxlag=None,
-        numlags=25,
-        units="frames",
-        plot=True,
-        save=None,
-        errors=None,
+        lags: list | range | np.ndarray | None = None,
+        minlag: float | None = None,
+        maxlag: float | None = None,
+        numlags: int = 25,
+        units: str = "frames",
+        plot: bool = True,
+        save: str | None = None,
+        errors: int | None = None,
     ):
         """Conducts a Chapman-Kolmogorov test.
 
         Parameters
         ----------
-        lags: list, optional
+        lags : list or range or np.ndarray, optional
             List of lag times to test
-        minlag : int, optional
+        minlag : float, optional
             Minimum lag time to test. Used if lags is None. By default it will
             use 10 if maxlag is greater than 20, otherwise it will use 2.
-        maxlag : int, optional
+        maxlag : float, optional
             Maximum lag time to test. Used if lags is None. By default it will
             use the mode of the trajectory lengths.
         numlags : int, optional
@@ -1135,7 +1160,7 @@ class Model(object):
         if plot:
             plt.show()
 
-    def createCoreSetModel(self, threshold=0.5):
+    def createCoreSetModel(self, threshold: float = 0.5) -> tuple:
         """Given an MSM this function detects the states belonging to a core set and returns a new model consisting
         only of these states.
 
@@ -1146,7 +1171,7 @@ class Model(object):
 
         Returns
         -------
-        newmodel :
+        newmodel : :class:`Model <htmd.model.Model>` object
             A new model object
         frames : list
             A list of the frames that were kept in the new model
@@ -1288,18 +1313,18 @@ class Model(object):
 
     def plotFES(
         self,
-        dimX,
-        dimY,
-        temperature,
-        states=False,
-        s=10,
+        dimX: int,
+        dimY: int,
+        temperature: float,
+        states: bool = False,
+        s: float = 10,
         cmap=None,
         fescmap=None,
         statescmap=None,
-        plot=True,
-        save=None,
-        data=None,
-        levels=7,
+        plot: bool = True,
+        save: str | None = None,
+        data: "MetricData | None" = None,
+        levels: int = 7,
     ):
         """Plots the free energy surface on any given two dimensions. Can also plot positions of states on top.
 
@@ -1315,11 +1340,11 @@ class Model(object):
             If True, will plot scatter plot of microstates coloured by macro state on top of FES.
         s : float
             Marker size for states.
-        cmap :
+        cmap : str or matplotlib colormap
             Sets the Matplotlib colormap for both `fescmap` and `statescmap`
-        fescmap :
+        fescmap : str or matplotlib colormap
             Matplotlib colormap for the free energy surface
-        statescmap:
+        statescmap : str or matplotlib colormap
             Matplotlib colormap for the states
         plot : bool
             If the method should display the plot of the FES. If both plot=False and save=None, the method will return the figure and axes.
@@ -1329,6 +1354,8 @@ class Model(object):
             Optionally you can pass a different MetricData object than the one used to build the model. For example
             if the user wants to build a model on distances but wants to plot the FES on top of RMSD values. The
             MetricData object needs to have the same simlist as the Model.
+        levels : int
+            Number of contour levels to use for the free energy surface.
 
         Returns
         -------
@@ -1461,14 +1488,14 @@ class Model(object):
 
 
 def getStateStatistic(
-    reference,
-    data,
-    states,
-    statetype="macro",
-    weighted=False,
+    reference: "Model | MetricData",
+    data: "MetricData",
+    states: list | range | np.ndarray,
+    statetype: str = "macro",
+    weighted: bool = False,
     method=np.mean,
-    axis=0,
-):
+    axis: int | None = 0,
+) -> list:
     """Calculates properties of the states.
 
     Calculates properties of data corresponding to states. Can calculate for example the mean distances of atoms in a
@@ -1481,10 +1508,10 @@ def getStateStatistic(
     data : :class:`MetricData` object
         A projection corresponding to the conformations in the states of the model. The data and the model need to share
         the same `simlist`
-    states : list
+    states : list or np.ndarray
         A list of the states for which we want to calculate the properties
-    statetype : ['macro','micro','cluster']
-        The state type
+    statetype : str
+        The state type. Can be 'macro', 'micro' or 'cluster'.
     weighted : bool
         If the properties of the macrostates should be calculated as the weighted average of their microstates, where the
         weights are the equilibrium probabilities of the microstates
@@ -1567,19 +1594,19 @@ def _weightedMethod(model, method, stconcat, datconcat, st, axis):
     return avgstatistic
 
 
-def macroAccumulate(model, microvalue):
+def macroAccumulate(model: "Model", microvalue: np.ndarray) -> np.ndarray:
     """Accumulate values of macrostates from a microstate array
 
     Parameters
     ----------
     model : :class:`Model <htmd.model.Model>` object
         The model which to use to accumulate
-    microvalue : ndarray
+    microvalue : np.ndarray
         An array of values corresponding to the microstates of the model
 
     Returns
     -------
-    macrovalue : ndarray
+    macrovalue : np.ndarray
         An array of values corresponding to the macrostates of the model
     """
     res = np.zeros(model.macronum)

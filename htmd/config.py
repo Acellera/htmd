@@ -17,27 +17,30 @@ _config = {
 
 
 def config(
-    ncpus=None,
-    njobs=_config["njobs"],
-    configfile=_config["configfile"],
-    lsf=_config["lsf"],
-    slurm=_config["slurm"],
-):
-    """
-    Function to change HTMD configuration variables.
+    ncpus: int | None = None,
+    njobs: int = _config["njobs"],
+    configfile: str | None = _config["configfile"],
+    lsf: str | None = _config["lsf"],
+    slurm: str | None = _config["slurm"],
+) -> None:
+    """Change HTMD configuration variables.
 
     Parameters
     ----------
-    njobs : int
-        Defines the number of parallel jobs spawned for several HTMD operations.
-        Negative numbers are used for spawning jobs as many as CPU threads.
-        -1: for all CPUs -2: for all except one etc.
-    configfile : str
-        Defines the HTMD configuration file that is called at the beginning of importing
-    lsf : str
-        Defines a YAML file that can contain default profile configurations for an LsfQueue
-    slurm : str
-        Defines a YAML file that can contain default profile configurations for an SlurmQueue
+    ncpus : int, optional
+        Deprecated. Use ``njobs`` instead.
+    njobs : int, optional
+        Number of parallel jobs spawned for several HTMD operations.
+        Negative numbers spawn as many jobs as CPU threads: -1 for all CPUs,
+        -2 for all except one, etc.
+    configfile : str, optional
+        HTMD configuration file called at the beginning of importing.
+    lsf : str, optional
+        YAML file that can contain default profile configurations for an
+        LsfQueue.
+    slurm : str, optional
+        YAML file that can contain default profile configurations for a
+        SlurmQueue.
     """
     from jobqueues.config import config as jqconfig
 

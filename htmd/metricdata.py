@@ -3,12 +3,17 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
 import numpy as np
 from copy import deepcopy
 import uuid
 import h5py
 import pickle
 import logging
+
+if TYPE_CHECKING:
+    from htmd.simlist import Sim
+    from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,13 @@ class Trajectory(object):
         A list of cluster indexes for each frame in the simulation
     """
 
-    def __init__(self, projection=None, reference=None, sim=None, cluster=None):
+    def __init__(
+        self,
+        projection: np.ndarray | None = None,
+        reference: np.ndarray | None = None,
+        sim: "Sim | None" = None,
+        cluster: np.ndarray | None = None,
+    ):
         self._projection = projection
         self._reference = reference
         self._cluster = cluster
@@ -113,12 +124,12 @@ class Trajectory(object):
                 "projection, reference and cluster must have same lengths"
             )
 
-    def dropFrames(self, frames):
+    def dropFrames(self, frames: list | range | np.ndarray):
         """Drop frames from the trajectory
 
         Parameters
         ----------
-        frames : list
+        frames : list or range or np.ndarray
             A list of frame indexes to drop
         """
         if np.min(frames) < 0 or np.max(frames) >= self.numFrames:
@@ -133,8 +144,14 @@ class Trajectory(object):
             self._cluster = np.delete(self._cluster, frames, axis=0)
         self._checkframes((self.projection, self.reference, self.cluster))
 
-    def copy(self):
-        """Produces a deep copy of the object"""
+    def copy(self) -> "Trajectory":
+        """Produce a deep copy of the object.
+
+        Returns
+        -------
+        traj : :class:`Trajectory` object
+            A copy of the current object.
+        """
         return deepcopy(self)
 
     def __repr__(self):
@@ -173,9 +190,9 @@ class MetricData(object):
 
     Parameters
     ----------
-    dat : numpy.ndarray
+    dat : list or numpy.ndarray
         The projected metrics
-    ref : numpy.ndarray
+    ref : list or numpy.ndarray
         Reference indices to the simulations and frames that generated the metrics
     description : pandas.DataFrame
         A description of the metrics
@@ -210,15 +227,15 @@ class MetricData(object):
 
     def __init__(
         self,
-        dat=None,
-        ref=None,
-        description=None,
-        simlist=None,
-        fstep=0,
-        parent=None,
-        file=None,
-        trajectories=None,
-        cluster=None,
+        dat: list | np.ndarray | None = None,
+        ref: list | np.ndarray | None = None,
+        description: "DataFrame | None" = None,
+        simlist: np.ndarray | None = None,
+        fstep: float = 0,
+        parent: "MetricData | None" = None,
+        file: str | None = None,
+        trajectories: list | None = None,
+        cluster: list | np.ndarray | None = None,
     ):
         if trajectories is None:
             self._loadTrajectories(dat, ref, simlist, cluster)
@@ -347,14 +364,14 @@ class MetricData(object):
         if self.fstep > 0:
             return self.numFrames * self.fstep
 
-    def cluster(self, clusterobj, mergesmall=None, batchsize=False):
+    def cluster(self, clusterobj, mergesmall: int | None = None, batchsize: int = 0):
         """Cluster the metrics
 
         Parameters
         ----------
         clusterobj : :class:`ClusterMixin <sklearn.cluster.ClusterMixin>` object
             The object of a clustering class from sklearn or with the same interface
-        mergesmall : int
+        mergesmall : int, optional
             Clusters containing less than `mergesmall` conformations will be joined into their closest well-populated
             neighbour.
         batchsize : int
@@ -425,7 +442,7 @@ class MetricData(object):
         self._dataid = str(uuid.uuid4())
         self._clusterid = self._dataid
 
-    def combine(self, otherdata):
+    def combine(self, otherdata: "MetricData"):
         """Combines two different metrics into one by concatenating them.
 
         Parameters
@@ -457,14 +474,18 @@ class MetricData(object):
         )
         self._dataid = str(uuid.uuid4())
 
-    def dropDimensions(self, drop=None, keep=None):
+    def dropDimensions(
+        self,
+        drop: list | range | np.ndarray | None = None,
+        keep: list | range | np.ndarray | None = None,
+    ):
         """Drop some dimensions of the data given their indexes
 
         Parameters
         ----------
-        drop : list
+        drop : list or range or np.ndarray, optional
             A list of integer indexes of the dimensions to drop
-        keep : list
+        keep : list or range or np.ndarray, optional
             A list of integer indexes of the dimensions to keep
 
         Examples
@@ -495,24 +516,34 @@ class MetricData(object):
         self.description = self.description.reset_index(drop=True)
 
     def dropTraj(
-        self, limits=None, multiple=None, partial=None, idx=None, keepsims=None
-    ):
+        self,
+        limits: list | tuple | np.ndarray | None = None,
+        multiple: list | range | np.ndarray | None = None,
+        partial: bool | None = None,
+        idx: list | range | np.ndarray | None = None,
+        keepsims: list | None = None,
+    ) -> np.ndarray:
         """Drops trajectories based on their lengths
 
         By default, drops all trajectories which are not of statistical mode (most common) length.
 
         Parameters
         ----------
-        limits : list, optional
+        limits : list or tuple or np.ndarray, optional
             Lower and upper limits of trajectory lengths we want to keep. e.g. [100, 500]
-        multiple : list, optional
+        multiple : list or range or np.ndarray, optional
             Drops trajectories whose length is not a multiple of lengths in the list. e.g. [50, 80]
-        partial : bool
+        partial : bool, optional
             Not implemented yet
-        idx : list, optional
+        idx : list or range or np.ndarray, optional
             A list of trajectory indexes to drop
-        keepsims : list of :class:`Sim <htmd.simlist.Sim>` objects
+        keepsims : list of :class:`Sim <htmd.simlist.Sim>` objects, optional
             A list of sims which we want to keep
+
+        Returns
+        -------
+        dropidx : np.ndarray
+            The indexes of the trajectories that were dropped
 
         Examples
         --------
@@ -582,7 +613,16 @@ class MetricData(object):
         )
         return dropIdx
 
-    def dropFrames(self, idx, frames):
+    def dropFrames(self, idx: int, frames: list | range | np.ndarray):
+        """Drop frames from a single trajectory of the data
+
+        Parameters
+        ----------
+        idx : int
+            The index of the trajectory from which to drop frames
+        frames : list or range or np.ndarray
+            A list of frame indexes to drop
+        """
         self.trajectories[idx].dropFrames(frames)
         self._dataid = str(uuid.uuid4())
         if self.parent:
@@ -590,15 +630,19 @@ class MetricData(object):
             self.parent._dataid = str(uuid.uuid4())
 
     def sampleClusters(
-        self, clusters=None, frames=20, replacement=False, allframes=False
+        self,
+        clusters: int | list | range | np.ndarray | None = None,
+        frames: int | list | np.ndarray | None = 20,
+        replacement: bool = False,
+        allframes: bool = False,
     ):
         """Samples frames from a set of clusters
 
         Parameters
         ----------
-        clusters : Union[None, list]
-            A list of cluster indexes from which we want to sample
-        frames : Union[None, int, list]
+        clusters : int or list or range or np.ndarray, optional
+            A list of cluster indexes from which we want to sample. If None is given it will sample from all clusters.
+        frames : int or list or np.ndarray, optional
             An integer with the number of frames we want to sample from each state or a list of same length as
             `clusters` which contains the number of frames we want from each of the clusters.
             If None is given it will return all frames.
@@ -649,7 +693,7 @@ class MetricData(object):
             relFrames.append(self.abs2rel(absFrames[-1]))
         return absFrames, relFrames
 
-    def bootstrap(self, ratio, replacement=False):
+    def bootstrap(self, ratio: float, replacement: bool = False) -> "MetricData":
         """Randomly sample a set of trajectories
 
         Parameters
@@ -714,14 +758,27 @@ class MetricData(object):
     def splitCols(self):
         raise NameError("Not implemented yet")
 
-    def deconcatenate(self, array):
+    def deconcatenate(self, array: np.ndarray) -> list:
+        """Split a concatenated data array back into per-trajectory pieces
+
+        Parameters
+        ----------
+        array : np.ndarray
+            A concatenated array spanning all trajectories, with as many rows as
+            the total number of frames in the data.
+
+        Returns
+        -------
+        pieces : list of np.ndarray
+            One array per trajectory, split at the trajectory boundaries.
+        """
         indeces = np.cumsum(self.trajLengths)
         if np.ndim(array) == 1:
             return np.split(array, indeces[:-1])
         else:
             return np.vsplit(array, indeces[:-1])
 
-    def abs2rel(self, absFrames):
+    def abs2rel(self, absFrames: int | list | np.ndarray) -> np.ndarray:
         """Convert absolute frame indexes into trajectory index-frame pairs
 
         Useful when doing calculations on a concatenated data array of all trajectories. When you find a frame of
@@ -729,8 +786,8 @@ class MetricData(object):
 
         Parameters
         ----------
-        absFrames : list of int
-            A list of absolute index frames
+        absFrames : int or list or np.ndarray
+            An absolute frame index or a list of absolute frame indexes
 
         Returns
         -------
@@ -752,14 +809,16 @@ class MetricData(object):
             relframe[i, :] = [trajIdx, trajFr]
         return relframe
 
-    def rel2sim(self, relFrames, simlist=None):
+    def rel2sim(
+        self, relFrames: list | np.ndarray, simlist: np.ndarray | None = None
+    ) -> np.ndarray:
         """Converts trajectory index-frame pairs into Sim-frame pairs
 
         Parameters
         ----------
-        relFrames : 2D np.ndarray
+        relFrames : list or np.ndarray
             An array containing in each row trajectory index and frame pairs
-        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects
+        simlist : numpy.ndarray of :class:`Sim <htmd.simlist.Sim>` objects, optional
             Optionally pass a different (but matching, i.e. filtered) simlist for creating the Frames.
 
         Returns
@@ -792,13 +851,13 @@ class MetricData(object):
             frames.append(Frame(simlist[trajID], ref[trajFrame, 0], ref[trajFrame, 1]))
         return np.array(frames)
 
-    def abs2sim(self, absFrames):
+    def abs2sim(self, absFrames: int | list | np.ndarray) -> np.ndarray:
         """Converts absolute frame indexes into Sim-frame pairs
 
         Parameters
         ----------
-        absFrames : list of int
-            A list of absolute index frames
+        absFrames : int or list or np.ndarray
+            An absolute frame index or a list of absolute frame indexes
 
         Returns
         -------
@@ -812,7 +871,7 @@ class MetricData(object):
         """
         return self.rel2sim(self.abs2rel(absFrames))
 
-    def copy(self):
+    def copy(self) -> "MetricData":
         """Produces a deep copy of the object
 
         Returns
@@ -827,7 +886,18 @@ class MetricData(object):
         """
         return deepcopy(self)
 
-    def toHDF5(self, filename=None, h5group=None):
+    def toHDF5(self, filename: str | None = None, h5group: "h5py.Group | None" = None):
+        """Save a :class:`MetricData` object to an HDF5 file or group
+
+        Parameters
+        ----------
+        filename : str, optional
+            Path of the HDF5 file in which to save the object. Either `filename` or
+            `h5group` must be given.
+        h5group : :class:`h5py.Group <h5py.Group>` object, optional
+            An open HDF5 group into which to write the object. Either `filename` or
+            `h5group` must be given.
+        """
         import h5py
 
         if h5group is None and filename is None:
@@ -863,7 +933,25 @@ class MetricData(object):
             h5f.close()
 
     @staticmethod
-    def fromHDF5(filename=None, h5group=None):
+    def fromHDF5(
+        filename: str | None = None, h5group: "h5py.Group | None" = None
+    ) -> "MetricData":
+        """Load a :class:`MetricData` object from an HDF5 file or group
+
+        Parameters
+        ----------
+        filename : str, optional
+            Path of the HDF5 file from which to load the object. Either `filename` or
+            `h5group` must be given.
+        h5group : :class:`h5py.Group <h5py.Group>` object, optional
+            An open HDF5 group from which to read the object. Either `filename` or
+            `h5group` must be given.
+
+        Returns
+        -------
+        data : :class:`MetricData` object
+            The loaded MetricData object
+        """
         import pandas as pd
         from natsort import natsorted
 
@@ -903,7 +991,7 @@ class MetricData(object):
 
         return data
 
-    def save(self, filename):
+    def save(self, filename: str):
         """Save a :class:`MetricData` object to disk
 
         Parameters
@@ -928,13 +1016,14 @@ class MetricData(object):
         if self.parent is not None:
             self.parent = parentpointer
 
-    def load(self, filename):
+    def load(self, filename: "str | dict | MetricData"):
         """Load a :class:`MetricData` object from disk
 
         Parameters
         ----------
-        filename : str
-            Path to the saved MetricData object
+        filename : str or dict or :class:`MetricData`
+            Path to the saved MetricData object. A dict of attributes or a legacy
+            MetricData object is also accepted for backward compatibility.
 
         Examples
         --------
@@ -1159,14 +1248,14 @@ class MetricData(object):
 
     def plotCounts(
         self,
-        dimX,
-        dimY,
-        resolution=100,
-        logplot=False,
-        plot=True,
-        save=None,
-        levels=7,
-        cmap="viridis",
+        dimX: int,
+        dimY: int,
+        resolution: int = 100,
+        logplot: bool = False,
+        plot: bool = True,
+        save: str | None = None,
+        levels: int = 7,
+        cmap: str = "viridis",
     ):
         """Plots a histogram of counts on any two given dimensions.
 
@@ -1182,8 +1271,12 @@ class MetricData(object):
             Set True to plot the logarithm of counts.
         plot : bool
             If the method should display the plot
-        save : str
+        save : str, optional
             Path of the file in which to save the figure
+        levels : int
+            Number of contour levels to draw.
+        cmap : str
+            Name of the matplotlib colormap to use.
         """
         from matplotlib import pylab as plt
 
@@ -1218,17 +1311,17 @@ class MetricData(object):
 
     def plotClusters(
         self,
-        dimX,
-        dimY,
-        resolution=100,
-        s=4,
+        dimX: int,
+        dimY: int,
+        resolution: int = 100,
+        s: float = 4,
         c=None,
         cmap="Greys",
-        logplot=False,
-        plot=True,
-        save=None,
-        data=None,
-        levels=7,
+        logplot: bool = False,
+        plot: bool = True,
+        save: str | None = None,
+        data: "MetricData | None" = None,
+        levels: int = 7,
     ):
         """Plot a scatter-plot of the locations of the clusters on top of the count histogram.
 
@@ -1250,12 +1343,14 @@ class MetricData(object):
             Set True to plot the logarithm of counts.
         plot : bool
             If the method should display the plot
-        save : str
+        save : str, optional
             Path of the file in which to save the figure
-        data : :class:`MetricData` object
+        data : :class:`MetricData` object, optional
             Optionally you can pass a different MetricData object than the one used for clustering. For example
             if the user wants to cluster on distances but wants to plot the centers on top of RMSD values. The new
             MetricData object needs to have the same simlist as this object.
+        levels : int
+            Number of contour levels to draw.
         """
         if self.Centers is None:
             raise RuntimeError("Data has not been clustered yet. Cannot plot clusters.")
@@ -1355,7 +1450,22 @@ class MetricData(object):
 
         return rep
 
-    def append(self, other):
+    def append(self, other: "MetricData") -> "MetricData":
+        """Append the trajectories of another :class:`MetricData` object to this one
+
+        The simulation ids of all trajectories are renumbered after appending, and any
+        existing clustering is reset.
+
+        Parameters
+        ----------
+        other : :class:`MetricData` object
+            The MetricData object whose trajectories will be appended to this one
+
+        Returns
+        -------
+        data : :class:`MetricData` object
+            This object, with the trajectories of `other` appended
+        """
         self.trajectories += other.trajectories
         for i, t in enumerate(self.trajectories):
             t.sim.simid = i
@@ -1377,17 +1487,22 @@ class MetricData(object):
         self.Centers = None
 
     def sampleRegion(
-        self, point=None, radius=None, limits=None, nsamples=20, singlemol=False
+        self,
+        point: list | tuple | np.ndarray | None = None,
+        radius: float | None = None,
+        limits: np.ndarray | None = None,
+        nsamples: int = 20,
+        singlemol: bool = False,
     ):
         """Samples conformations from a region in the projected space.
 
         Parameters
         ----------
-        point : list or np.ndarray
+        point : list or tuple or np.ndarray, optional
             A point in the projected space. Undefined dimensions should have None value.
-        radius : float
+        radius : float, optional
             The radius in around the point in which to sample conformations.
-        limits : np.ndarray
+        limits : np.ndarray, optional
             A (2, ndim) dimensional array containing the min (1st row) and max (2nd row) limits for each dimension.
             None values will be interpreted as no limit in that dimension, or min/max value.
         nsamples : int
@@ -1578,5 +1693,3 @@ def _generate_toy_data(trans_prob, n_traj=1000, n_frames=1000, seed=None, cluste
     )
 
     return data
-
-

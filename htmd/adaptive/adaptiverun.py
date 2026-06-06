@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class AdaptiveMD(AdaptiveBase):
-    """Adaptive class which uses a Markov state model for respawning
+    """Adaptive sampling using Markov state models for conformation selection.
 
-    AdaptiveMD uses Markov state models to choose respawning poses for the next epochs. In more detail, it projects all
-    currently retrieved simulations according to the specified projection, clusters those and then builds a Markov model using
-    the discretized trajectories. From the Markov model it then chooses conformations from the various states based on
-    the chosen criteria which will be used for starting new simulations.
+    Projects completed simulations according to the specified projection, clusters
+    the projected data, and builds a Markov state model. From the model it selects
+    conformations from the various states based on the chosen criteria to spawn the
+    next epoch of simulations.
 
     Parameters
     ----------
@@ -89,8 +89,8 @@ class AdaptiveMD(AdaptiveBase):
     save : bool, default=False
         Save the model generated
 
-    Example
-    -------
+    Examples
+    --------
     >>> adapt = AdaptiveMD()
     >>> adapt.nmin = 2
     >>> adapt.nmax = 3

@@ -30,15 +30,59 @@ for _key, (_charge, _fullname, _ambername, _charmmname) in _ions.items():
 
 
 def ionize(
-    mol,
-    netcharge,
-    nwater,
-    neutralize=True,
-    saltconc=None,
-    cation=None,
-    anion=None,
-    ff=None,
+    mol: Molecule,
+    netcharge: float,
+    nwater: int,
+    neutralize: bool = True,
+    saltconc: float | None = None,
+    cation: str | None = None,
+    anion: str | None = None,
+    ff: str | None = None,
 ):
+    """Calculate the number of ions required to neutralize or salt a system.
+
+    Computes the anion and cation counts needed to neutralize the system's net
+    charge, and optionally adds extra ions to reach a target salt concentration.
+    Ion stoichiometry is inferred from the ion charges (e.g. MgCl2 for Mg2+/Cl-).
+
+    Parameters
+    ----------
+    mol : Molecule
+        The molecular system (used to count existing ions when *saltconc* is set).
+    netcharge : float
+        Net charge of the molecular system (e.g. from partial charges).
+    nwater : int
+        Number of water molecules in the system (used to estimate box volume for
+        salt concentration calculations).
+    neutralize : bool
+        If True, return only the counts needed for neutralization. If *saltconc*
+        is not None, this is automatically set to False.
+    saltconc : float, optional
+        Target salt concentration in molar. If given, additional ions are added on
+        top of the neutralizing ions to reach this concentration.
+    cation : str, optional
+        Cation residue name. Accepts canonical keys (``"NA"``, ``"K"``, ``"MG"``,
+        ``"CA"``, ``"CS"``), full names (``"sodium"``), AMBER names (``"Na+"``),
+        or CHARMM names (``"SOD"``). If None, defaults to ``"NA"``.
+    anion : str, optional
+        Anion residue name. Accepts canonical keys (``"CL"``), full names
+        (``"chloride"``), AMBER names (``"Cl-"``), or CHARMM names (``"CLA"``).
+        If None, defaults to ``"CL"``.
+    ff : str, optional
+        Deprecated. No longer needed; pass standard ion names via *cation* / *anion*.
+
+    Returns
+    -------
+    tuple
+        When *neutralize* is True: ``(anion, cation, nanion, ncation)``.
+        When *saltconc* is given: ``(anion, cation, anion, cation, nanion, ncation)``.
+
+    Raises
+    ------
+    NameError
+        If the ion charges cannot neutralize the system, if no waters are found,
+        or if the requested salt concentration is already exceeded.
+    """
     if ff:
         logger.warning(
             "The ff option is no longer needed and is deprecated. "
@@ -168,18 +212,18 @@ def _ionGetCharge(ion):
 
 
 def ionizePlace(
-    solvent_mol,
-    solute_mol,
-    anion_resname,
-    cation_resname,
-    anion_name,
-    cation_name,
-    nanion,
-    ncation,
-    dfrom=5,
-    dbetween=5,
-    segname=None,
-):
+    solvent_mol: Molecule,
+    solute_mol: Molecule | None,
+    anion_resname: str,
+    cation_resname: str,
+    anion_name: str,
+    cation_name: str,
+    nanion: int,
+    ncation: int,
+    dfrom: float = 5,
+    dbetween: float = 5,
+    segname: str | None = None,
+) -> Molecule:
     """Place a given number of negative and positive ions in the solvent.
 
     Uses farthest point sampling to produce well-spaced ion positions and
@@ -188,34 +232,34 @@ def ionizePlace(
 
     Parameters
     ----------
-    solvent_mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The solvent (water) molecule
-    solute_mol : :class:`Molecule <moleculekit.molecule.Molecule>` object or None
+    solvent_mol : Molecule
+        The solvent (water) molecule.
+    solute_mol : Molecule or None
         The solute molecule used for minimum-distance filtering. If None or
         empty, no minimum distance from solute is enforced.
     anion_resname : str
-        Resname of the added anions
+        Resname of the added anions.
     cation_resname : str
-        Resname of the added cations
+        Resname of the added cations.
     anion_name : str
-        Name of the added anions
+        Name of the added anions.
     cation_name : str
-        Name of the added cations
+        Name of the added cations.
     nanion : int
-        Number of anions to add
+        Number of anions to add.
     ncation : int
-        Number of cations to add
+        Number of cations to add.
     dfrom : float
-        Min distance of ions from solute molecule
+        Minimum distance of ions from solute molecule in Angstroms.
     dbetween : float
-        Min distance between ions
-    segname : str
-        Segment name to add
+        Minimum distance between ions in Angstroms.
+    segname : str, optional
+        Segment name to assign to the ions.
 
     Returns
     -------
-    mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-        The solvent molecule with ions replacing some water molecules
+    mol : Molecule
+        The solvent molecule with ions replacing some water molecules.
     """
 
     newmol = solvent_mol.copy()

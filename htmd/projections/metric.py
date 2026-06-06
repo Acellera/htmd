@@ -3,6 +3,8 @@
 # Distributed under HTMD Software License Agreement
 # No redistribution in whole or part
 #
+from typing import TYPE_CHECKING
+
 import numpy as np
 from moleculekit.molecule import Molecule
 from htmd.metricdata import MetricData
@@ -14,6 +16,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from pandas import DataFrame
+
 
 class Metric:
     """Class for calculating projections of a simlist.
@@ -21,12 +26,12 @@ class Metric:
     Parameters
     ----------
     simulations : list
-        A list of simulations produced by :func:`simlist <htmd.simlist.simlist>`
-    skip : int
-        Frame skipping. Setting i.e. to 3 will keep only every third frame of each simulation.
-    metricdata : :class:`MetricData <htmd.metricdata.MetricData>` object
-        If a MetricData object is passed in the constructor, Metric will try to update it by only adding simulations
-        which don't exist in it yet.
+        A list of simulations produced by :func:`simlist <htmd.simlist.simlist>`.
+    skip : int, optional
+        Frame skipping. Setting to 3 will keep only every third frame of each simulation.
+    metricdata : :class:`MetricData <htmd.metricdata.MetricData>` object, optional
+        If a MetricData object is passed in the constructor, Metric will try to update it by only
+        adding simulations which do not exist in it yet.
 
     Examples
     --------
@@ -54,19 +59,25 @@ class Metric:
         :attributes:
     """
 
-    def __init__(self, simulations, skip=1, metricdata=None):
+    def __init__(
+        self,
+        simulations,
+        skip: int = 1,
+        metricdata: "MetricData | None" = None,
+    ):
         self.simulations = simulations
         self.skip = skip
         self.projectionlist = []
         self.metricdata = metricdata
 
     def set(self, projection):
-        """Sets the projection to be applied to the simulations.
+        """Set the projection to be applied to the simulations.
 
         Parameters
         ----------
-        projection : function or :class:`Projection <moleculekit.projections.projection.Projection>` object or list of objects
-            A function or projection or a list of projections/functions which to use on the simulations
+        projection : :class:`Projection <moleculekit.projections.projection.Projection>` object or list
+            A function, a Projection object, or a list of projections/functions to apply to the
+            simulations. Can also be a ``(function, args)`` tuple.
         """
         self.projectionlist = projection
         if not (
@@ -93,18 +104,19 @@ class Metric:
                 "lists and tuples thereof."
             )
 
-    def getMapping(self, mol):
-        """Returns the description of each projected dimension.
+    def getMapping(self, mol: "Molecule | None") -> "DataFrame | None":
+        """Return the description of each projected dimension.
 
         Parameters
         ----------
-        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object
-            A Molecule object which will be used to calculate the descriptions of the projected dimensions.
+        mol : :class:`Molecule <moleculekit.molecule.Molecule>` object, optional
+            A Molecule object used to calculate the descriptions of the projected dimensions.
+            If None, returns None.
 
         Returns
         -------
         map : :class:`DataFrame <pandas.core.frame.DataFrame>` object
-            A DataFrame containing the descriptions of each dimension
+            A DataFrame containing the descriptions of each dimension.
         """
         import pandas as pd
 
@@ -118,20 +130,20 @@ class Metric:
                 )
         return pandamap
 
-    def project(self, njobs=None):
-        """
-        Applies all projections stored in Metric on all simulations.
+    def project(self, njobs: int | None = None) -> "MetricData":
+        """Apply all projections stored in Metric on all simulations.
 
         Parameters
         ----------
-        njobs : int
-            Number of parallel jobs to spawn for projection of trajectories. Take care that this can use large amounts
-            of memory as multiple trajectories are loaded at once.  If None it will use the default from htmd.config.
+        njobs : int, optional
+            Number of parallel jobs to spawn for projection of trajectories. Take care that this
+            can use large amounts of memory as multiple trajectories are loaded at once. If None it
+            will use the default from htmd.config.
 
         Returns
         -------
-        data : MetricData object
-               Returns a MetricData object containing the projected data.
+        data : :class:`MetricData <htmd.metricdata.MetricData>` object
+            A MetricData object containing the projected data.
         """
         if len(self.projectionlist) == 0:
             raise RuntimeError(
