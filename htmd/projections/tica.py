@@ -56,7 +56,7 @@ class TICA(object):
 
     def __init__(
         self,
-        data,
+        data: "MetricData | Metric",
         lag: float,
         units: str = "frames",
         dimensions: list | range | np.ndarray | None = None,

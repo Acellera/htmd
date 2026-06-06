@@ -25,8 +25,9 @@ class Metric:
 
     Parameters
     ----------
-    simulations : list
-        A list of simulations produced by :func:`simlist <htmd.simlist.simlist>`.
+    simulations : list or np.ndarray or :class:`Molecule <moleculekit.molecule.Molecule>`
+        A list of simulations produced by :func:`simlist <htmd.simlist.simlist>`,
+        or a single Molecule.
     skip : int, optional
         Frame skipping. Setting to 3 will keep only every third frame of each simulation.
     metricdata : :class:`MetricData <htmd.metricdata.MetricData>` object, optional
@@ -61,7 +62,7 @@ class Metric:
 
     def __init__(
         self,
-        simulations,
+        simulations: list | np.ndarray | Molecule,
         skip: int = 1,
         metricdata: "MetricData | None" = None,
     ):

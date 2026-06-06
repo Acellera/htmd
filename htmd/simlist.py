@@ -78,9 +78,9 @@ class Sim(object):
 
     def __init__(
         self,
-        trajf,
-        topology=None,
-        inputf=None,
+        trajf: str | list | tuple | np.ndarray,
+        topology: str | list | tuple | np.ndarray | None = None,
+        inputf: str | None = None,
         _simid=None,
         _parent=None,
         _input=None,
@@ -187,25 +187,26 @@ class Sim(object):
 
 
 def simlist(
-    datafolders: list,
-    topologies: list,
-    inputfolders: list | None = None,
+    datafolders: str | list,
+    topologies: str | list,
+    inputfolders: str | list | None = None,
 ) -> list:
     """Create a list of simulations.
 
     Parameters
     ----------
-    datafolders : list
-        A list of directories, each containing a single trajectory.
-    topologies : list
+    datafolders : str or list
+        A list of directories (or a single directory), each containing a single
+        trajectory.
+    topologies : str or list
         A list of topology files or folders containing a topology file
         corresponding to the trajectories in ``datafolders``. Can also be a
         single path to a structure that applies to all trajectories. If the
         single path is a folder, topology files will be auto-detected in that
         folder.
-    inputfolders : list, optional
-        A list of directories, each containing the input files used to produce
-        the trajectories in ``datafolders``.
+    inputfolders : str or list, optional
+        A list of directories (or a single directory), each containing the input
+        files used to produce the trajectories in ``datafolders``.
 
     Returns
     -------
