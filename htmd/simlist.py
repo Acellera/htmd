@@ -130,6 +130,7 @@ class Sim(object):
         self.numframes = _numframes
 
     def toHDF5(self, h5group: h5py.Group):
+        """Write this simulation's fields into an open HDF5 group."""
         from moleculekit.util import ensurelist
 
         h5group.attrs["simid"] = self.simid
@@ -142,7 +143,8 @@ class Sim(object):
             self.parent.toHDF5(parentgroup)
 
     @staticmethod
-    def fromHDF5(h5group: h5py.Group):
+    def fromHDF5(h5group: h5py.Group) -> "Sim":
+        """Reconstruct a :class:`Sim` from an open HDF5 group."""
         return Sim(
             trajf=None,
             _simid=str(h5group.attrs["simid"]),
@@ -177,7 +179,8 @@ class Sim(object):
             iseq &= self.trajectory[i] == other.trajectory[i]
         return iseq
 
-    def copy(self):
+    def copy(self) -> "Sim":
+        """Return a deep copy of this simulation."""
         from copy import deepcopy
 
         return deepcopy(self)

@@ -109,7 +109,23 @@ def embed(mol1: "Molecule", mol2: "Molecule", gap: float = 1.3) -> "Molecule":
     return mol2
 
 
-def convertDisulfide(mol, disu):
+def convertDisulfide(mol: "Molecule", disu: list) -> list:
+    """Convert disulfide selection-string pairs to UniqueResidueID pairs.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule the selections refer to.
+    disu : list
+        A list of pairs of atom selection strings, each pair identifying the two
+        residues forming a disulfide bond.
+
+    Returns
+    -------
+    newdisu : list
+        The same pairs with each selection string resolved to a
+        :class:`UniqueResidueID <moleculekit.molecule.UniqueResidueID>`.
+    """
     from moleculekit.molecule import UniqueResidueID
 
     newdisu = []
@@ -215,7 +231,20 @@ def detectDisulfideBonds(mol: "Molecule", thresh: float = 3) -> list:
     return sorted(disubonds, key=lambda x: x[0].resid)
 
 
-def detectCisPeptideBonds(mol, respect_bonds=False):
+def detectCisPeptideBonds(mol: "Molecule", respect_bonds: bool = False) -> None:
+    """Detect and warn about cis peptide bonds in a protein.
+
+    Projects the protein omega dihedrals and logs a warning for every frame and
+    residue whose omega angle indicates a cis peptide bond.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule to check for cis peptide bonds.
+    respect_bonds : bool, optional
+        If True, only report cis bonds whose backbone atoms form a connected
+        component in the molecule's bond graph.
+    """
     from moleculekit.projections.metricdihedral import MetricDihedral, Dihedral
     import networkx as nx
 
@@ -343,7 +372,22 @@ def removeAtomsInHull(
     return mol2, numlipsrem
 
 
-def removeHET(prot):
+def removeHET(prot: "Molecule") -> "Molecule":
+    """Remove all HETATM residues from a structure.
+
+    Each unique HETATM residue name is removed, assuming it is a bound ligand or
+    other heteroatom group.
+
+    Parameters
+    ----------
+    prot : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule to clean.
+
+    Returns
+    -------
+    prot : :class:`Molecule <moleculekit.molecule.Molecule>`
+        A copy of the input molecule with all HETATM residues removed.
+    """
     prot = prot.copy()
     hetatoms = np.unique(prot.resname[prot.record == "HETATM"])
     for het in hetatoms:

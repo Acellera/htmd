@@ -55,6 +55,7 @@ class Trajectory(object):
         self._checkframes((self.projection, self.reference, self.cluster))
 
     def toHDF5(self, h5group: h5py.Group):
+        """Write this trajectory's data into an open HDF5 group."""
         h5group.create_dataset("_projection", data=self._projection)
         h5group.create_dataset("_reference", data=self._reference)
         if self._cluster is not None:
@@ -63,7 +64,8 @@ class Trajectory(object):
         self.sim.toHDF5(simgroup)
 
     @staticmethod
-    def fromHDF5(h5group: h5py.Group):
+    def fromHDF5(h5group: h5py.Group) -> "Trajectory":
+        """Reconstruct a :class:`Trajectory` from an open HDF5 group."""
         from htmd.simlist import Sim
 
         self = Trajectory()
@@ -285,22 +287,27 @@ class MetricData(object):
 
     @property
     def dat(self):
+        """List of the projected metrics of each trajectory."""
         return [t.projection for t in self.trajectories]
 
     @property
     def ref(self):
+        """List of the reference simulation and frame indexes of each trajectory."""
         return [t.reference for t in self.trajectories]
 
     @property
     def St(self):
+        """List of the cluster assignments (state trajectory) of each trajectory."""
         return [t.cluster for t in self.trajectories]
 
     @property
     def simlist(self):
+        """List of the :class:`Sim <htmd.simlist.Sim>` object of each trajectory."""
         return [x.sim for x in self.trajectories]
 
     @property
     def map(self):
+        """The description of the projected dimensions (alias for ``description``)."""
         return self.description
 
     @property
