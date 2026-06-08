@@ -189,6 +189,69 @@ class TestModel(unittest.TestCase):
         # Explicit lags are used as given (here units='frames' so unchanged).
         assert model._cktest_lags(lags=[10, 20, 30]) == [10, 20, 30]
 
+    def test_get_model_oom_recovers_transition_matrix(self):
+        from htmd.metricdata import _generate_toy_data
+
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        statelist = [traj.cluster for traj in fakedata.trajectories]
+
+        msm = Model._get_model(statelist, 1, estimator="oom")
+
+        # OOM returns a deeptime KoopmanReweightedMSM (a MarkovStateModel).
+        assert msm.count_model.state_symbols.tolist() == [0, 1, 2]
+        assert np.allclose(msm.transition_matrix, self.trans_prob, atol=0.1)
+        assert np.isclose(msm.stationary_distribution.sum(), 1.0)
+
+    def test_get_model_oom_rejects_bayesian_and_unknown_estimator(self):
+        from htmd.metricdata import _generate_toy_data
+
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        statelist = [traj.cluster for traj in fakedata.trajectories]
+
+        # OOM cannot be combined with Bayesian error sampling.
+        with self.assertRaises(ValueError):
+            Model._get_model(statelist, 1, bayesian_samples=10, estimator="oom")
+
+        # Unknown estimator names are rejected.
+        with self.assertRaises(ValueError):
+            Model._get_model(statelist, 1, estimator="bogus")
+
+    def test_markov_model_with_oom_estimator(self):
+        from htmd.metricdata import _generate_toy_data
+
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(1, 3, estimator="oom")
+
+        assert model.micronum == 3
+        assert model.macronum == 3
+        assert np.allclose(self.trans_prob, model.P, atol=0.1)
+        assert np.isclose(model.eqDistribution(plot=False).sum(), 1.0)
+
+    def test_plottimescales_and_cktest_forward_oom(self):
+        from htmd.metricdata import _generate_toy_data
+        from matplotlib import pylab as plt
+
+        plt.ioff()
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+
+        # plotTimescales should run with the OOM estimator.
+        its, lags = model.plotTimescales(
+            lags=[1, 2, 3], plot=False, results=True, estimator="oom"
+        )
+        assert its.shape[0] == 3
+
+        # OOM is incompatible with Bayesian error sampling, also via plotTimescales.
+        with self.assertRaises(ValueError):
+            model.plotTimescales(
+                lags=[1, 2, 3], plot=False, errors=10, estimator="oom"
+            )
+
+        # cktest should run with the OOM estimator.
+        model.markovModel(1, 3)
+        model.cktest(lags=[1, 2, 3], plot=False, estimator="oom")
+
     def test_msm(self):
         from htmd.metricdata import _generate_toy_data
 

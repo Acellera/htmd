@@ -69,9 +69,30 @@ class Model(object):
         self._clusterid = self.data._clusterid
 
     @staticmethod
-    def _get_model(statelist, lagtime, bayesian_samples=None):
-        from deeptime.markov.msm import MaximumLikelihoodMSM, BayesianMSM
+    def _get_model(statelist, lagtime, bayesian_samples=None, estimator="mle"):
+        from deeptime.markov.msm import (
+            MaximumLikelihoodMSM,
+            BayesianMSM,
+            OOMReweightedMSM,
+        )
         from deeptime.markov import TransitionCountEstimator
+
+        if estimator == "oom":
+            if bayesian_samples is not None:
+                raise ValueError(
+                    "The 'oom' estimator does not support Bayesian error sampling. "
+                    "Use estimator='mle' to compute Bayesian errors."
+                )
+            return (
+                OOMReweightedMSM(lagtime=lagtime, reversible=True)
+                .fit(statelist)
+                .fetch_model()
+            )
+
+        if estimator != "mle":
+            raise ValueError(
+                f"Unknown estimator '{estimator}'. Choose 'mle' or 'oom'."
+            )
 
         count_mode = "sliding" if bayesian_samples is None else "effective"
 
@@ -93,7 +114,7 @@ class Model(object):
         lag: float,
         macronum: int,
         units: str = "frames",
-        sparse: bool = False,
+        estimator: str = "mle",
     ):
         """Build a Markov model at a given lag time and calculate metastable states
 
@@ -105,8 +126,13 @@ class Model(object):
             The number of macrostates (metastable states) to produce
         units : str
             The units of lag. Can be 'frames' or any time unit given as a string.
-        sparse : bool
-            Make the transition matrix sparse. Useful if lots (> 4000) states are used for the MSM. Warning: untested.
+        estimator : str
+            Which MSM estimator to use. ``'mle'`` (default) builds a reversible
+            maximum-likelihood MSM. ``'oom'`` uses deeptime's OOM-reweighted
+            estimator, which corrects for the effect of starting out of
+            equilibrium and is suited to short, adaptively sampled trajectories.
+            Note: ``'oom'`` can occasionally yield negative stationary
+            probabilities on ill-conditioned or sparsely sampled data.
 
         Examples
         --------
@@ -119,7 +145,9 @@ class Model(object):
 
         statelist = [traj.cluster for traj in self.data.trajectories]
         self.lag = lag
-        self.msm = self._get_model(statelist, lag, bayesian_samples=None)
+        self.msm = self._get_model(
+            statelist, lag, bayesian_samples=None, estimator=estimator
+        )
         modelflag = False
         while not modelflag:
             try:
@@ -149,7 +177,9 @@ class Model(object):
 
         self._modelid = random.random()
 
-        logger.info(f"{self.msm.count_fraction * 100:.1f}% of the data was used")
+        logger.info(
+            f"{self.msm.count_model.selected_count_fraction * 100:.1f}% of the data was used"
+        )
 
         _macroTrajectoriesReport(
             self.macronum,
@@ -432,6 +462,7 @@ class Model(object):
         save: str | None = None,
         njobs: int = 1,
         ylog: bool = True,
+        estimator: str = "mle",
     ):
         """Plot the implied timescales of MSMs of various lag times
 
@@ -462,6 +493,10 @@ class Model(object):
             -1: for all CPUs -2: for all except one etc.
         ylog : bool
             Set to False to get linear y axis instead of logarithmic
+        estimator : str
+            Which MSM estimator to use for each lag time. ``'mle'`` (default) or
+            ``'oom'``. ``'oom'`` cannot be combined with ``errors`` (Bayesian
+            sampling).
 
         Returns
         -------
@@ -493,7 +528,11 @@ class Model(object):
         statelist = [traj.cluster for traj in self.data.trajectories]
         models = []
         for lagtime in tqdm(lags, desc="Estimating Timescales"):
-            models.append(self._get_model(statelist, lagtime, bayesian_samples=errors))
+            models.append(
+                self._get_model(
+                    statelist, lagtime, bayesian_samples=errors, estimator=estimator
+                )
+            )
 
         its_data = implied_timescales(models, n_its=nits)
         if plot or (save is not None):
@@ -1142,6 +1181,7 @@ class Model(object):
         plot: bool = True,
         save: str | None = None,
         errors: int | None = None,
+        estimator: str = "mle",
     ):
         """Conducts a Chapman-Kolmogorov test.
 
@@ -1174,6 +1214,10 @@ class Model(object):
         errors : int, optional
             Number of Bayesian samples to use for the error bars. If set to None,
             it will not plot error bars and use a Maximum Likelihood MSM.
+        estimator : str
+            Which MSM estimator to use for each lag time. ``'mle'`` (default) or
+            ``'oom'``. ``'oom'`` cannot be combined with ``errors`` (Bayesian
+            sampling).
         """
         from deeptime.plots.chapman_kolmogorov import plot_ck_test
         from matplotlib import pylab as plt
@@ -1187,7 +1231,11 @@ class Model(object):
         statelist = [traj.cluster for traj in self.data.trajectories]
         models = []
         for lag in lags:
-            models.append(self._get_model(statelist, lag, bayesian_samples=errors))
+            models.append(
+                self._get_model(
+                    statelist, lag, bayesian_samples=errors, estimator=estimator
+                )
+            )
 
         res = models[0].ck_test(models, n_metastable_sets=self.macronum)
         plot_ck_test(res, legend=True)
