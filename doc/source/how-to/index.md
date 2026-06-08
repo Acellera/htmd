@@ -39,6 +39,7 @@ adaptive-inspect-run
 msm-simlist-custom-layout
 msm-filter-trajectories
 msm-drop-bad-trajectories
+msm-choose-features-vampscore
 msm-bootstrap-errors
 msm-interpret-its-plot
 msm-plot-fes
