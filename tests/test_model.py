@@ -161,6 +161,34 @@ class TestModel(unittest.TestCase):
             model.cktest(plot=False, save=outplot)
             assert os.path.exists(outplot)
 
+    def test_cktest_lags_anchor_on_production_lag(self):
+        from htmd.metricdata import _generate_toy_data
+
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        prod_lag = 5
+        model.markovModel(prod_lag, 3)
+
+        lags = model._cktest_lags()
+
+        # deeptime uses the smallest-lag model as the CK-test reference, so the
+        # production lag must be the smallest lag tested and every test lag must
+        # be an integer multiple of it (the Chapman-Kolmogorov identity
+        # T(k*tau) = T(tau)^k). It must never prepend lag=1.
+        assert min(lags) == prod_lag
+        assert all(lag % prod_lag == 0 for lag in lags)
+        assert len(lags) >= 2
+
+    def test_cktest_lags_explicit_passthrough(self):
+        from htmd.metricdata import _generate_toy_data
+
+        fakedata = _generate_toy_data(self.trans_prob, n_traj=100, seed=0)
+        model = Model(fakedata)
+        model.markovModel(5, 3)
+
+        # Explicit lags are used as given (here units='frames' so unchanged).
+        assert model._cktest_lags(lags=[10, 20, 30]) == [10, 20, 30]
+
     def test_msm(self):
         from htmd.metricdata import _generate_toy_data
 

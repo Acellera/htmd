@@ -202,9 +202,17 @@ class TICA(object):
                 keepdata = [x[:, keepdim] for x in self.data.dat]
                 if self.data.description is not None:
                     keepdimdesc = self.data.description.iloc[keepdim]
-            proj = [
-                self.model.transform(tr.projection) for tr in self.data.trajectories
-            ]
+                # The model was fitted only on the requested subset, so transform
+                # only those dimensions (the rest are carried through unaltered).
+                proj = [
+                    self.model.transform(tr.projection[:, self.dimensions])
+                    for tr in self.data.trajectories
+                ]
+            else:
+                proj = [
+                    self.model.transform(tr.projection)
+                    for tr in self.data.trajectories
+                ]
             simlist = self.data.simlist
             ref = self.data.ref
             fstep = self.data.fstep
@@ -228,9 +236,8 @@ class TICA(object):
         datatica = MetricData(
             dat=proj, simlist=simlist, ref=ref, fstep=fstep, parent=parent
         )
-        from pandas import DataFrame
+        from pandas import DataFrame, concat
 
-        # TODO: Make this messy pandas creation cleaner. I'm sure I can append rows to DataFrame
         types = []
         indexes = []
         description = []
@@ -245,8 +252,8 @@ class TICA(object):
         if (
             self.dimensions is not None and keepdimdesc is not None
         ):  # If TICA is done on a subset of dims
-            datatica.description = keepdimdesc.append(
-                datatica.description, ignore_index=True
+            datatica.description = concat(
+                [keepdimdesc, datatica.description], ignore_index=True
             )
 
         return datatica

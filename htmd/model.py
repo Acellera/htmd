@@ -1104,10 +1104,38 @@ class Model(object):
 
         return deepcopy(self)
 
+    def _cktest_lags(
+        self,
+        lags: list | range | np.ndarray | None = None,
+        maxlag: float | None = None,
+        numlags: int = 25,
+        units: str = "frames",
+    ) -> list:
+        """Compute the lag times (in frames) for the Chapman-Kolmogorov test.
+
+        When `lags` is None the test is anchored on the production lag
+        (``self.lag``) and the returned lags are the integer multiples
+        ``tau, 2*tau, 3*tau, ...`` bounded by `maxlag` and `numlags`. deeptime
+        uses the smallest-lag model as the test reference, so the production-lag
+        model is the one being validated.
+        """
+        if lags is not None:
+            return unitconvert(units, "frames", lags, fstep=self.data.fstep).tolist()
+
+        if maxlag is None:
+            from scipy import stats
+
+            maxlag = int(stats.mode(self.data.trajLengths, keepdims=False).mode) - 1
+        else:
+            maxlag = unitconvert(units, "frames", maxlag, fstep=self.data.fstep)
+
+        tau = int(self.lag)
+        nmultiples = min(numlags, max(2, int(maxlag // tau)))
+        return [tau * k for k in range(1, nmultiples + 1)]
+
     def cktest(
         self,
         lags: list | range | np.ndarray | None = None,
-        minlag: float | None = None,
         maxlag: float | None = None,
         numlags: int = 25,
         units: str = "frames",
@@ -1117,18 +1145,26 @@ class Model(object):
     ):
         """Conducts a Chapman-Kolmogorov test.
 
+        The Chapman-Kolmogorov test validates the model estimated at the
+        production lag time tau (the lag passed to :meth:`markovModel`) by
+        checking the identity ``T(k*tau) = T(tau)^k``. When ``lags`` is not
+        given, the test is anchored on the production lag and the test lag times
+        are the integer multiples ``tau, 2*tau, 3*tau, ...``. The production-lag
+        model is used as the reference, so the model you actually built is the
+        one being validated.
+
         Parameters
         ----------
         lags : list or range or np.ndarray, optional
-            List of lag times to test
-        minlag : float, optional
-            Minimum lag time to test. Used if lags is None. By default it will
-            use 10 if maxlag is greater than 20, otherwise it will use 2.
+            Explicit list of lag times to test. If given, the smallest lag is
+            used as the reference model, so it should be the production lag.
         maxlag : float, optional
-            Maximum lag time to test. Used if lags is None. By default it will
-            use the mode of the trajectory lengths.
+            Largest lag time to test. Used if `lags` is None. By default it will
+            use the mode of the trajectory lengths. The number of multiples is
+            chosen so that ``k*tau`` does not exceed `maxlag`.
         numlags : int, optional
-            Number of lag times to test between minlag and maxlag. Used if lags is None.
+            Upper bound on the number of multiples of the production lag to test.
+            Used if `lags` is None.
         units : str, optional
             Units of the lag times. By default it will use frames.
         plot : bool
@@ -1142,10 +1178,11 @@ class Model(object):
         from deeptime.plots.chapman_kolmogorov import plot_ck_test
         from matplotlib import pylab as plt
 
-        if lags is None:
-            lags = self.data._defaultLags(minlag, maxlag, numlags, units)
-        else:
-            lags = unitconvert(units, "frames", lags, fstep=self.data.fstep).tolist()
+        self._integrityCheck(postmsm=True)
+
+        lags = self._cktest_lags(
+            lags=lags, maxlag=maxlag, numlags=numlags, units=units
+        )
 
         statelist = [traj.cluster for traj in self.data.trajectories]
         models = []
@@ -1268,48 +1305,6 @@ class Model(object):
             data._loadTrajectories(dat, ref, simstmp, cluster if len(cluster) else None)
 
         return Model(newdata), frames
-
-    def _getFEShistogramCounts(
-        self,
-        data,
-        dimx,
-        dimy,
-        nbins=80,
-        pad=0.5,
-        micro_ofcluster=None,
-        stationary_distribution=None,
-    ):
-        from tqdm import tqdm
-
-        clusters = np.hstack(data.St)
-        data_dim = []
-        for traj in data.trajectories:
-            data_dim.append(traj.projection[:, [dimx, dimy]])
-        data_dim = np.vstack(data_dim)
-
-        xmin, ymin = data_dim.min(axis=0)
-        xmax, ymax = data_dim.max(axis=0)
-        hist_range = np.array([[xmin - pad, xmax + pad], [ymin - pad, ymax + pad]])
-
-        if micro_ofcluster is None:
-            counts, xbins, ybins = np.histogram2d(
-                data_dim[:, 0], data_dim[:, 1], bins=nbins, range=hist_range
-            )
-            return counts.T, xbins, ybins
-
-        counts = np.zeros((nbins, nbins))
-        for m in tqdm(range(len(stationary_distribution))):
-            frames = micro_ofcluster[clusters] == m
-            if frames.sum():
-                state_mask, xbins, ybins = np.histogram2d(
-                    data_dim[frames, 0],
-                    data_dim[frames, 1],
-                    bins=nbins,
-                    range=hist_range,
-                )
-                state_mask = state_mask.T > 0
-                counts += state_mask * stationary_distribution[m]
-        return counts, xbins, ybins
 
     def plotFES(
         self,
