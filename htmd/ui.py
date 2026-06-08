@@ -25,6 +25,7 @@ from htmd.projections.metric import Metric
 from htmd.projections.tica import TICA
 from htmd.projections.kmeanstri import KMeansTri
 from htmd.projections.gwpca import GWPCA
+from htmd.projections.vamp import vampScore
 from moleculekit.molecule import Molecule
 from htmd.adaptive.adaptiverun import AdaptiveMD
 from htmd.adaptive.adaptivegoal import AdaptiveGoal
