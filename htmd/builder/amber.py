@@ -1527,6 +1527,13 @@ def _run_tleap(
         )
 
 
+# Longest first-N to last-C distance still accepted as a real head-to-tail
+# amide closure when the input declares it as an explicit bond. A real amide
+# C-N is ~1.33 A; even poorly-modeled ones stay well under this. Beyond it an
+# explicit closure bond is treated as a misassigned LINK / CONECT record.
+MAX_CYCLIC_CLOSURE_DIST = 2.0
+
+
 def _detect_cyclic_segments(mol: Molecule):
     cyclic = []
     prot = mol.atomselect("protein")
@@ -1567,8 +1574,30 @@ def _detect_cyclic_segments(mol: Molecule):
         dist = np.linalg.norm(
             mol.coords[first_mask, :, 0] - mol.coords[last_mask, :, 0]
         )
+        # An explicit head-to-tail amide bond between the first residue's N
+        # and the last residue's C is authoritative: the peptide is cyclic no
+        # matter how long that bond was modeled, as long as the distance stays
+        # physically plausible. Crystallographic amides routinely exceed the
+        # 1.35 A heuristic below (e.g. 7BTI's phalloidin closure is 1.468 A),
+        # so honor the input bond up to MAX_CYCLIC_CLOSURE_DIST. Beyond that
+        # the "bond" is almost certainly a misassigned LINK / CONECT record;
+        # ignore it rather than ask tLeap to close a ring across a nonsensical
+        # gap. Fall back to the distance heuristic when no such bond exists.
+        has_closure_bond = False
+        if len(mol.bonds):
+            pair = {int(np.where(first_mask)[0][0]), int(np.where(last_mask)[0][0])}
+            has_closure_bond = any(
+                {int(b[0]), int(b[1])} == pair for b in mol.bonds
+            )
+        if has_closure_bond and dist > MAX_CYCLIC_CLOSURE_DIST:
+            logger.warning(
+                f"Segment {seg} carries an explicit first-N to last-C bond, but "
+                f"it spans {dist:.2f} A - too long for a real amide. Ignoring it "
+                "for cyclic-peptide detection (likely a misassigned bond record)."
+            )
+            has_closure_bond = False
         # Amide bond distance ranges between 1.325 - 1.346
-        if dist < 1.35:
+        if has_closure_bond or dist < 1.35:
             cyclic.append((seg, first_resid, last_resid))
     return cyclic
 

@@ -622,6 +622,70 @@ def test_tleap_residue_positions_cyclic_appended_in_cyc_info_order():
     assert cyc2_pos == {4}
 
 
+def _cyclic_peptide_mol(closure_dist, add_closure_bond):
+    """Synthetic 3-residue protein segment whose first-residue N and
+    last-residue C are ``closure_dist`` Angstrom apart. When
+    ``add_closure_bond`` is True an explicit bond is added between them
+    (as a real cyclic peptide's head-to-tail amide would be in the input).
+    """
+    mol = Molecule()
+    for r in (1, 2, 3):
+        mol.append(_ala_mol(r, "P0", "A", x0=r * 5.0))
+    mol.guessBonds()
+    n_first = int(np.where((mol.resid == 1) & (mol.name == "N"))[0][0])
+    c_last = int(np.where((mol.resid == 3) & (mol.name == "C"))[0][0])
+    # Place the first N exactly closure_dist away from the last C.
+    c_xyz = mol.coords[c_last, :, 0]
+    mol.coords[n_first, :, 0] = c_xyz + np.array([closure_dist, 0.0, 0.0], np.float32)
+    if add_closure_bond:
+        mol.bonds = np.vstack([mol.bonds, [[n_first, c_last]]]).astype(mol.bonds.dtype)
+        if mol.bondtype is not None and len(mol.bondtype):
+            mol.bondtype = np.append(mol.bondtype, "1")
+    return mol
+
+
+def test_detect_cyclic_segments_honors_explicit_bond():
+    """A head-to-tail amide modeled longer than 1.35 A (e.g. 7BTI's
+    1.468 A HYP-CYS closure) is still cyclic when the input carries an
+    explicit first-N to last-C bond. Distance alone would miss it."""
+    from htmd.builder.amber import _detect_cyclic_segments
+
+    mol = _cyclic_peptide_mol(closure_dist=1.468, add_closure_bond=True)
+    cyclic = _detect_cyclic_segments(mol)
+    assert cyclic == [("P0", 1, 3)]
+
+
+def test_detect_cyclic_segments_distance_fallback():
+    """With no explicit closure bond, a sub-1.35 A first-N/last-C
+    distance still flags the segment cyclic (legacy behavior preserved)."""
+    from htmd.builder.amber import _detect_cyclic_segments
+
+    mol = _cyclic_peptide_mol(closure_dist=1.32, add_closure_bond=False)
+    cyclic = _detect_cyclic_segments(mol)
+    assert cyclic == [("P0", 1, 3)]
+
+
+def test_detect_cyclic_segments_linear_not_cyclic():
+    """A linear peptide (no closure bond, ends far apart) is not cyclic -
+    guards the explicit-bond addition against false positives."""
+    from htmd.builder.amber import _detect_cyclic_segments
+
+    mol = _cyclic_peptide_mol(closure_dist=1.468, add_closure_bond=False)
+    cyclic = _detect_cyclic_segments(mol)
+    assert cyclic == []
+
+
+def test_detect_cyclic_segments_ignores_implausibly_long_explicit_bond():
+    """A first-N to last-C bond stretched far beyond any real amide (e.g. a
+    misassigned LINK/CONECT record) is NOT treated as a cyclic closure -
+    honoring it would make tLeap close a ring across a nonsensical gap."""
+    from htmd.builder.amber import _detect_cyclic_segments
+
+    mol = _cyclic_peptide_mol(closure_dist=5.0, add_closure_bond=True)
+    cyclic = _detect_cyclic_segments(mol)
+    assert cyclic == []
+
+
 @pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_custombond_directive_matches_combined_unit_position(tmp_path):
     """Regression test: when waters sit between two solute residues in

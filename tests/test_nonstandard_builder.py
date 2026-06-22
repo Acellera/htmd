@@ -127,6 +127,25 @@ def _check_no_overvalent_atoms(built):
     assert not bad, "over-valent atoms in built mol:\n" + "\n".join(bad)
 
 
+def _backbone_ring_closures(built):
+    """Return the list of head-to-tail cyclic backbone closures in ``built``
+    as ``(resid_a, resid_b)`` tuples. A closure is a backbone ``C``-``N`` bond
+    between two residues that are not sequential neighbours (a linear peptide
+    only ever bonds consecutive residues; a macrocycle additionally bonds its
+    first residue back to its last)."""
+    name = built.name
+    resid = built.resid
+    closures = []
+    for a, b in built.bonds:
+        a, b = int(a), int(b)
+        if {str(name[a]), str(name[b])} != {"C", "N"}:
+            continue
+        if abs(int(resid[a]) - int(resid[b])) <= 1:
+            continue
+        closures.append((int(resid[a]), int(resid[b])))
+    return closures
+
+
 # N-terminal NH3+ first-hydrogen naming convention differs between
 # builders: amber.build emits ``H1`` / ``H2`` / ``H3``; openff.build
 # emits ``H`` / ``H2`` / ``H3``. Topologically identical. The alias is
@@ -616,6 +635,64 @@ def test_full_pipeline_5vbl(tmp_path):
     )
     assert built is not None
     _check_no_overvalent_atoms(built)
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build needs antechamber + teLeap",
+)
+def test_full_pipeline_1m63(tmp_path):
+    """1M63: calcineurin / cyclophilin in complex with cyclosporin. Covers
+    three things the simpler fixtures do not:
+
+      * a free iron ion (resname ``FE``) coordinating Asp/His in the
+        calcineurin Fe/Zn binuclear centre. ``FE`` is not in the ion-resname
+        list, so detection has to recognise it as a free metal ion from its
+        element-symbol resname - otherwise the metal-coordination bond is
+        mistaken for a covalent crosslink. tleap then parameterizes it (and
+        the Zn / Ca ions) from AMBER's own ion library.
+      * the cyclic, fully N-methylated cyclosporin undecapeptide. Its six
+        NCAAs include sarcosine (``SAR``), an N-methyl-glycine whose alpha
+        carbon is a CH2 carrying two hydrogens (named HA2 / HA3).
+      * a head-to-tail cyclic peptide bond, which amber.build closes with no
+        custombond.
+    """
+    mol = Molecule("1M63")
+    mol.remove("water", _logger=False)
+
+    # Mid-chain SMILES (carbonyl as C=O, backbone N as bare N; N-methylated
+    # residues carry the extra methyl as "NC").
+    smiles = {
+        "DAL": "C[C@H](C=O)N",                     # D-alanine
+        "ABA": "CC[C@@H](C=O)N",                   # L-2-aminobutyrate
+        "SAR": "O=CCNC",                           # sarcosine (N-methyl-Gly)
+        "MLE": "CC(C)C[C@@H](C=O)NC",              # N-methyl-L-leucine
+        "MVA": "CC(C)[C@@H](C=O)NC",               # N-methyl-L-valine
+        "BMT": "O=C[C@@H](NC)C(O)C(C)C/C=C/C",     # (4R)-MeBmt
+    }
+    built = _run_pipeline(mol, smiles, tmp_path)
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # Metals survive as correctly-typed free ions (FE is the key one).
+    for resname, count, charge in (("FE", 2, 3.0), ("ZN", 2, 2.0), ("CA", 8, 2.0)):
+        sel = built.resname == resname
+        assert int(sel.sum()) == count, (
+            f"{resname}: {int(sel.sum())} atoms, expected {count}"
+        )
+        assert np.allclose(built.charge[sel], charge), (
+            f"{resname} charge {np.unique(built.charge[sel])}, expected {charge}"
+        )
+
+    # The two cyclosporin copies are each closed head-to-tail (and nothing
+    # else in the system is): exactly two backbone ring closures, each
+    # spanning the 11-residue macrocycle.
+    closures = _backbone_ring_closures(built)
+    assert len(closures) == 2, f"expected 2 cyclic closures, got {closures}"
+    for ra, rb in closures:
+        assert abs(ra - rb) == 10, (
+            f"cyclosporin ring should span 11 residues, closure {ra}-{rb}"
+        )
 
 
 try:
