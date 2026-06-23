@@ -24,9 +24,14 @@ def _assign_rdkit_gasteiger_charges(mol):
 
     antechamber's own ``-c gas`` ignores the net charge and produces a
     charge set summing to zero even for an ion. RDKit's Gasteiger seeds
-    from the per-atom formal charges, so the charges sum to the actual
-    net charge - it handles charged species correctly. RDKit is already
-    a moleculekit dependency and is available under Pyodide.
+    from the per-atom formal charges, so it handles charged species
+    correctly. PEOE does not always converge exactly onto an integer
+    total, though (it conserves for simple molecules but can drift a
+    fraction of an electron on larger, multi-amide ones), so any
+    sub-electron residual is spread equally over the atoms to make the
+    charges sum to the integer formal charge - MD requires an integer
+    total. RDKit is already a moleculekit dependency and is available
+    under Pyodide.
     """
     from moleculekit.rdkittools import molecule_to_rdkitmol
     from rdkit.Chem import AllChem
@@ -42,6 +47,16 @@ def _assign_rdkit_gasteiger_charges(mol):
             "RDKit Gasteiger produced non-finite charges; the molecule may "
             "have an atom in an environment its parameters do not cover."
         )
+
+    # Spread any sub-electron PEOE residual equally so the charges sum to the
+    # integer formal charge. A residual >= 0.5 e means RDKit converged onto a
+    # different integer (a genuine formal-charge mismatch); that is left alone
+    # for the caller's net-charge check to surface rather than silently masked.
+    target = float(round(float(np.sum(mol.formalcharge))))
+    residual = target - float(np.sum(charges, dtype=np.float64))
+    if abs(residual) < 0.5:
+        charges = charges + np.float32(residual / len(charges))
+
     mol.charge = charges
 
 
