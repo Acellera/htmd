@@ -1229,6 +1229,7 @@ def _mol_to_openmm(mol, outdir, extra_xml=None):
     import openmm.app as app
 
     _register_amber_variant_bond_defs()
+    _register_modified_residue_bond_defs(mol)
 
     # Metal-ion coordination is non-bonded in AMBER; drop those bonds so they
     # don't reach the topology via CONECT and trip the template matcher.
@@ -1401,6 +1402,53 @@ def _register_amber_variant_bond_defs():
             Topology._standardBonds[variant] = kept
 
     _AMBER_VARIANT_BONDS_REGISTERED = True
+
+
+def _register_modified_residue_bond_defs(mol):
+    """Register intra-residue + peptide bond definitions for the force-field-
+    supported MODIFIED residues present in *mol* (HYP, MSE, SEP, ...), so
+    ``PDBFile.createStandardBonds`` builds their bonds.
+
+    These residues are parameterized by the stock AMBER FF (``ff14SB.xml`` /
+    phosaa) but are absent from OpenMM's ``residues.xml``; and because they are
+    canonical, ``systemPrepare``'s bond capture drops their intra-residue bonds
+    (tLeap rebuilds them from its libraries - the OpenMM path must do it here).
+    Without this the residue reaches the template matcher with no bonds ("the
+    set of atoms matches HYP, but the residue has no bonds between its atoms").
+
+    Bond definitions are taken from moleculekit's shipped reference cif (named
+    atom pairs). Bonds to terminal atoms (OXT etc.) register harmlessly -
+    ``createStandardBonds`` only adds a bond when both atoms are present in the
+    residue, so an internal residue ignores them. The ``(-C, N)`` entry encodes
+    the peptide bond to the previous residue (OpenMM's own convention).
+    """
+    from openmm.app import Topology
+    from moleculekit.residues import MODIFIED_PROTEIN_RESIDUE_NAMES
+    from moleculekit import __share_dir
+
+    present = {str(r) for r in np.unique(mol.resname)} & set(
+        MODIFIED_PROTEIN_RESIDUE_NAMES
+    )
+    if not present:
+        return
+    # Ensure the bundled residues.xml defs are loaded before we add to the dict.
+    Topology().createStandardBonds()
+    cif_dir = os.path.join(__share_dir, "residue_cifs")
+    for resn in sorted(present):
+        if resn in Topology._standardBonds:
+            continue
+        cif = os.path.join(cif_dir, f"{resn}.cif")
+        if not os.path.isfile(cif):
+            continue
+        ref = Molecule(cif)
+        if ref.bonds is None or len(ref.bonds) == 0:
+            continue
+        defs = [
+            (str(ref.name[int(a)]), str(ref.name[int(b)])) for a, b in ref.bonds
+        ]
+        if "N" in set(ref.name.tolist()):
+            defs.append(("-C", "N"))
+        Topology._standardBonds[resn] = defs
 
 
 def _add_missing_bonds(mol, topology):
