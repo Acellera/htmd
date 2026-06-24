@@ -146,6 +146,70 @@ def _backbone_ring_closures(built):
     return closures
 
 
+def _beta_residue_mol():
+    """A minimal beta-amino-acid residue (backbone N-CA-C18-C, shortest N->C
+    path = 4), like microcystin's Adda."""
+    mol = Molecule().empty(5)
+    mol.name[:] = ["N", "CA", "C18", "C", "O"]
+    mol.element[:] = ["N", "C", "C", "C", "O"]
+    mol.resname[:] = "BZA"
+    mol.resid[:] = 1
+    mol.chain[:] = "A"
+    mol.segid[:] = "P0"
+    mol.record[:] = "ATOM"
+    mol.coords = np.array(
+        [[0, 0, 0], [1.5, 0, 0], [2.5, 1, 0], [3.5, 0.5, 0], [3.5, -0.7, 0]],
+        dtype=np.float32,
+    ).reshape(5, 3, 1)
+    mol.bonds = np.array([[0, 1], [1, 2], [2, 3], [3, 4]], dtype=np.uint32)
+    mol.bondtype = np.array(["1"] * 4, dtype=object)
+    return mol
+
+
+def test_warn_if_nonalpha_backbone(caplog):
+    """A chain-resident residue with a non-alpha (beta/gamma) backbone triggers
+    a loud warning that its non-alpha backbone atoms get GAFF/OpenFF charges +
+    analogy torsions, which are known-approximate for non-alpha amino acids."""
+    import logging
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import _warn_if_nonalpha_backbone
+
+    mol = _beta_residue_mol()
+    spec = ChainResidueSpec(
+        resname="BZA",
+        residue=UniqueResidueID.fromMolecule(mol, "resid 1"),
+        is_n_term=True,
+        is_c_term=True,
+    )
+    with caplog.at_level(logging.WARNING):
+        _warn_if_nonalpha_backbone(mol, [spec])
+    msgs = " ".join(r.message for r in caplog.records)
+    assert "BZA" in msgs, msgs
+    assert "non-alpha" in msgs.lower() or "backbone" in msgs.lower(), msgs
+
+
+def test_warn_if_nonalpha_backbone_silent_for_alpha(caplog):
+    """A standard alpha residue (N-CA-C, path 3) triggers no such warning."""
+    import logging
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import _warn_if_nonalpha_backbone
+
+    mol = _beta_residue_mol()
+    # collapse to an alpha backbone: bond CA directly to C (drop C18 from path)
+    mol.remove("name C18", _logger=False)
+    mol.bonds = np.array([[0, 1], [1, 2], [2, 3]], dtype=np.uint32)  # N-CA-C-O
+    mol.bondtype = np.array(["1"] * 3, dtype=object)
+    spec = ChainResidueSpec(
+        resname="BZA",
+        residue=UniqueResidueID.fromMolecule(mol, "resid 1"),
+        is_n_term=True,
+        is_c_term=True,
+    )
+    with caplog.at_level(logging.WARNING):
+        _warn_if_nonalpha_backbone(mol, [spec])
+    assert not caplog.records, [r.message for r in caplog.records]
+
+
 # N-terminal NH3+ first-hydrogen naming convention differs between
 # builders: amber.build emits ``H1`` / ``H2`` / ``H3``; openff.build
 # emits ``H`` / ``H2`` / ``H3``. Topologically identical. The alias is
@@ -306,7 +370,7 @@ def test_disulfide_path_unchanged(tmp_path):
     mol.record[:] = "ATOM"
     mol.coords = np.array([r[3:] for r in rows], dtype=np.float32)[:, :, np.newaxis]
 
-    disulfide, _, _ = _prepareMolecule(
+    disulfide, _, _, _ = _prepareMolecule(
         mol,
         caps={},
         disulfide=[["resid 1 and name SG", "resid 2 and name SG"]],
@@ -1376,6 +1440,22 @@ def test_normalize_residue_charges_pins_map_and_rebalances():
     for name, q in _NEUTRAL_BACKBONE.items():
         assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
     assert float(np.sum(sub.charge)) == pytest.approx(0.0, abs=1e-4)
+
+
+def test_gasteiger_charges_renormalized_to_integer_formal_charge():
+    """RDKit's Gasteiger (PEOE) does not always converge to an integer total.
+    For 1FJM's microcystin DAM/FGA cluster (formal charge 0) it lands ~0.11 e
+    short, even though every atom is parameterized and the per-atom charges are
+    otherwise reasonable (it conserves exactly for simpler molecules). The helper
+    must spread that residual so the charges sum to the integer formal charge -
+    MD requires an integer total, and the downstream net-charge check expects it.
+    """
+    from htmd.builder._charge_helpers import _assign_rdkit_gasteiger_charges
+
+    mol = Molecule(os.path.join(DATA_DIR, "1FJM_microcystin_cluster.cif"))
+    target = int(round(float(np.sum(mol.formalcharge))))
+    _assign_rdkit_gasteiger_charges(mol)
+    assert float(np.sum(mol.charge)) == pytest.approx(target, abs=1e-4)
 
 
 def test_normalize_residue_charges_targets_integer_formal_charge():

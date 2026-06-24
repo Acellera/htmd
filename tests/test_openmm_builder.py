@@ -225,6 +225,34 @@ class TestOpenMMBuilder:
         assert np.all(mol.resname == "HOH")
         assert mol.name[0] == "O"
 
+    def test_strip_metal_coordination_bonds(self):
+        """A metal-coordination bond (stored with bondtype 'mc' by moleculekit's
+        readers, e.g. ADP phosphate-O -> Mg in 7BTI) must be dropped: AMBER
+        models metal coordination as non-bonded, and OpenMM's template matcher
+        rejects the coordinated residue otherwise ('externally bonded atoms has
+        1 O atom too many'). Real covalent bonds (other types) are preserved."""
+        from htmd.builder.openmm import _strip_metal_coordination_bonds
+        from moleculekit.molecule import Molecule
+
+        mol = Molecule().empty(3)
+        mol.name[:] = ["C1", "O1", "MG"]
+        mol.element[:] = ["C", "O", "Mg"]
+        mol.resname[:] = ["LIG", "LIG", "MG"]
+        mol.resid[:] = [1, 1, 2]
+        mol.chain[:] = ["A", "A", "A"]
+        mol.segid[:] = ["L", "L", "I"]
+        mol.coords = np.array(
+            [[0, 0, 0], [1.4, 0, 0], [3.0, 0, 0]], np.float32
+        ).reshape(3, 3, 1)
+        # C1-O1 real covalent bond; O1-MG metal coordination (typed 'mc')
+        mol.bonds = np.array([[0, 1], [1, 2]], dtype=np.uint32)
+        mol.bondtype = np.array(["1", "mc"], dtype=object)
+
+        out = _strip_metal_coordination_bonds(mol)
+        pairs = {frozenset((int(a), int(b))) for a, b in out.bonds}
+        assert frozenset((0, 1)) in pairs  # real covalent bond kept
+        assert frozenset((1, 2)) not in pairs  # 'mc' coordination dropped
+
 
 # ------------------------------------------------------------------
 # Comparative build tests (mirrors test_amber_builder.py)

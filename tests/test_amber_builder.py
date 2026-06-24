@@ -686,6 +686,101 @@ def test_detect_cyclic_segments_ignores_implausibly_long_explicit_bond():
     assert cyclic == []
 
 
+def _mixed_cyclic_mol(closure_dist=1.32):
+    """3-residue cyclic segment whose middle residue is non-canonical and
+    fails the 'protein' selection (as microcystin's beta-amino-acid Adda does),
+    with an explicit first-N to last-C closure bond. The flanking residues are
+    canonical."""
+    mol = Molecule()
+    mol.append(_ala_mol(1, "P0", "A", x0=0.0))
+    lig = Molecule().empty(3)
+    lig.name[:] = ["C1", "C2", "O1"]
+    lig.element[:] = ["C", "C", "O"]
+    lig.resname[:] = "LIG"
+    lig.resid[:] = 2
+    lig.chain[:] = "A"
+    lig.segid[:] = "P0"
+    lig.record[:] = "HETATM"
+    lig.coords = np.array(
+        [[5.0, 0, 0], [6.5, 0, 0], [7.0, 1, 0]], np.float32
+    ).reshape(3, 3, 1)
+    mol.append(lig)
+    mol.append(_ala_mol(3, "P0", "A", x0=10.0))
+    mol.guessBonds()
+    n_first = int(np.where((mol.resid == 1) & (mol.name == "N"))[0][0])
+    c_last = int(np.where((mol.resid == 3) & (mol.name == "C"))[0][0])
+    mol.coords[n_first, :, 0] = mol.coords[c_last, :, 0] + np.array(
+        [closure_dist, 0.0, 0.0], np.float32
+    )
+    mol.bonds = np.vstack([mol.bonds, [[n_first, c_last]]]).astype(mol.bonds.dtype)
+    if mol.bondtype is not None and len(mol.bondtype):
+        mol.bondtype = np.append(mol.bondtype, "1")
+    return mol
+
+
+def test_detect_cyclic_segments_allows_noncanonical_residues():
+    """A cyclic segment containing a non-canonical residue that fails the
+    'protein' selection (e.g. microcystin's beta-amino-acid Adda, 1FJM) must
+    still be detected as cyclic. The old gate required the WHOLE segment to be
+    canonical protein, which silently dropped such macrocycles."""
+    from htmd.builder.amber import _detect_cyclic_segments
+
+    mol = _mixed_cyclic_mol(closure_dist=1.32)
+    cyclic = _detect_cyclic_segments(mol)
+    assert cyclic == [("P0", 1, 3)]
+
+
+def test_custombond_break_points_consecutive_only():
+    """Only a custombond joining CONSECUTIVE residues is a break-after point.
+    A custombond between non-consecutive residues (e.g. a head-to-tail closure
+    or a long-range crosslink) does not break auto-sequencing."""
+    from htmd.builder.amber import _custombond_break_points
+    from moleculekit.molecule import UniqueAtomID
+
+    mol = Molecule()
+    for r in (1, 2, 3):
+        mol.append(_ala_mol(r, "P0", "A", x0=r * 5.0))
+    consec = [
+        UniqueAtomID.fromMolecule(mol, "resid 1 and name C"),
+        UniqueAtomID.fromMolecule(mol, "resid 2 and name N"),
+    ]
+    nonconsec = [
+        UniqueAtomID.fromMolecule(mol, "resid 1 and name N"),
+        UniqueAtomID.fromMolecule(mol, "resid 3 and name C"),
+    ]
+    pts = _custombond_break_points(mol, [consec, nonconsec])
+    assert pts == {("P0", 1)}
+
+
+def test_apply_chain_breaks_splits_chain_at_break():
+    """A break-after point puts the residues before and after it in different
+    chains, so tLeap writes a TER and won't head-to-tail auto-sequence them.
+    Resids and atom order are unchanged."""
+    from htmd.builder.amber import _apply_chain_breaks
+
+    mol = Molecule()
+    for r in (1, 2, 3, 4):
+        mol.append(_ala_mol(r, "P0", "A", x0=r * 5.0))
+    before = mol.resid.copy()
+    out = _apply_chain_breaks(mol, {("P0", 2)})
+    ch = {r: str(out.chain[out.resid == r][0]) for r in (1, 2, 3, 4)}
+    assert ch[1] == ch[2]  # before the break: same chain
+    assert ch[3] == ch[4]  # after the break: same chain
+    assert ch[2] != ch[3]  # break between 2 and 3 -> distinct chains (TER)
+    assert np.array_equal(out.resid, before)  # resids untouched
+
+
+def test_apply_chain_breaks_noop_without_breaks():
+    """No break points -> the molecule is returned unchanged."""
+    from htmd.builder.amber import _apply_chain_breaks
+
+    mol = Molecule()
+    for r in (1, 2, 3):
+        mol.append(_ala_mol(r, "P0", "A", x0=r * 5.0))
+    out = _apply_chain_breaks(mol, set())
+    assert np.array_equal(out.chain, mol.chain)
+
+
 @pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_custombond_directive_matches_combined_unit_position(tmp_path):
     """Regression test: when waters sit between two solute residues in
