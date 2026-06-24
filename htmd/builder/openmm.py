@@ -1179,6 +1179,36 @@ def _fix_nucleic_naming(mol):
 # ====================================================================
 
 
+def _strip_metal_coordination_bonds(mol):
+    """Return *mol* (a copy if anything changed) with metal-coordination bonds
+    removed.
+
+    moleculekit's structure readers store metal coordination with the dedicated
+    bond type ``"mc"``. AMBER / ff14SB models such coordination (Mg2+, Zn2+,
+    Ca2+, ...) as non-bonded point charges; ``amber.build`` never carries these
+    bonds because it deletes all input bonds and lets tLeap regenerate only
+    standard + custom ones. The OpenMM path instead keeps ``mol.bonds`` (written
+    as CONECT and read back by ``PDBFile``), so a coordination bond such as ADP
+    phosphate-O -> Mg (7BTI) would survive and OpenMM's template matcher would
+    then reject the coordinated residue ("externally bonded atoms has 1 O atom
+    too many"). Drop the ``"mc"`` bonds to match amber.build's treatment. The
+    bonds are needed for the CONECT records of the PDB written next, so a copy is
+    returned rather than aliasing the caller's arrays.
+    """
+    if mol.bonds is None or len(mol.bonds) == 0 or mol.bondtype is None:
+        return mol
+    bondtype = np.asarray(mol.bondtype, dtype=object)
+    if len(bondtype) != len(mol.bonds):
+        return mol
+    keep = bondtype != "mc"
+    if keep.all():
+        return mol
+    mol = mol.copy()
+    mol.bonds = mol.bonds[keep]
+    mol.bondtype = mol.bondtype[keep]
+    return mol
+
+
 def _mol_to_openmm(mol, outdir, extra_xml=None):
     """Write *mol* to PDB and read back with OpenMM.
 
@@ -1199,6 +1229,10 @@ def _mol_to_openmm(mol, outdir, extra_xml=None):
     import openmm.app as app
 
     _register_amber_variant_bond_defs()
+
+    # Metal-ion coordination is non-bonded in AMBER; drop those bonds so they
+    # don't reach the topology via CONECT and trip the template matcher.
+    mol = _strip_metal_coordination_bonds(mol)
 
     pdb_path = os.path.join(outdir, "input.pdb")
     mol.write(pdb_path, writebonds=True)
