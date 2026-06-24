@@ -297,6 +297,40 @@ def _cofactors_ncaa_ptm_params():
     return res_dict
 
 
+# Modified amino acids that AMBER parameterizes only in mod_amino.lib (the
+# ff*SB_modAA forcefield), NOT the base ff14SB/ff19SB libraries. Mirrors the
+# unit list + PDB aliases in leaprc.protein.ff14SB_modAA.
+_MODAA_RESNAMES = frozenset(
+    {"ALY", "AZF", "CYF", "CNX", "MSE", "4II", "4CF", "MTN"}
+)
+
+
+def _detect_modaa_residues(mol, ff):
+    """Auto-load AMBER's modified-amino-acid forcefield when such a residue is
+    present. MSE, ALY, AZF, CYF, CNX live in ``mod_amino.lib`` (loaded by
+    ``leaprc.protein.ff*SB_modAA``), not the base ff14SB/ff19SB libraries, so
+    without this tleap reports "Unknown residue". The modAA leaprc is purely
+    additive (atom types + frcmod + lib + PDB name map), designed to load
+    alongside the base protein ff; the variant is matched to the loaded protein
+    ff (ff19SB vs ff14SB). Appends the leaprc to ``ff`` in place and returns the
+    detected resnames.
+    """
+    present = sorted(
+        {str(r) for r in np.unique(mol.resname)} & _MODAA_RESNAMES
+    )
+    if not present:
+        return []
+    variant = "ff19SB" if any("ff19SB" in str(f) for f in ff) else "ff14SB"
+    leaprc = f"leaprc.protein.{variant}_modAA"
+    if leaprc not in ff:
+        ff.append(leaprc)
+        logger.info(
+            f"Modified amino acid(s) {', '.join(present)} detected in system. "
+            f"Automatically loading {leaprc} for AMBER."
+        )
+    return present
+
+
 def _detect_cofactors_ncaa_ptm(mol, param, topo):
     import itertools
     import string
@@ -906,6 +940,7 @@ def build(
         mol, caps, disulfide, custombonds, remove
     )
     _detect_cofactors_ncaa_ptm(mol, param, topo)
+    _detect_modaa_residues(mol, ff)
 
     backend, backend_value = _prepare_build(
         mol,
