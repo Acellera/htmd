@@ -914,6 +914,86 @@ def _warn_if_openff_mismatched_charges(forcefield, charge_method):
         return  # one warning per call is enough
 
 
+def _warn_if_nonalpha_backbone(mol, specs):
+    """Loudly warn for every chain-resident residue whose backbone is non-alpha
+    - a shortest N -> C path longer than the standard 3-atom ``N-CA-C`` (beta /
+    gamma amino acids such as microcystin's Adda, ``N-CA-C18-C``).
+
+    Such residues build, and their junction atoms ``N`` / ``C`` are still pinned
+    to ff14SB so the bonds to neighbouring canonical residues stay consistent.
+    But the backbone atoms BEYOND ``N-CA-C`` fall outside the alpha backbone
+    atom-name set, so they are treated as sidechain: their partial charges are
+    refit by GAFF / OpenFF and their backbone torsions are assigned by analogy.
+    That is known to be inaccurate for non-alpha amino-acid backbones - GAFF /
+    SMIRNOFF torsions are fit to small molecules, not peptide backbones - so we
+    warn rather than silently emit unreliable parameters.
+    """
+    from collections import deque
+    from moleculekit.tools.nonstandard_residues import ChainResidueSpec
+
+    for spec in specs:
+        if not isinstance(spec, ChainResidueSpec):
+            continue
+        rid = spec.residue
+        idx = np.where(
+            (mol.segid == str(rid.segid))
+            & (mol.chain == str(rid.chain))
+            & (mol.resid == int(rid.resid))
+            & (mol.insertion == str(rid.insertion))
+        )[0]
+        if not len(idx):
+            continue
+        idxset = {int(i) for i in idx}
+        byname = {}
+        for i in idx:
+            byname.setdefault(str(mol.name[int(i)]), int(i))
+        if "N" not in byname or "C" not in byname:
+            continue
+
+        adj = {int(i): [] for i in idx}
+        for a, b in mol.bonds:
+            a, b = int(a), int(b)
+            if a in idxset and b in idxset:
+                adj[a].append(b)
+                adj[b].append(a)
+
+        # BFS for the shortest N -> C path within the residue.
+        src, dst = byname["N"], byname["C"]
+        prev = {src: None}
+        dq = deque([src])
+        while dq:
+            x = dq.popleft()
+            if x == dst:
+                break
+            for nb in adj[x]:
+                if nb not in prev:
+                    prev[nb] = x
+                    dq.append(nb)
+        if dst not in prev:
+            continue
+        path = []
+        x = dst
+        while x is not None:
+            path.append(x)
+            x = prev[x]
+        if len(path) <= 3:
+            continue  # standard alpha backbone (N-CA-C)
+
+        path_names = " ".join(str(mol.name[i]) for i in reversed(path))
+        logger.warning(
+            f"Residue {spec.resname} {rid.chain}:{rid.resid}{rid.insertion} has a "
+            f"non-alpha amino-acid backbone (shortest N->C path: {path_names}). It "
+            f"will build and its junction atoms N/C are pinned to ff14SB, but the "
+            f"backbone atoms beyond the standard N-CA-C are treated as sidechain: "
+            f"their partial charges are refit by GAFF/OpenFF and their backbone "
+            f"torsions are assigned by analogy. This is KNOWN TO BE INACCURATE for "
+            f"non-alpha (beta/gamma) amino-acid backbones - GAFF/SMIRNOFF torsions "
+            f"are fit to small molecules, not peptide backbones. For production, "
+            f"validate the backbone or supply bespoke QM-derived torsion "
+            f"parameters (e.g. OpenFF BespokeFit)."
+        )
+
+
 def _resolve_forcefield(forcefield):
     """Normalise the ``forcefield`` argument to a callable
     ``resname -> (engine, ff_name)``.
@@ -969,6 +1049,7 @@ def _detect_clusters(mol, specs):
     from moleculekit.tools.nonstandard_residues import (
         ChainResidueSpec,
         PROTEIN_RESNAMES,
+        infer_nonstandard_junction_bonds,
     )
 
     a2r, groups = _residue_groups_with_index(mol)
@@ -999,9 +1080,13 @@ def _detect_clusters(mol, specs):
     _check_specs_protonated(mol, spec_by_res_idx, groups)
 
     # Walk mol.bonds for non-peptide inter-residue bonds among spec'd residues.
+    # Also consult inter-residue backbone-continuation bonds the input omits at a
+    # non-standard junction (an undeposited side-chain isopeptide), recovered from
+    # geometry so the cluster forms without those bonds being stored on mol.bonds.
     spec_indices = set(spec_by_res_idx)
+    inferred = infer_nonstandard_junction_bonds(mol)
     inter_bonds = []
-    for a1, a2 in mol.bonds:
+    for a1, a2 in list(mol.bonds) + [tuple(p) for p in inferred]:
         a1, a2 = int(a1), int(a2)
         r1, r2 = int(a2r[a1]), int(a2r[a2])
         if r1 == r2 or r1 < 0 or r2 < 0:
@@ -2540,6 +2625,12 @@ def parameterizeFromSpecs(
     # the user but don't reject - they may have a reason (e.g. comparing
     # backends with the same external charge model for diagnostic tests).
     _warn_if_openff_mismatched_charges(forcefield, charge_method)
+
+    # Non-alpha (beta/gamma) amino-acid backbones build, but their non-alpha
+    # backbone atoms get GAFF/OpenFF charges + analogy torsions, which are
+    # known-approximate. Warn loudly so the user validates / supplies bespoke
+    # torsion params.
+    _warn_if_nonalpha_backbone(mol, specs)
 
     # SMIRNOFF parameters can't be expressed losslessly as AMBER frcmod
     # (e.g. SMIRNOFF supports more torsion periodicities and improper
