@@ -686,6 +686,50 @@ def test_detect_cyclic_segments_ignores_implausibly_long_explicit_bond():
     assert cyclic == []
 
 
+def test_detect_modaa_residues_autoloads_modaa_leaprc():
+    """A modified amino acid that lives only in AMBER's mod_amino.lib (e.g. MSE,
+    ALY) - not the base ff14SB libraries - must auto-load
+    leaprc.protein.ff14SB_modAA, otherwise tleap reports 'Unknown residue'."""
+    from htmd.builder.amber import _detect_modaa_residues, defaultFf
+
+    mol = Molecule().empty(2)
+    mol.resname[:] = "MSE"
+    mol.name[:] = ["N", "CA"]
+    mol.element[:] = ["N", "C"]
+    ff = defaultFf()
+    detected = _detect_modaa_residues(mol, ff)
+    assert "MSE" in detected
+    assert "leaprc.protein.ff14SB_modAA" in ff
+
+
+def test_detect_modaa_residues_picks_ff19_variant():
+    """When the build uses ff19SB, the ff19SB_modAA variant is loaded."""
+    from htmd.builder.amber import _detect_modaa_residues
+
+    mol = Molecule().empty(1)
+    mol.resname[:] = "ALY"
+    mol.name[:] = ["NZ"]
+    mol.element[:] = ["N"]
+    ff = ["leaprc.protein.ff19SB", "leaprc.water.tip3p"]
+    _detect_modaa_residues(mol, ff)
+    assert "leaprc.protein.ff19SB_modAA" in ff
+    assert "leaprc.protein.ff14SB_modAA" not in ff
+
+
+def test_detect_modaa_residues_noop_without_modaa():
+    """A system with no modAA residue does not pull in the modAA leaprc."""
+    from htmd.builder.amber import _detect_modaa_residues, defaultFf
+
+    mol = Molecule().empty(1)
+    mol.resname[:] = "ALA"
+    mol.name[:] = ["CA"]
+    mol.element[:] = ["C"]
+    ff = defaultFf()
+    detected = _detect_modaa_residues(mol, ff)
+    assert detected == []
+    assert not any("modAA" in f for f in ff)
+
+
 def _mixed_cyclic_mol(closure_dist=1.32):
     """3-residue cyclic segment whose middle residue is non-canonical and
     fails the 'protein' selection (as microcystin's beta-amino-acid Adda does),

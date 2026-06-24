@@ -77,6 +77,10 @@ QU4_A_CIF = os.path.join(DATA_DIR, "8QU4_A.cif")
 VBL_PDB = os.path.join(DATA_DIR, "5vbl.pdb")
 TOT_E_PDB = os.path.join(DATA_DIR, "4TOT_E.pdb")
 R1J_PDB = os.path.join(DATA_DIR, "1r1j.pdb")
+# 7BTI single-copy subset: one phalloidin chain + one ADP + its Mg2+.
+PHALLOIDIN_ADP_CIF = os.path.join(DATA_DIR, "7BTI_phalloidin_adp.cif")
+# 1FJM: protein phosphatase-1 with two microcystin-LR toxins (no water).
+FJM_CIF = os.path.join(DATA_DIR, "1FJM.cif")
 
 # Pre-reaction LFI warhead: 1,3,5-triazinane core with three bromoacetyl arms.
 # After reaction with the three Cys SG atoms, the Br leaving groups are
@@ -144,6 +148,24 @@ def _backbone_ring_closures(built):
             continue
         closures.append((int(resid[a]), int(resid[b])))
     return closures
+
+
+def _backbone_closure_resname_pairs(built):
+    """Resname pairs (as frozensets) for each head-to-tail backbone ``C``-``N``
+    closure between non-sequential residues. Lets a test assert *which*
+    residues close a macrocycle, not just how many closures there are."""
+    name = built.name
+    resid = built.resid
+    resname = built.resname
+    pairs = []
+    for a, b in built.bonds:
+        a, b = int(a), int(b)
+        if {str(name[a]), str(name[b])} != {"C", "N"}:
+            continue
+        if abs(int(resid[a]) - int(resid[b])) <= 1:
+            continue
+        pairs.append(frozenset((str(resname[a]), str(resname[b]))))
+    return pairs
 
 
 def _beta_residue_mol():
@@ -893,6 +915,138 @@ def test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
         openmm_prmtop=str(tmp_path / "openmm" / "structure.prmtop"),
         energy_tol=0.001,
     )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build comparison needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
+    """7BTI single-copy subset: the bicyclic toxin phalloidin (one chain,
+    residues HYP-ALA-TRP-G5G-ALA-ALO-CYS) plus one ADP cofactor and its
+    coordinating Mg2+, carved out of the F-actin / phalloidin complex.
+
+    Builds the same prepared mol through BOTH amber.build and openmm.build
+    and checks they agree, exercising in one shot:
+
+      * HYP (4-hydroxyproline) as a force-field-supported MODIFIED residue
+        (stock ff14SB / amber14 template), NOT a templated NCAA;
+      * the head-to-tail macrocycle closure HYP.N - CYS.C, preserved across
+        the PDB2PQR round-trip by systemPrepare's bond capture;
+      * two peptide-linked NCAAs (ALO, G5G) parameterized via the cluster
+        path and emitted as OpenMM ForceField XML;
+      * an ADP cofactor (free ligand) plus a Mg2+ ion whose metal-
+        coordination ("mc") bond the openmm builder strips before template
+        matching.
+
+    Multi-copy ADP (the full 7BTI has five, with equivalent-oxygen naming
+    that trips up name-based bond inference) is deliberately out of scope -
+    a single copy is the common case.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+    from htmd.builder.openmm import build as openff_build
+
+    smiles = {
+        "ALO": "C[C@@H](O)[C@H](N)C=O",
+        "G5G": "O=C[C@@H](N)CC(C)(O)CO",
+        "ADP": "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O",
+    }
+
+    mol = Molecule(PHALLOIDIN_ADP_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    # ALO/G5G are peptide-linked NCAAs, ADP a free ligand. HYP is a MODIFIED
+    # residue and needs no SMILES template.
+    for resname, smi in smiles.items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol, _ = systemPrepare(mol, detect_specs=specs)
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
+    caps = {str(s): ("none", "none") for s in set(pmol.segid.tolist())}
+
+    amber_built = amber_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "amber"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+        caps=caps,
+    )
+    openmm_built, _ = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+        extra_xml=list(out.xml_paths),
+        custombonds=out.custombonds,
+        caps=caps,
+    )
+
+    # Both builders must produce the same topology.
+    assert openmm_built.numAtoms == amber_built.numAtoms, (
+        f"atom count differs: amber={amber_built.numAtoms}, "
+        f"openmm={openmm_built.numAtoms}"
+    )
+    assert Counter(amber_built.resname.tolist()) == Counter(
+        openmm_built.resname.tolist()
+    )
+
+    for built in (amber_built, openmm_built):
+        _check_no_overvalent_atoms(built)
+        # Exactly one head-to-tail macrocycle closure: HYP.N - CYS.C.
+        assert _backbone_closure_resname_pairs(built) == [frozenset({"HYP", "CYS"})]
+        # HYP flows as a (modified) standard residue, cofactor + metal survive.
+        assert (built.resname == "HYP").any()
+        assert int((built.resname == "ADP").sum()) == 41
+        assert int((built.resname == "MG").sum()) == 1
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build needs antechamber + teLeap",
+)
+def test_full_pipeline_1fjm_microcystin(tmp_path):
+    """1FJM: protein phosphatase-1 (PP1) with two copies of the cyclic
+    heptapeptide toxin microcystin-LR, each covalently bound to Cys273
+    (a CYS.SG - DAM.CB thioether) and sitting beside a binuclear Mn centre.
+
+    The microcystin macrocycle stresses non-alpha backbones in one ring:
+    a beta-amino acid (ACB), a gamma-linked D-Glu isopeptide (FGA),
+    N-methyl-dehydroalanine (DAM), the C20 amino acid Adda (1ZN) and
+    D-alanine (DAL), plus a free beta-mercaptoethanol (BME) on each Cys.
+
+    Asserts the full amber build succeeds with both macrocycles closed
+    (DAL.N - DAM.C), the four Mn ions retained, and no over-valent atoms.
+    """
+    mol = Molecule(FJM_CIF)
+    smiles = {
+        "DAL": "CC(C=O)N",
+        "ACB": "O=C(O)C(N)C(C)C=O",
+        "1ZN": "O=CC(C)C(N)C=CC(C)=CC(C)C(OC)Cc1ccccc1",
+        "FGA": "O=CC(N)CCC=O",
+        "DAM": "O=CC(C)NC",
+        "BME": "OCCS",
+    }
+    built = _run_pipeline(mol, smiles, tmp_path)
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # Two microcystin macrocycles, one per protein copy: DAL.N - DAM.C, and
+    # nothing else in the system closes a ring.
+    pairs = _backbone_closure_resname_pairs(built)
+    assert pairs == [frozenset({"DAL", "DAM"})] * 2, pairs
+
+    # Binuclear Mn centre, one per protein copy (4 ions total).
+    assert int((built.resname == "MN").sum()) == 4
 
 
 @pytest.mark.skipif(
