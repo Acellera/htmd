@@ -1050,6 +1050,91 @@ def test_full_pipeline_1fjm_microcystin(tmp_path):
 
 
 @pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_1fjm_microcystin_openmm(tmp_path):
+    """1FJM through openmm.build. The microcystin macrocycle links some of
+    its residues by SIDE-CHAIN isopeptide bonds (the donor ACB's gamma
+    carbon ACB.CG to the acceptor XX3's backbone N), not backbone peptide
+    bonds - the donor's own backbone C stays a free acid.
+
+    createStandardBonds must NOT add a spurious (-C, N) peptide bond at the
+    acceptor: its N is already satisfied by the isopeptide, so a backbone
+    bond would give the donor one external bond too many and OpenMM would
+    reject the template (the amber builder handles this via chain breaks).
+
+    Asserts the build succeeds, both macrocycles close (DAL.N - DAM.C), the
+    isopeptide is present while the spurious backbone bond is absent, the
+    four Mn ions survive, and no atom is over-valent.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.openmm import build as openff_build
+
+    smiles = {
+        "DAL": "CC(C=O)N",
+        "ACB": "O=C(O)C(N)C(C)C=O",
+        "1ZN": "O=CC(C)C(N)C=CC(C)=CC(C)C(OC)Cc1ccccc1",
+        "FGA": "O=CC(N)CCC=O",
+        "DAM": "O=CC(C)NC",
+        "BME": "OCCS",
+    }
+
+    mol = Molecule(FJM_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    for resname, smi in smiles.items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol, _ = systemPrepare(mol, detect_specs=specs)
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"),
+        forcefield="gaff2", charge_method="gasteiger",
+    )
+    caps = {str(s): ("none", "none") for s in set(pmol.segid.tolist())}
+
+    built, _ = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+        extra_xml=list(out.xml_paths),
+        custombonds=out.custombonds,
+        caps=caps,
+    )
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # Both microcystin macrocycles close head-to-tail (DAL.N - DAM.C).
+    pairs = _backbone_closure_resname_pairs(built)
+    assert pairs.count(frozenset({"DAL", "DAM"})) == 2, pairs
+
+    # The ACB.CG - XX3.N isopeptide is present, and there is NO spurious
+    # ACB.C - XX3.N backbone peptide bond (the bug this test guards against).
+    acb_c = set(np.where((built.resname == "ACB") & (built.name == "C"))[0].tolist())
+    acb_cg = set(np.where((built.resname == "ACB") & (built.name == "CG"))[0].tolist())
+    xx3_n = set(np.where((built.resname == "XX3") & (built.name == "N"))[0].tolist())
+    n_iso = sum(
+        1 for a, b in built.bonds
+        if ({int(a), int(b)} & acb_cg) and ({int(a), int(b)} & xx3_n)
+    )
+    n_spurious = sum(
+        1 for a, b in built.bonds
+        if ({int(a), int(b)} & acb_c) and ({int(a), int(b)} & xx3_n)
+    )
+    assert n_iso >= 1, "isopeptide ACB.CG - XX3.N missing"
+    assert n_spurious == 0, "spurious ACB.C - XX3.N backbone bond present"
+
+    # Binuclear Mn centre, one per protein copy.
+    assert int((built.resname == "MN").sum()) == 4
+
+
+@pytest.mark.skipif(
     not (_antechamber and _openmm),
     reason="OpenMM XML test needs antechamber + openmm",
 )

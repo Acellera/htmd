@@ -157,9 +157,16 @@ def build(
     # because Modeller.addHydrogens() may change atom indices.
     bond_specs = _extract_bond_specs(mol, cyclic, disulfide_ids, custombond_ids)
 
+    # Resnames whose backbone N is a custombond (isopeptide / side-chain
+    # crosslink) endpoint. createStandardBonds must not ALSO add a (-C, N)
+    # backbone peptide bond for them (see _isopeptide_acceptor_resnames).
+    skip_peptide_n = _isopeptide_acceptor_resnames(mol, custombond_ids)
+
     os.makedirs(outdir, exist_ok=True)
 
-    topology, positions = _mol_to_openmm(mol, outdir, extra_xml=extra_xml)
+    topology, positions = _mol_to_openmm(
+        mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
+    )
 
     forcefield, smallmol_ffxml = _setup_forcefield(
         ff, extra_xml, small_molecule_ff, molecules
@@ -229,7 +236,9 @@ def build(
             rigidWater=True,
         )
         mol = _ionize_presolvated(mol, tmp_system, saltconc, saltanion, saltcation)
-        topology, positions = _mol_to_openmm(mol, outdir, extra_xml=extra_xml)
+        topology, positions = _mol_to_openmm(
+            mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
+        )
         modeller = app.Modeller(topology, positions)
         modeller.addHydrogens(forcefield)
         topology = modeller.topology
@@ -1209,7 +1218,7 @@ def _strip_metal_coordination_bonds(mol):
     return mol
 
 
-def _mol_to_openmm(mol, outdir, extra_xml=None):
+def _mol_to_openmm(mol, outdir, extra_xml=None, skip_peptide_n=None):
     """Write *mol* to PDB and read back with OpenMM.
 
     Before reading the PDB we temporarily register the residue bond
@@ -1224,6 +1233,10 @@ def _mol_to_openmm(mol, outdir, extra_xml=None):
     Python process don't see leftover bond defs (the dict is
     class-level / process-wide).
 
+    *skip_peptide_n* (from :func:`_isopeptide_acceptor_resnames`) is the set
+    of resnames whose backbone N is an isopeptide acceptor and so must NOT
+    get a ``(-C, N)`` peptide bond from ``createStandardBonds``.
+
     Returns ``(topology, positions)`` ready for ``ForceField.createSystem``.
     """
     import openmm.app as app
@@ -1237,7 +1250,7 @@ def _mol_to_openmm(mol, outdir, extra_xml=None):
 
     pdb_path = os.path.join(outdir, "input.pdb")
     mol.write(pdb_path, writebonds=True)
-    with _temporary_residue_bond_defs(extra_xml):
+    with _temporary_residue_bond_defs(extra_xml, skip_peptide_n=skip_peptide_n):
         pdb = app.PDBFile(pdb_path)
 
     topology = pdb.topology
@@ -1246,8 +1259,38 @@ def _mol_to_openmm(mol, outdir, extra_xml=None):
     return topology, pdb.positions
 
 
+def _isopeptide_acceptor_resnames(mol, custombonds):
+    """Resnames whose backbone ``N`` is an endpoint of a custombond - i.e.
+    the acceptor of an isopeptide / side-chain crosslink, amide-bonded
+    through a side chain rather than by the usual backbone peptide bond.
+
+    ``createStandardBonds`` must NOT add the ``(-C, N)`` peptide bond for
+    these residues: the N's external bond is the custombond, and a spurious
+    backbone bond would give the *donor* residue (whose backbone C is a free
+    acid) one external bond too many and break OpenMM's template match.
+    Skipping the acceptor's ``(-C, N)`` is also what keeps the donor's C
+    free, so a single skip covers both sides of the junction. This is the
+    OpenMM analog of the chain-break the amber builder inserts at isopeptide
+    junctions.
+
+    The custombonds (from ``detectNonStandardResidues`` /
+    ``parameterizeFromSpecs``) are the authoritative list of non-standard
+    inter-residue bonds, so we reuse that classification here rather than
+    re-deriving it from atom names. *custombonds* is the resolved list of
+    ``[UniqueAtomID, UniqueAtomID]`` pairs returned by
+    :func:`_prepare_molecule`.
+    """
+    resnames = set()
+    for a1, a2 in (custombonds or []):
+        for aid in (a1, a2):
+            idx = aid.selectAtom(mol)
+            if str(mol.name[idx]) == "N":
+                resnames.add(str(mol.resname[idx]))
+    return resnames
+
+
 @contextlib.contextmanager
-def _temporary_residue_bond_defs(extra_xml):
+def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
     """Register the ``<Residue>``/``<Bond>`` entries from each OpenMM
     force-field XML in *extra_xml* into ``Topology._standardBonds`` for
     the duration of the ``with`` block.
@@ -1257,6 +1300,11 @@ def _temporary_residue_bond_defs(extra_xml):
     each ``<Residue>``. ``Topology._standardBonds`` expects
     ``(from, to)`` tuples (the same shape ``Topology.loadBondDefinitions``
     populates). We translate one to the other here.
+
+    *skip_peptide_n* is the set of resnames whose backbone ``N`` is an
+    isopeptide / side-chain acceptor rather than a normal peptide-bond
+    acceptor. For those we do NOT emit the ``(-C, N)`` peptide bond (see
+    :func:`_isopeptide_acceptor_resnames`).
 
     On exit we restore the snapshot of every entry we touched so other
     builds in the same Python process see a pristine dict.
@@ -1302,9 +1350,10 @@ def _temporary_residue_bond_defs(extra_xml):
                 # handled via ``custombonds`` since their partner is
                 # not known a-priori.
                 atom_names = {a.attrib.get("name") for a in res.findall("Atom")}
+                skip_n = skip_peptide_n is not None and name in skip_peptide_n
                 for ext in res.findall("ExternalBond"):
                     aname = ext.attrib.get("atomName")
-                    if aname == "N" and "N" in atom_names:
+                    if aname == "N" and "N" in atom_names and not skip_n:
                         bonds.append(("-C", "N"))
                 Topology._standardBonds[name] = bonds
         yield
