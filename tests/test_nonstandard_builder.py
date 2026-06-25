@@ -81,6 +81,21 @@ R1J_PDB = os.path.join(DATA_DIR, "1r1j.pdb")
 PHALLOIDIN_ADP_CIF = os.path.join(DATA_DIR, "7BTI_phalloidin_adp.cif")
 # 1FJM: protein phosphatase-1 with two microcystin-LR toxins (no water).
 FJM_CIF = os.path.join(DATA_DIR, "1FJM.cif")
+# 1LKK: Lck SH2 domain + the pYEEI phosphopeptide (PTR-GLU-GLU-ILE). Water and
+# the deposited, malformed N-terminal acetyl cap (split across two resids with
+# non-standard atom names) were stripped, leaving a clean PTR-containing peptide.
+LKK_CIF = os.path.join(DATA_DIR, "1LKK.cif")
+# 6MDX: a protein with a Cys-methyllysine thioether crosslink (CYS75.SG -
+# MLZ184.CM), two structural zincs and selenomethionine. Water and the inert
+# crystallization ligands (EDO, FLC) were stripped.
+MDX_CIF = os.path.join(DATA_DIR, "6MDX.cif")
+# 6A6L: YB-1 cold-shock domain + RNA carrying 5-methylcytidine (5MC) at the 3'
+# end - the modified-ribonucleotide path. Water stripped.
+A6L_CIF = os.path.join(DATA_DIR, "6A6L.cif")
+# 5EMZ: K48-linked diubiquitin. The distal chain's C-terminal Gly76 carbonyl C
+# forms an isopeptide to the proximal chain's Lys48 side-chain NZ - a
+# backbone-C acyl donor to a side-chain N acceptor across two chains.
+EMZ_CIF = os.path.join(DATA_DIR, "5EMZ.cif")
 
 # Pre-reaction LFI warhead: 1,3,5-triazinane core with three bromoacetyl arms.
 # After reaction with the three Cys SG atoms, the Br leaving groups are
@@ -1132,6 +1147,302 @@ def test_full_pipeline_1fjm_microcystin_openmm(tmp_path):
 
     # Binuclear Mn centre, one per protein copy.
     assert int((built.resname == "MN").sum()) == 4
+
+
+@pytest.mark.skipif(
+    not _tleap,
+    reason="end-to-end PTR build needs teLeap",
+)
+def test_full_pipeline_1lkk_ptr(tmp_path):
+    """1LKK: the Lck SH2 domain bound to its high-affinity pYEEI ligand (the
+    phosphopeptide PTR-GLU-GLU-ILE). Exercises phosphotyrosine (PTR) as a
+    force-field-supported MODIFIED residue - no SMILES, no antechamber: the
+    amber builder auto-loads ``ff-ptm/PTR`` (prepi + frcmod), the same way the
+    other phospho residues (SEP / TPO) flow through.
+
+    ``detectNonStandardResidues`` returns no specs here (PTR is a known PTM,
+    not an NCAA), so this is the plain systemPrepare -> amber.build path with a
+    phospho residue dropped in. The peptide is capped with an N-terminal acetyl
+    (restoring the real pYEEI cap; the deposited ACE was dropped from the
+    fixture for being malformed) so PTR sits mid-chain.
+
+    AMBER only: the openmm builder has no phospho force field. Its default
+    protein FF is OpenMM's bundled ``amber14/protein.ff14SB.xml`` (whose atom
+    types are namespaced ``protein-*``), and the only phosaa available here
+    (openmmforcefields ``amber/phosaa14SB.xml``) loads exclusively against the
+    bare-typed monolithic ``amber/ff14SB.xml`` base. Mixing it with the
+    ``amber14/`` base raises ``KeyError: 'N'``. Adding openmm PTR/SEP/TPO
+    support means switching the builder's protein FF base (and reworking its
+    ``protein-*`` type_overrides), which is out of scope for this test.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(LKK_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
+    pmol, _ = systemPrepare(mol, verbose=False)
+
+    # Cap the 4-residue phosphopeptide (segment P1) with an N-terminal acetyl,
+    # restoring the real pYEEI ligand chemistry (the deposited ACE was dropped
+    # from the fixture for being malformed) and moving PTR off the chain
+    # terminus. The C-terminus keeps its deposited free acid (OXT).
+    caps = {"P1": ("ACE", "none")}
+
+    built = amber_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "amber"),
+        ionize=False,
+        caps=caps,
+    )
+
+    _check_no_overvalent_atoms(built)
+    # The N-acetyl cap was added (PTR is mid-chain, not a terminus).
+    assert (built.resname == "ACE").any()
+    # The phosphotyrosine survives the build as PTR, with exactly one intact
+    # phosphate (one P).
+    assert (built.resname == "PTR").any()
+    assert int(((built.resname == "PTR") & (built.element == "P")).sum()) == 1
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end build needs antechamber + teLeap",
+)
+def test_full_pipeline_6mdx_mlz(tmp_path):
+    """6MDX: a DNA-protein-crosslink repair protein carrying a Cys-methyllysine
+    thioether crosslink (CYS75.SG - MLZ184.CM), two structural zincs and four
+    selenomethionines.
+
+    Exercises a KNOWN MODIFIED residue (MLZ, an ff-ncaa methyllysine) that is
+    itself COVALENTLY CROSSLINKED - the case detect used to drop. A free MLZ
+    rides its auto-loaded template, but here its CM methyl is a methylene
+    bridging to Cys75's sulfur, so the stock template no longer fits. detect now
+    elevates it to a renamed cluster member (MLZ -> XX) alongside the anchored
+    Cys (CYS -> XX); both auto-template from moleculekit's built-in
+    RESIDUE_SMILES (no caller SMILES), and the Cys+methyllysine junction is
+    parameterized as one cluster so the inter-residue bonded terms exist. The
+    free selenomethionines stay on the stock ff14SB_modAA template; the two Zn
+    are kept as ions with their coordination stripped.
+
+    AMBER only: MSE and MLZ are absent from OpenMM's stock ff14SB (same gap
+    class as the phospho residues in 1LKK), so the openmm builder cannot
+    template them.
+    """
+    mol = Molecule(MDX_CIF)
+    # No SMILES dict: the crosslinked MLZ auto-templates from RESIDUE_SMILES.
+    built = _run_pipeline(mol, {}, tmp_path)
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # The Cys-S - methyllysine-CM thioether crosslink survives the build. Both
+    # residues are renamed to XX cluster members but keep their atom names, so
+    # the invariant is a single SG-CM bond.
+    sg = set(np.where(built.name == "SG")[0].tolist())
+    cm = set(np.where(built.name == "CM")[0].tolist())
+    n_xlink = sum(
+        1
+        for a, b in built.bonds
+        if ({int(a), int(b)} & sg) and ({int(a), int(b)} & cm)
+    )
+    assert n_xlink == 1, "Cys-SG - methyllysine-CM thioether crosslink missing"
+
+    # Both structural zincs are retained and selenomethionine survives.
+    assert int((built.resname == "ZN").sum()) == 2
+    assert (built.resname == "MSE").any()
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end isopeptide build needs antechamber + teLeap",
+)
+def test_full_pipeline_5emz_k48_diubiquitin(tmp_path):
+    """5EMZ: K48-linked diubiquitin. The distal chain's C-terminal Gly76
+    carbonyl C is joined by an isopeptide bond to the proximal chain's Lys48
+    side-chain NZ - an acyl DONOR on a backbone C reaching a side-chain N
+    acceptor, the mirror image of 1FJM's side-chain-C-to-backbone-N isopeptide.
+
+    Exercises the backbone-C acyl-donor path: detect renames both partners to
+    cluster members (GLY76 -> XX, LYS48 -> XX) and parameterizes them as one
+    cluster so the C-NZ junction's bonded terms exist; the donor Gly76 templates
+    from glycine with its carboxyl -OH dropped (the displaced isopeptide leaving
+    group) and is stamped a non-C-terminus so PDB2PQR does not re-add OXT. At
+    build time the donor's now-bonded C-terminus must NOT be capped: the default
+    ACE/NME capping would attach an NME whose N tLeap bonds to the already
+    isopeptide-bonded carbonyl C, over-coordinating it (the `N-C-ns` junction
+    terms have no parameters). amber.build suppresses the cap on a terminus
+    consumed by a custom bond.
+
+    AMBER only: the same FF-gap class is not at play here, but the cluster
+    parameters use the antechamber/GAFF cluster path validated against tLeap.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(EMZ_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    # Both isopeptide partners are elevated to renamed cluster members: the
+    # backbone-C acyl donor (Gly76, anchor C) and the side-chain N acceptor
+    # (Lys48, anchor NZ).
+    assert len(specs) == 2, f"expected two cluster members, got {specs}"
+    anchors = {(s.resname, s.anchor_atom) for s in specs}
+    assert anchors == {("GLY", "C"), ("LYS", "NZ")}, anchors
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
+    built = amber_build(
+        pmol,
+        outdir=str(tmp_path / "build"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+    )
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # The Gly76.C - Lys48.NZ isopeptide survives the build as a single bond.
+    donor_cs = set()
+    for a, b in built.bonds:
+        a, b = int(a), int(b)
+        if {str(built.name[a]), str(built.name[b])} == {"C", "NZ"}:
+            donor_cs.add(a if str(built.name[a]) == "C" else b)
+    assert len(donor_cs) == 1, "Gly76.C - Lys48.NZ isopeptide bond missing"
+
+    # The donor carbonyl C is a clean tetravalent carbonyl - bonded to its own
+    # O and CA and the acceptor NZ only. A spurious NME cap on the now-bonded
+    # C-terminus (the bug this guards against) would add a fourth bond to an
+    # NME nitrogen and over-coordinate it.
+    donor_c = donor_cs.pop()
+    neigh = sorted(str(built.name[n]) for n in built.getNeighbors(donor_c))
+    assert neigh == ["CA", "NZ", "O"], f"donor C mis-bonded (NME cap?): {neigh}"
+
+
+@pytest.mark.skipif(
+    not _tleap,
+    reason="end-to-end RNA build needs teLeap",
+)
+def test_full_pipeline_6a6l_5mc(tmp_path):
+    """6A6L: YB-1 cold-shock domain bound to RNA carrying 5-methylcytidine
+    (5MC) at the 3' end - the first end-to-end test of the MODIFIED
+    RIBONUCLEOTIDE path.
+
+    Exercises the nucleic counterpart of the modified-amino-acid support:
+    detect now recognises 5MC as a known modified ribonucleotide (so it is no
+    longer mis-classified as a free ligand); systemPrepare normalises its atom
+    names to the AMBER/modrna08 convention (OP1 -> O1P, CM5 -> C10) and
+    registers it with PDB2PQR through its reference cif on the NUCLEIC side
+    (a `CustomNucleicResidue`, not the amino-acid path); and amber.build
+    auto-loads `leaprc.modrna08`, stripping the 3'-terminal proton PDB2PQR adds
+    (modrna08 ships internal-only units, no 5MC3 terminal variant).
+
+    AMBER only: modrna08 has no OpenMM XML, so the openmm builder cannot
+    template it (same gap class as the phospho residues in 1LKK).
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(A6L_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
+    # 5MC is a known modified ribonucleotide now - NOT a spurious LigandSpec.
+    specs = detectNonStandardResidues(mol)
+    assert specs == [], f"expected no specs (5MC is known), got {specs}"
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+
+    built = amber_build(pmol, outdir=str(tmp_path / "amber"), ionize=False)
+
+    _check_no_overvalent_atoms(built)
+    # The 5-methylcytidine survives the build with its methyl (C10) intact.
+    assert (built.resname == "5MC").any()
+    assert int(((built.resname == "5MC") & (built.name == "C10")).sum()) == 1
+    # The protein and the rest of the RNA built alongside it.
+    assert np.any(built.atomselect("protein"))
+    assert np.any(built.atomselect("nucleic"))
+
+
+# Supported modified ribonucleotides (modrna08 + moleculekit residue_cifs).
+# Fixtures under modrna_pdb/ are the RCSB chemical components in PDB-v3 naming.
+_MODRNA_PDB_DIR = os.path.join(DATA_DIR, "modrna_pdb")
+_MODRNA_RESIDUES = [
+    "5MC", "PSU", "5MU", "2MG", "1MG", "2MA", "4AC", "6IA", "1MA",
+]
+
+
+@pytest.mark.skipif(not _tleap, reason="modified-nucleotide build needs teLeap")
+@pytest.mark.parametrize("resname", _MODRNA_RESIDUES)
+def test_prepare_modified_ribonucleotide_from_pdb(resname, tmp_path):
+    """Each supported modified ribonucleotide, starting from its PDB-v3-named
+    RCSB chemical component, flows through the full pipeline: detect recognises
+    it as a known modified nucleotide (no spec), systemPrepare normalises its
+    atom names to the AMBER/modrna08 convention and protonates it via PDB2PQR on
+    the nucleic side, and amber.build auto-loads leaprc.modrna08. AMBER only."""
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(os.path.join(_MODRNA_PDB_DIR, f"{resname}.cif"))
+    mol.resname[:] = resname
+    mol.chain[:] = "A"
+    mol.segid[:] = "A"
+    mol.resid[:] = 1
+    mol.remove("element H", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    assert specs == [], f"{resname} should be a known modified nucleotide"
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+    built = amber_build(pmol, outdir=str(tmp_path / "build"), ionize=False)
+
+    assert (built.resname == resname).any(), f"{resname} missing after build"
+    _check_no_overvalent_atoms(built)
+
+
+# Newly-supported modified amino acids (AMBER ff-ptm) - RCSB components in
+# PDB-v3 naming under modaa_pdb/.
+_MODAA_PDB_DIR = os.path.join(DATA_DIR, "modaa_pdb")
+_MODAA_RESIDUES = ["CSO", "CSS", "PCA", "2MR", "CGU"]
+
+
+@pytest.mark.skipif(not _tleap, reason="modified-amino-acid build needs teLeap")
+@pytest.mark.parametrize("resname", _MODAA_RESIDUES)
+def test_prepare_modified_amino_acid_from_pdb(resname, tmp_path):
+    """Each newly-supported modified amino acid, starting from its PDB-v3-named
+    RCSB chemical component, flows through the pipeline: detect recognises it as
+    a known modified residue (no spec), systemPrepare protonates it via its
+    reference cif, and amber.build auto-loads its ff-ptm parameters. The single
+    residue is ACE/NME-capped into a mid-chain context, since the ff-ptm units
+    are internal-only (no C-terminal variant). AMBER only."""
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(os.path.join(_MODAA_PDB_DIR, f"{resname}.cif"))
+    mol.resname[:] = resname
+    mol.chain[:] = "A"
+    mol.segid[:] = "A"
+    mol.resid[:] = 1
+    # Drop the free C-terminal oxygen; the residue is capped mid-chain below.
+    mol.remove("element H or name OXT", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    assert specs == [], f"{resname} should be a known modified residue"
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+    built = amber_build(
+        pmol, outdir=str(tmp_path / "build"), ionize=False,
+        caps={"A": ("ACE", "NME")},
+    )
+
+    assert (built.resname == resname).any(), f"{resname} missing after build"
+    _check_no_overvalent_atoms(built)
 
 
 @pytest.mark.skipif(

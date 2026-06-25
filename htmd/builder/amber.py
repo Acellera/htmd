@@ -331,6 +331,43 @@ def _detect_modaa_residues(mol, ff):
     return present
 
 
+def _detect_modrna_residues(mol, ff):
+    """Auto-load AMBER's modified-RNA forcefield when such a residue is present.
+
+    Supported modified ribonucleotides (5MC, ...) live in ``all_modrna08.lib``
+    (loaded by ``leaprc.modrna08``), not the base ``leaprc.RNA.OL3`` library, so
+    without this tleap reports "Unknown residue". The modrna08 leaprc is purely
+    additive (atom types + frcmod + lib), designed to load alongside the base
+    RNA ff. Appends the leaprc to ``ff`` in place and returns the detected
+    resnames.
+
+    Also strips the chain-terminal atoms PDB2PQR adds to a terminal modified
+    ribonucleotide - the 3'/5' hydroxyl protons (H3T / H5T) and the extra
+    free-5'-phosphate oxygen (O3P): modrna08 ships only internal units (no
+    5MC3 / 5MC5 terminal variant), so those atoms have no atom type and tLeap
+    would reject them. An in-chain residue never carries them, so this only
+    affects genuine 5'/3' termini, which are left as the linking form.
+    """
+    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+
+    present = sorted(
+        {str(r) for r in np.unique(mol.resname)} & set(MODIFIED_NUCLEIC_RESIDUE_NAMES)
+    )
+    if not present:
+        return []
+    term = np.isin(mol.resname, present) & np.isin(mol.name, ("H3T", "H5T", "O3P"))
+    if term.any():
+        mol.remove(term, _logger=False)
+    leaprc = "leaprc.modrna08"
+    if leaprc not in ff:
+        ff.append(leaprc)
+        logger.info(
+            f"Modified ribonucleotide(s) {', '.join(present)} detected in system. "
+            f"Automatically loading {leaprc} for AMBER."
+        )
+    return present
+
+
 def _detect_cofactors_ncaa_ptm(mol, param, topo):
     import itertools
     import string
@@ -657,6 +694,8 @@ def _prepareMolecule(mol: Molecule, caps, disulfide, custombonds, remove):
             logger.info(f"Found cyclic segment {cc}. Disabling capping on it.")
             del caps[cc]
 
+    caps = _suppress_caps_at_custombonds(mol, caps, custombonds)
+
     _add_caps(mol, caps)
 
     # Before modifying the resids copy the molecule to map back the disulfide bonds
@@ -941,6 +980,7 @@ def build(
     )
     _detect_cofactors_ncaa_ptm(mol, param, topo)
     _detect_modaa_residues(mol, ff)
+    _detect_modrna_residues(mol, ff)
 
     backend, backend_value = _prepare_build(
         mol,
@@ -1755,6 +1795,52 @@ def _apply_chain_breaks(mol: Molecule, break_points):
         mol.chain[segmask & (mol.resid > prev)] = pool[pi]
         pi += 1
     return mol
+
+
+def _suppress_caps_at_custombonds(mol: Molecule, caps, custombonds):
+    """Disable the default ACE / NME cap on a segment terminus whose backbone
+    N (N-terminus) or C (C-terminus) is consumed by a custom bond.
+
+    A crosslink / isopeptide to a chain-terminal residue (e.g. K48 diubiquitin,
+    where the distal chain's C-terminal Gly76 carbonyl C bonds the proximal
+    chain's Lys48 NZ) leaves no free terminus there. Capping it anyway inserts
+    an ACE / NME whose backbone atom tLeap then bonds to the already
+    custom-bonded terminal atom, over-coordinating it and emitting junction
+    angles / torsions (``N-C-ns`` ...) that have no force-field parameters. Only
+    the segment-cap (list) format produced by :func:`_defaultProteinCaps` is
+    adjusted; explicit per-residue cap selections are left untouched. Resids are
+    still the input values here (renumbering happens later), so the custombond
+    selection strings resolve directly."""
+    if not custombonds:
+        return caps
+    for bb in custombonds:
+        for sel in bb:
+            if not isinstance(sel, str):
+                continue
+            idx = mol.atomselect(sel, indexes=True)
+            if len(idx) != 1:
+                continue
+            i = int(idx[0])
+            seg = str(mol.segid[i])
+            if seg not in caps or not isinstance(caps[seg], (list, tuple)):
+                continue
+            seg_atom_idx = np.where(mol.segid == seg)[0]
+            first_resid = int(mol.resid[seg_atom_idx[0]])
+            last_resid = int(mol.resid[seg_atom_idx[-1]])
+            name, resid = str(mol.name[i]), int(mol.resid[i])
+            caps_seg = list(caps[seg])
+            if name == "N" and resid == first_resid:
+                caps_seg[0] = "none"
+            elif name == "C" and resid == last_resid:
+                caps_seg[1] = "none"
+            else:
+                continue
+            logger.info(
+                f"Custom bond consumes the {name}-terminus of segment {seg} "
+                f"(resid {resid}); disabling its default cap."
+            )
+            caps[seg] = caps_seg
+    return caps
 
 
 def _add_caps(mol: Molecule, caps: dict):
