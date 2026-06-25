@@ -96,6 +96,11 @@ A6L_CIF = os.path.join(DATA_DIR, "6A6L.cif")
 # forms an isopeptide to the proximal chain's Lys48 side-chain NZ - a
 # backbone-C acyl donor to a side-chain N acceptor across two chains.
 EMZ_CIF = os.path.join(DATA_DIR, "5EMZ.cif")
+# 6JCH: sortase-assembled pilin with two INTRAMOLECULAR Lys-Asn isopeptides
+# (Lys39.NZ - Asn215.CG and Lys226.NZ - Asn370.CG). The Asn side-chain carbonyl
+# C is the acyl donor, the Lys side-chain NZ the acceptor; the Asn's amide ND2
+# leaves on bond formation, so the mature structure has no ND2. Water stripped.
+JCH_CIF = os.path.join(DATA_DIR, "6JCH.cif")
 
 # Pre-reaction LFI warhead: 1,3,5-triazinane core with three bromoacetyl arms.
 # After reaction with the three Cys SG atoms, the Br leaving groups are
@@ -1325,6 +1330,73 @@ def test_full_pipeline_5emz_k48_diubiquitin(tmp_path):
     donor_c = donor_cs.pop()
     neigh = sorted(str(built.name[n]) for n in built.getNeighbors(donor_c))
     assert neigh == ["CA", "NZ", "O"], f"donor C mis-bonded (NME cap?): {neigh}"
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end isopeptide build needs antechamber + teLeap",
+)
+def test_full_pipeline_6jch_pilin_isopeptide(tmp_path):
+    """6JCH: a sortase-assembled pilin with two INTRAMOLECULAR Lys-Asn
+    isopeptides (Lys39.NZ - Asn215.CG and Lys226.NZ - Asn370.CG).
+
+    The third isopeptide geometry, after 1FJM (side-chain C -> backbone N) and
+    5EMZ (backbone C -> side-chain N): here BOTH anchors are side-chain atoms -
+    the Asn side-chain carbonyl C is the acyl donor, the Lys side-chain NZ the
+    acceptor. The Asn's amide ND2 leaves on bond formation, so the mature
+    structure has no ND2 and the donor templates to an Asn with its side-chain
+    amide N stripped (`N[C@H](C=O)CC=O`). Both partners are renamed cluster
+    members and each Lys+Asn pair parameterizes as one cluster.
+
+    Two independent isopeptides in a single chain also exercise that the cluster
+    detection pairs each Lys with its own Asn rather than merging them.
+
+    AMBER only: the cluster parameters use the antechamber/GAFF cluster path
+    validated against tLeap.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(JCH_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    # Two isopeptides, each elevating both partners: 2 x (Lys NZ donor-acceptor,
+    # Asn CG acyl donor).
+    assert len(specs) == 4, f"expected four cluster members, got {specs}"
+    by_resid = {s.residue.resid: s.anchor_atom for s in specs}
+    assert by_resid == {39: "NZ", 215: "CG", 226: "NZ", 370: "CG"}, by_resid
+
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+    )
+    built = amber_build(
+        pmol,
+        outdir=str(tmp_path / "build"),
+        ionize=False,
+        custombonds=out.custombonds,
+        topo=out.topo_paths,
+        param=out.frcmod_paths,
+    )
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # Both Asn.CG - Lys.NZ isopeptides survive the build as single bonds, and
+    # each Asn donor CG is a clean carbonyl carbon bonded to its OD1, CB and the
+    # acceptor NZ only (the leaving ND2 is gone).
+    donor_cgs = set()
+    for a, b in built.bonds:
+        a, b = int(a), int(b)
+        if {str(built.name[a]), str(built.name[b])} == {"CG", "NZ"}:
+            donor_cgs.add(a if str(built.name[a]) == "CG" else b)
+    assert len(donor_cgs) == 2, "expected two Asn.CG - Lys.NZ isopeptide bonds"
+    for cg in donor_cgs:
+        neigh = sorted(str(built.name[n]) for n in built.getNeighbors(cg))
+        assert neigh == ["CB", "NZ", "OD1"], f"donor CG mis-bonded: {neigh}"
 
 
 @pytest.mark.skipif(
