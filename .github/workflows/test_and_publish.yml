@@ -21,6 +21,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # AmberTools' sqm (AM1-BCC backend used by antechamber) is linked
+      # against Homebrew gcc's libquadmath; install it so sqm can load on macOS.
+      - name: Provide gfortran runtime for AmberTools sqm (macOS)
+        if: runner.os == 'macOS'
+        run: brew install gcc
+
       - name: Install dependencies
         run: uv sync --group test --no-sources
 
