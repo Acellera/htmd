@@ -2085,6 +2085,59 @@ def _ionize_presolvated(mol, system, saltconc, saltanion, saltcation):
 # ====================================================================
 
 
+def _rigidify_three_point_water(struct):
+    """Rewrite 3-point water to AMBER's rigid encoding before the prmtop is saved.
+
+    OpenMM force fields express TIP3P-style water rigidity as constraints, but
+    ParmEd's ``load_topology`` only translates Forces, so the export System
+    (built flexible so every bond keeps an explicit force constant) yields water
+    with two O-H bonds and an H-O-H angle. OpenMM's ``AmberPrmtopFile`` only
+    rigidifies water that carries an explicit H-H bond; without it,
+    ``constraints=HBonds`` constrains the two O-H bonds but leaves the H-O-H
+    angle flexible, which is unstable at timesteps of 2 fs or more. This mirrors
+    tleap by adding the H-H bond (length derived from the O-H length and H-O-H
+    angle) and removing the H-O-H angle, so the water is fully constrained by any
+    downstream consumer. The pass is idempotent: water that already carries an
+    H-H bond is left untouched.
+    """
+    import math
+
+    from parmed.topologyobjects import Bond, BondType
+
+    hh_type = None
+    n_rigidified = n_angles_removed = 0
+    for res in struct.residues:
+        atoms = res.atoms
+        if len(atoms) != 3 or sorted(at.atomic_number for at in atoms) != [1, 1, 8]:
+            continue
+        ox = next(at for at in atoms if at.atomic_number == 8)
+        h1, h2 = (at for at in atoms if at.atomic_number == 1)
+        if any({b.atom1, b.atom2} == {h1, h2} for b in h1.bonds):
+            continue  # already rigid (e.g. a tleap-built water)
+        r_oh = next(b.type.req for b in ox.bonds if h1 in (b.atom1, b.atom2))
+        theta = next(
+            (ang.type.theteq for ang in struct.angles
+             if ang.atom2 is ox and {ang.atom1, ang.atom3} == {h1, h2}),
+            104.52,
+        )
+        d_hh = 2.0 * r_oh * math.sin(math.radians(theta) / 2.0)
+        if hh_type is None:
+            hh_type = BondType(553.0, d_hh)
+            struct.bond_types.append(hh_type)
+        struct.bonds.append(Bond(h1, h2, type=hh_type))
+        n_rigidified += 1
+        for ang in [a for a in struct.angles
+                    if a.atom2 is ox and {a.atom1, a.atom3} == {h1, h2}]:
+            ang.delete()
+            struct.angles.remove(ang)
+            n_angles_removed += 1
+    if n_rigidified:
+        logger.info(
+            f"Rigidified {n_rigidified} water molecules for the prmtop "
+            f"(added H-H bonds, removed {n_angles_removed} H-O-H angles)"
+        )
+
+
 def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
     """Write AMBER prmtop / inpcrd via ParmEd.
 
@@ -2116,6 +2169,7 @@ def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
             )
 
         struct = parmed.openmm.load_topology(topology, export_system, xyz=positions)
+        _rigidify_three_point_water(struct)
         struct.save(prmtop, overwrite=True)
         struct.save(inpcrd, overwrite=True)
         logger.info(f"Wrote {prmtop} and {inpcrd} via ParmEd")
