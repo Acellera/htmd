@@ -48,6 +48,14 @@ _FORCEFIELD_MAP = {
     "gaff2": ("gaff2", "2"),
 }
 
+# Elements GAFF / GAFF2 can atom-type: the main-group organic set. Transition
+# metals and other elements (handled as ions or by specialised metal parameter
+# sets, never by GAFF) are deliberately excluded so antechamber is not asked to
+# type something it cannot.
+_GAFF_SUPPORTED_ELEMENTS = {
+    "H", "C", "N", "O", "S", "P", "F", "CL", "BR", "I", "B",
+}
+
 # Charge methods that work under Pyodide. AM1-BCC needs the SQM backend,
 # NAGL needs PyTorch, RESP needs Psi4 - none of those are available
 # in-browser, so only the lightweight RDKit Gasteiger path works there.
@@ -168,6 +176,30 @@ def _fftype_antechamber(
             f"Supported: {sorted(_FORCEFIELD_MAP)}"
         )
     at_flag, parmchk_s = _FORCEFIELD_MAP[ff_key]
+
+    # GAFF/GAFF2 only types main-group organic elements. A residue carrying a
+    # transition metal (an Fe-S cluster such as SF4, a heme iron, a structural
+    # Zn that was bonded into a cluster, ...) cannot be parameterized this way -
+    # antechamber would mis-type it and the charge step yields garbage (RDKit
+    # Gasteiger returns non-finite values). Fail early with an actionable
+    # message instead.
+    unsupported = sorted(
+        {
+            str(e)
+            for e in mol.element
+            if str(e).upper() not in _GAFF_SUPPORTED_ELEMENTS
+        }
+    )
+    if unsupported:
+        resnames = sorted({str(r) for r in mol.resname})
+        raise RuntimeError(
+            f"Cannot parameterize residue(s) {resnames} with {forcefield}: "
+            f"element(s) {unsupported} are outside GAFF's main-group coverage "
+            f"(e.g. a transition-metal cofactor like a 4Fe-4S cluster or heme). "
+            f"GAFF/antechamber cannot type these. Supply pre-built parameters "
+            f"for this cofactor (a frcmod + prepi/off) through amber.build's "
+            f"`param` / `topo` arguments, or remove the cofactor before building."
+        )
 
     charge_key = charge_method.lower() if charge_method else None
     if charge_key not in _CHARGE_METHOD_MAP:
