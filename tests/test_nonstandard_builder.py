@@ -96,6 +96,20 @@ A6L_CIF = os.path.join(DATA_DIR, "6A6L.cif")
 # forms an isopeptide to the proximal chain's Lys48 side-chain NZ - a
 # backbone-C acyl donor to a side-chain N acceptor across two chains.
 EMZ_CIF = os.path.join(DATA_DIR, "5EMZ.cif")
+# 6LXU: methionine gamma-lyase with a PLP-lysine Schiff base (LLP) - the
+# pyridoxal-5'-phosphate cofactor imine-linked to an active-site lysine NZ, one
+# large chain-resident NCAA. Water and inert MPD/NO3 additives stripped.
+LXU_CIF = os.path.join(DATA_DIR, "6LXU.cif")
+# N6-(pyridoxal phosphate)-L-lysine: the Lys NZ = PLP C4' Schiff base (imine),
+# the PLP pyridine ring (with 2-methyl and 3-hydroxyl) and the 5'-phosphate.
+LLP_SMILES = r"Cc1ncc(COP(=O)(O)O)c(/C=N/CCCC[C@@H](C(=O)O)N)c1O"
+# 1IUA: high-potential iron-sulfur protein (HiPIP) with a 4Fe-4S cluster (SF4)
+# ligated by four cysteines (Cys43/46/61/75 SG -> Fe). Water stripped.
+IUA_CIF = os.path.join(DATA_DIR, "1IUA.cif")
+# 2DPQ: conantokin-G, an 18-residue peptide with five gamma-carboxyglutamates
+# (CGU, a known ff-ptm modified residue), a C-terminal amide cap (NH2) and three
+# Ca2+. Water stripped.
+DPQ_CIF = os.path.join(DATA_DIR, "2DPQ.cif")
 # 6JCH: sortase-assembled pilin with two INTRAMOLECULAR Lys-Asn isopeptides
 # (Lys39.NZ - Asn215.CG and Lys226.NZ - Asn370.CG). The Asn side-chain carbonyl
 # C is the acyl donor, the Lys side-chain NZ the acceptor; the Asn's amide ND2
@@ -1397,6 +1411,130 @@ def test_full_pipeline_6jch_pilin_isopeptide(tmp_path):
     for cg in donor_cgs:
         neigh = sorted(str(built.name[n]) for n in built.getNeighbors(cg))
         assert neigh == ["CB", "NZ", "OD1"], f"donor CG mis-bonded: {neigh}"
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end NCAA build needs antechamber + teLeap",
+)
+def test_full_pipeline_6lxu_plp_lysine(tmp_path):
+    """6LXU: methionine gamma-lyase with a PLP-lysine Schiff base (LLP).
+
+    LLP is the pyridoxal-5'-phosphate cofactor covalently imine-linked to an
+    active-site lysine (Lys NZ = PLP C4'), deposited as ONE residue: a standard
+    peptide backbone carrying the whole PLP moiety (aromatic pyridine ring,
+    3-hydroxyl, 2-methyl, 5'-phosphate) on its side chain. Unlike the isopeptide
+    cases, the cofactor link is INTERNAL to the residue, so this is a single
+    large chain-resident NCAA (no cross-residue custom bond) - parameterized in
+    one piece through the antechamber/GAFF NCAA path with its backbone retyped
+    to ff14SB. All its elements (C/N/O/P) are within GAFF coverage.
+
+    Asserts the build succeeds, LLP survives with its Schiff base (NZ=C4') and
+    5'-phosphate intact, and no atom is over-valent.
+    """
+    mol = Molecule(LXU_CIF)
+    built = _run_pipeline(mol, {"LLP": LLP_SMILES}, tmp_path)
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert (built.resname == "LLP").any()
+
+    # The Lys NZ = PLP C4' Schiff base survives as a single bond.
+    nz = set(np.where(built.name == "NZ")[0].tolist())
+    c4p = set(np.where(built.name == "C4'")[0].tolist())
+    n_sb = sum(
+        1
+        for a, b in built.bonds
+        if ({int(a), int(b)} & nz) and ({int(a), int(b)} & c4p)
+    )
+    assert n_sb == 1, "Lys NZ = PLP C4' Schiff base missing"
+    # The 5'-phosphate rode through intact.
+    assert int(((built.resname == "LLP") & (built.element == "P")).sum()) == 1
+
+
+def test_1iua_fes_cluster_clear_error(tmp_path):
+    """1IUA: a HiPIP with a 4Fe-4S cluster (SF4) ligated by four cysteines.
+
+    The 4Fe-4S core is a transition-metal cofactor: detect makes SF4 a scaffold
+    and clusters the four ligating Cys onto it, but GAFF / antechamber cannot
+    type iron, so it cannot be parameterized automatically. This is a genuine
+    limitation, not a bug - the contract is that the user is told clearly (and
+    pointed at amber.build's param/topo arguments for supplying external
+    metal-cluster parameters) rather than hitting a cryptic non-finite-charge
+    failure deep in the charge step.
+
+    Locks in the early, actionable error from the GAFF element-coverage guard.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+
+    mol = Molecule(IUA_CIF)
+    mol.remove("water", _logger=False)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    # SF4 is a scaffold and the four ligating Cys are anchored cluster members.
+    assert any(type(s).__name__ == "ScaffoldSpec" for s in specs)
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+
+    with pytest.raises(RuntimeError, match=r"(?i)GAFF.*coverage|outside GAFF"):
+        parameterizeFromSpecs(
+            specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+        )
+
+
+@pytest.mark.skipif(not _tleap, reason="end-to-end build needs teLeap")
+def test_full_pipeline_2dpq_conantokin(tmp_path):
+    """2DPQ: conantokin-G, an 18-residue peptide with five
+    gamma-carboxyglutamates (CGU), a C-terminal amide cap (NH2) and three Ca2+.
+
+    CGU is a known ff-ptm modified residue, so detect returns nothing and
+    amber.build auto-loads its parameters. The interesting part is the
+    C-terminal amide: a lone NH2 cap carries no backbone, so autoSegment used to
+    orphan it into its own segment, after which the default capping put an NME
+    on the now-exposed peptide C-terminus and left the NH2 (-> NHE) floating
+    disconnected. Two fixes make this correct:
+      * autoSegment classifies cap residues (ACE/NME/NHE/NH2) as polymer so the
+        geometric C-N link folds them into their parent chain;
+      * amber.build's default capping does not re-cap a terminus that is already
+        a cap residue (adding NME onto NHE would build a backbone on the cap and
+        tLeap would fail on its missing atom types).
+
+    Asserts the build succeeds, all five CGU and three Ca2+ survive, the NHE
+    cap stays bonded to the peptide C-terminus, no spurious NME is added, and no
+    atom is over-valent.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+
+    mol = Molecule(DPQ_CIF)
+    mol.remove("water", _logger=False)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    assert specs == [], f"CGU is a known modified residue; expected no specs, got {specs}"
+
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+    built = amber_build(pmol, outdir=str(tmp_path / "build"), ionize=False)
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    assert len(np.unique(built.resid[built.resname == "CGU"])) == 5
+    assert int((built.resname == "CA").sum()) == 3
+    # No spurious NME cap was added on top of the existing C-terminal amide.
+    assert int((built.resname == "NME").sum()) == 0
+
+    # The NHE amide cap stays bonded to the peptide C-terminus (its N bonds the
+    # last residue's backbone C and its own two amide hydrogens), not floating.
+    nhe_n = np.where((built.resname == "NHE") & (built.name == "N"))[0]
+    assert len(nhe_n) == 1, "expected a single NHE cap"
+    neigh = built.getNeighbors(int(nhe_n[0]))
+    neigh_names = sorted(str(built.name[n]) for n in neigh)
+    assert neigh_names == ["C", "HN1", "HN2"], f"NHE cap not bonded to chain: {neigh_names}"
 
 
 @pytest.mark.skipif(
