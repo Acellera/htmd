@@ -289,6 +289,200 @@ def _maybe_add_amber_modres(mol, outdir, extra_xml):
     return list(extra_xml) + list(paths)
 
 
+def _ffptm_prepi_residues():
+    """Resnames htmd ships as ff-PTM prepi units (post-translational
+    modifications AMBER parameterizes through ``ff-ptm/<RES>.prepi`` +
+    ``<RES>.frcmod``, auto-loaded by :func:`amber._detect_cofactors_ncaa_ptm`).
+
+    These are amino-acid modifications built on the standard ff14SB atom types
+    (the prepi carries custom charges + a handful of extra bonded terms in the
+    frcmod; no new atom types), so their OpenMM counterpart is a residue
+    template over ``protein-*`` types. Phospho residues were removed from
+    ff-ptm in favour of phosaa, so there is no overlap with
+    :data:`amber._PHOSAA_RESNAMES`."""
+    from htmd.builder.amber import htmdAmberHome
+
+    ffptm = os.path.join(htmdAmberHome(), "ff-ptm")
+    if not os.path.isdir(ffptm):
+        return frozenset()
+    return frozenset(
+        os.path.splitext(f)[0]
+        for f in os.listdir(ffptm)
+        if f.endswith(".prepi")
+    )
+
+
+def _parse_prepi(path):
+    """Parse an AMBER amino-acid ``prepi`` unit tleap-free.
+
+    Returns ``(atoms, bonds)`` where ``atoms`` is a list of
+    ``(name, amber_type, charge)`` for the real (non-dummy) atoms and ``bonds``
+    is a list of ``(name1, name2)`` intra-residue covalent bonds. Bonds are
+    read from the internal-coordinate tree (each atom's ``NA`` parent column)
+    plus the explicit ``LOOP`` ring-closure section; bonds to the three leading
+    ``DUMM`` atoms (the backbone-N chain entry) are dropped as those become
+    inter-residue external bonds.
+
+    Parameters
+    ----------
+    path : str
+        Path to the ``.prepi`` file.
+
+    Returns
+    -------
+    atoms : list of tuple
+        ``(name, amber_type, charge)`` per real atom, in prepi order.
+    bonds : list of tuple
+        ``(name1, name2)`` covalent bonds.
+    """
+    idx_name = {}
+    idx_isdummy = {}
+    atoms = []
+    bonds = []
+    in_loop = False
+    for ln in open(path).read().splitlines():
+        f = ln.split()
+        if not f:
+            continue
+        if f[0] == "LOOP":
+            in_loop = True
+            continue
+        if f[0] in ("IMPROPER", "DONE", "STOP", "CHARGE"):
+            in_loop = False
+            continue
+        if in_loop:
+            if len(f) == 2:
+                bonds.append((f[0], f[1]))
+            continue
+        # atom row: "I NAME TYPE TOPO NA NB NC R THETA PHI CHARGE"
+        if len(f) >= 11 and f[0].isdigit() and f[3] in (
+            "M", "S", "B", "E", "3", "4", "5", "6",
+        ):
+            i = int(f[0])
+            name, atype = f[1], f[2]
+            idx_name[i] = name
+            idx_isdummy[i] = atype == "DU"
+            if atype == "DU":
+                continue
+            atoms.append((name, atype, float(f[10])))
+            na = int(f[4])
+            if na in idx_name and not idx_isdummy[na]:
+                bonds.append((name, idx_name[na]))
+    return atoms, bonds
+
+
+def _ffptm_prepi_ffxml(present, outdir):
+    """Convert each ff-PTM prepi residue in ``present`` to a minimal
+    amber14-compatible OpenMM ffxml plus a hydrogen-definition XML.
+
+    The residue template is read straight from the prepi (atoms with their
+    ff-PTM charges over ``protein-*`` types, the tree/LOOP bonds, and backbone
+    N/C external bonds). The frcmod's extra bonded terms (a handful of
+    bond/angle/dihedral/improper terms over standard classes that ff14SB lacks)
+    are converted to OpenMM units by ParmEd - the frcmod carries no MASS
+    section, so it defines no new atom types and ParmEd emits exactly those
+    terms. A companion hydrogen-definition XML (H name -> parent, from the
+    prepi) lets ``Modeller.addHydrogens`` rebuild the residue's hydrogens in
+    the template's naming, sidestepping the prepi-vs-PDBv3 hydrogen-name
+    mismatch. Returns a list of ``(resname, ffxml_path, hdef_path)``."""
+    import xml.etree.ElementTree as ET
+    from parmed.amber import AmberParameterSet
+    from parmed.openmm import OpenMMParameterSet
+    from htmd.builder.amber import htmdAmberHome
+
+    ffptm = os.path.join(htmdAmberHome(), "ff-ptm")
+    want = sorted(set(present) & _ffptm_prepi_residues())
+    results = []
+    for res in want:
+        atoms, bonds = _parse_prepi(os.path.join(ffptm, f"{res}.prepi"))
+        names = {a[0] for a in atoms}
+
+        ff = ET.Element("ForceField")
+        resblock = ET.SubElement(ff, "Residues")
+        rel = ET.SubElement(resblock, "Residue", {"name": res})
+        for name, atype, charge in atoms:
+            ET.SubElement(rel, "Atom", {
+                "name": name, "type": f"protein-{atype}", "charge": f"{charge:.6f}",
+            })
+        for n1, n2 in bonds:
+            ET.SubElement(rel, "Bond", {"atomName1": n1, "atomName2": n2})
+        for bb in ("N", "C"):
+            if bb in names:
+                ET.SubElement(rel, "ExternalBond", {"atomName": bb})
+
+        # Extra bonded terms from the frcmod, converted to OpenMM units.
+        frcmod = os.path.join(ffptm, f"{res}.frcmod")
+        aps = AmberParameterSet(frcmod)
+        if any((aps.bond_types, aps.angle_types, aps.dihedral_types,
+                getattr(aps, "improper_periodic_types", {}))):
+            tmp = os.path.join(outdir, f"_frcmod_{res}.xml")
+            OpenMMParameterSet.from_parameterset(aps).write(tmp, provenance=None)
+            froot = ET.parse(tmp).getroot()
+            os.remove(tmp)
+            for tag in ("HarmonicBondForce", "HarmonicAngleForce",
+                        "PeriodicTorsionForce"):
+                src = froot.find(f".//{tag}")
+                if src is None or len(src) == 0:
+                    continue
+                dst = ET.SubElement(ff, tag, src.attrib)
+                for c in src:
+                    # AMBER wildcard "X" -> OpenMM empty class.
+                    for k, v in list(c.attrib.items()):
+                        if k.startswith("class") and v == "X":
+                            c.set(k, "")
+                    dst.append(c)
+
+        ffxml_path = os.path.join(outdir, f"{res}_ff14SBnamespaced.xml")
+        ET.ElementTree(ff).write(ffxml_path)
+
+        # Hydrogen definition: parent heavy atom of each H, from the prepi bonds.
+        parent = {}
+        for a, b in bonds:
+            if a.startswith("H") ^ b.startswith("H"):
+                h, p = (a, b) if a.startswith("H") else (b, a)
+                parent[h] = p
+        hroot = ET.Element("Residues")
+        hres = ET.SubElement(hroot, "Residue", {"name": res})
+        for name, _, _ in atoms:
+            if name.startswith("H") and name in parent:
+                ET.SubElement(hres, "H", {"name": name, "parent": parent[name]})
+        hdef_path = os.path.join(outdir, f"{res}_hydrogens.xml")
+        ET.ElementTree(hroot).write(hdef_path)
+
+        results.append((res, ffxml_path, hdef_path))
+    return results
+
+
+def _maybe_add_ffptm_prepi(mol, outdir, extra_xml):
+    """Auto-convert + load any ff-PTM prepi residue present in ``mol`` (CGU,
+    CSO, ...). Registers each residue's hydrogen definition and strips its
+    input hydrogens **in place** so ``Modeller.addHydrogens`` rebuilds them in
+    the template's naming (mirroring how amber.build strips + rebuilds these
+    from the prepi via tleap). Returns the augmented ``extra_xml``."""
+    import openmm.app as app
+
+    results = _ffptm_prepi_ffxml({str(r) for r in np.unique(mol.resname)}, outdir)
+    if not results:
+        return extra_xml
+    present = [r for r, _, _ in results]
+    logger.info(
+        f"ff-PTM modified residue(s) {', '.join(present)} detected; auto-loading "
+        "converted OpenMM XML and rebuilding their hydrogens from the prepi."
+    )
+    paths = []
+    for res, ffxml_path, hdef_path in results:
+        app.Modeller.loadHydrogenDefinitions(hdef_path)
+        mol.remove(
+            (mol.resname == res) & (mol.element == "H"), _logger=False
+        )
+        paths.append(ffxml_path)
+    if not extra_xml:
+        return paths
+    if isinstance(extra_xml, str):
+        return [extra_xml, *paths]
+    return list(extra_xml) + paths
+
+
 def build(
     mol: Molecule,
     ff: list | None = None,
@@ -402,6 +596,10 @@ def build(
     # Same for AMBER-library modified residues openmmforcefields never converted
     # (MSE / ALY / ... from ff14SB_modAA): convert them on the fly.
     extra_xml = _maybe_add_amber_modres(mol, outdir, extra_xml)
+    # ff-PTM prepi residues (CGU, CSO, ...): convert the prepi + frcmod straight
+    # to an OpenMM template, register a hydrogen definition, and strip their
+    # input Hs so addHydrogens rebuilds them in the template's naming.
+    extra_xml = _maybe_add_ffptm_prepi(mol, outdir, extra_xml)
 
     topology, positions = _mol_to_openmm(
         mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
@@ -1211,6 +1409,11 @@ def _prepare_molecule(mol, caps, disulfide, custombonds):
     _fix_water_naming(mol)
     _fix_nucleic_naming(mol)
 
+    # PDB stores the C-terminal amide cap as "NH2" but the OpenMM ff14SB
+    # template (like AMBER) calls it "NHE"; rename so it is recognised.
+    if np.any(mol.resname == "NH2"):
+        mol.resname[mol.resname == "NH2"] = "NHE"
+
     cyclic = _detect_cyclic_segments(mol)
 
     if caps is None:
@@ -1342,17 +1545,31 @@ def _add_caps(mol, caps):
 
 
 def _defaultProteinCaps(mol):
+    from moleculekit.residues import (
+        N_TERMINAL_CAP_RESIDUE_NAMES,
+        C_TERMINAL_CAP_RESIDUE_NAMES,
+    )
+
     segs = np.unique(mol.get("segid", sel="protein"))
     caps = {}
     for s in segs:
-        nres = len(np.unique(mol.resid[mol.segid == s]))
-        if nres < 10:
+        segmask = mol.segid == s
+        if len(np.unique(mol.resid[segmask])) < 10:
             logger.warning(
                 f"Segment {s} has fewer than 10 residues - not capped by "
                 "default.  Use the caps argument to override."
             )
             continue
-        caps[s] = ["ACE", "NME"]
+        # A segment already carrying a terminal cap (e.g. a deposited
+        # C-terminal amide NH2 / NHE) must not be re-capped: aligning an NME
+        # onto an existing cap residue has no backbone to match and would
+        # otherwise build a spurious terminus. Mirrors amber._defaultProteinCaps.
+        seg_atoms = np.where(segmask)[0]
+        first_rn = str(mol.resname[seg_atoms[0]])
+        last_rn = str(mol.resname[seg_atoms[-1]])
+        nterm = "none" if first_rn in N_TERMINAL_CAP_RESIDUE_NAMES else "ACE"
+        cterm = "none" if last_rn in C_TERMINAL_CAP_RESIDUE_NAMES else "NME"
+        caps[s] = [nterm, cterm]
     return caps
 
 
