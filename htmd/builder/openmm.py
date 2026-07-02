@@ -163,7 +163,16 @@ def _amber_modres_libs():
             "prefix": "protein",
         },
         {
-            "params": ("parm10.dat", "all_modrna08.frcmod"),
+            # parm10 is listed AFTER all_modrna08.frcmod on purpose: ParmEd is
+            # last-wins, and all_modrna08.frcmod is an ff99/GAFF-derived set whose
+            # broad NONBON/BOND/ANGLE/DIHE sections re-state (and would clobber)
+            # standard atom types. Loading parm10 last lets the standard base win
+            # for shared type-combos while modrna08 only fills the genuinely-new
+            # modified-nucleotide terms - matching amber, which sources
+            # leaprc.modrna08 BEFORE the base for the same reason (see
+            # amber._detect_modrna_residues). Contrast the modAA entry above,
+            # where frcmod.ff14SBmodAA is a clean add-on that SHOULD win.
+            "params": ("all_modrna08.frcmod", "parm10.dat"),
             "lib": "all_modrna08.lib",
             "residues": frozenset(MODIFIED_NUCLEIC_RESIDUE_NAMES),
             "base_xml": "amber14/RNA.OL3.xml",
@@ -178,6 +187,48 @@ def _amber14_base_classes(base_xml):
 
     txt = open(os.path.join(os.path.dirname(app.__file__), "data", base_xml)).read()
     return set(re.findall(r'<Type[^>]*\bclass="([^"]+)"', txt))
+
+
+def _amber14_base_class_combos(base_xml):
+    """The bond and angle class-combinations the base ffxml already defines.
+
+    The amber14 ffxmls spell their bonds/angles by ``type`` (e.g.
+    ``type1="RNA-O2"``); we map each type back to its class so a converted
+    modified-residue term (class-based) can be checked against what the base
+    already provides. Bonds are returned as ``frozenset({c1, c2})`` and angles
+    as the reversal-invariant ``(min(c1, c3), c2, max(c1, c3))``. Used to detect
+    the terms a modified residue needs that the base LACKS (e.g. modrna08 types
+    a phosphate oxygen ``O`` where the base only has the ``O2`` variant, so
+    ``{O, P}`` is base-lacking and must come from the modified-residue library)."""
+    import re
+    import openmm.app as app
+
+    txt = open(os.path.join(os.path.dirname(app.__file__), "data", base_xml)).read()
+    type_cls = {}
+    for m in re.finditer(r"<Type\b([^>]*)/>", txt):
+        a = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
+        if "name" in a and "class" in a:
+            type_cls[a["name"]] = a["class"]
+
+    def _cls(ref):
+        return type_cls.get(ref, ref)
+
+    bonds, angles = set(), set()
+    bf = re.search(r"<HarmonicBondForce>.*?</HarmonicBondForce>", txt, re.S)
+    if bf:
+        for m in re.finditer(r"<Bond\b([^>]*)/>", bf.group(0)):
+            a = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
+            bonds.add(frozenset((_cls(a.get("type1") or a.get("class1")),
+                                 _cls(a.get("type2") or a.get("class2")))))
+    af = re.search(r"<HarmonicAngleForce>.*?</HarmonicAngleForce>", txt, re.S)
+    if af:
+        for m in re.finditer(r"<Angle\b([^>]*)/>", af.group(0)):
+            a = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
+            c1 = _cls(a.get("type1") or a.get("class1"))
+            c2 = _cls(a.get("type2") or a.get("class2"))
+            c3 = _cls(a.get("type3") or a.get("class3"))
+            angles.add((min(c1, c3), c2, max(c1, c3)))
+    return bonds, angles
 
 
 def _amber_modres_ffxml(present, outdir):
@@ -227,6 +278,38 @@ def _amber_modres_ffxml(present, outdir):
         new_types = {t for t in used if type_def[t].get("class") not in base_cls}
         new_classes = {type_def[t].get("class") for t in new_types}
 
+        # Class of each residue atom and the residue's intra-residue bond graph,
+        # captured from the ORIGINAL (pre-namespacing) type refs. From these we
+        # derive the bond/angle class-combos the residue actually uses, so we can
+        # emit the library's own params for any combo the base ff lacks (e.g.
+        # modrna08's O-P phosphate bond, absent from the base's O2-only phosphate)
+        # instead of silently dropping it. This is the general fix that keeps a
+        # modified residue on ITS library's parameters (matching amber) while
+        # ordinary shared-type combos still resolve from the base ff.
+        cls_of, adj = {}, {}
+        for res in res_elems:
+            rn = res.get("name")
+            for a in res.findall("Atom"):
+                cls_of[(rn, a.get("name"))] = type_def[a.get("type")].get("class")
+                adj.setdefault((rn, a.get("name")), set())
+            for b in res.findall("Bond"):
+                adj[(rn, b.get("atomName1"))].add(b.get("atomName2"))
+                adj[(rn, b.get("atomName2"))].add(b.get("atomName1"))
+        modres_bonds, modres_angles = set(), set()
+        for res in res_elems:
+            rn = res.get("name")
+            for b in res.findall("Bond"):
+                modres_bonds.add(frozenset((
+                    cls_of[(rn, b.get("atomName1"))], cls_of[(rn, b.get("atomName2"))]
+                )))
+        for (rn, center), nbrs in adj.items():
+            nb = sorted(nbrs)
+            for i in range(len(nb)):
+                for j in range(i + 1, len(nb)):
+                    lo, hi = sorted((cls_of[(rn, nb[i])], cls_of[(rn, nb[j])]))
+                    modres_angles.add((lo, cls_of[(rn, center)], hi))
+        base_bonds, base_angles = _amber14_base_class_combos(lib["base_xml"])
+
         ff = ET.Element("ForceField")
         atblock = ET.SubElement(ff, "AtomTypes")
         for t in sorted(new_types):
@@ -236,6 +319,16 @@ def _amber_modres_ffxml(present, outdir):
             for a in res.findall("Atom"):
                 if a.get("type") not in new_types:
                     a.set("type", f"{prefix}-{a.get('type')}")
+            if prefix == "RNA":
+                # modrna08 ships only internal units; the OpenMM builder supports
+                # these modified ribonucleotides only at a 3' terminus, where the
+                # O3' carries no downstream phosphate. Drop its external bond so
+                # the residue matches with a dangling O3' - exactly the linking
+                # form amber builds (its terminal H3T is stripped, see
+                # _strip_terminal_modrna). In-chain use is rejected upstream.
+                for eb in res.findall("ExternalBond"):
+                    if eb.get("atomName") == "O3'":
+                        res.remove(eb)
             resblock.append(res)
 
         def _touches_new(el):
@@ -247,6 +340,15 @@ def _amber_modres_ffxml(present, outdir):
                     vals.add(type_def[v].get("class") if v in type_def else v)
             return bool(vals & new_classes)
 
+        def _bond_base_lacking(el):
+            c = frozenset((el.get("class1"), el.get("class2")))
+            return c in modres_bonds and c not in base_bonds
+
+        def _angle_base_lacking(el):
+            c1, c2, c3 = el.get("class1"), el.get("class2"), el.get("class3")
+            key = (min(c1, c3), c2, max(c1, c3))
+            return key in modres_angles and key not in base_angles
+
         for tag in (
             "HarmonicBondForce", "HarmonicAngleForce",
             "PeriodicTorsionForce", "NonbondedForce",
@@ -254,7 +356,12 @@ def _amber_modres_ffxml(present, outdir):
             src = root.find(f".//{tag}")
             if src is None:
                 continue
-            keep = [c for c in list(src) if _touches_new(c)]
+            if tag == "HarmonicBondForce":
+                keep = [c for c in src if _touches_new(c) or _bond_base_lacking(c)]
+            elif tag == "HarmonicAngleForce":
+                keep = [c for c in src if _touches_new(c) or _angle_base_lacking(c)]
+            else:
+                keep = [c for c in list(src) if _touches_new(c)]
             if tag == "NonbondedForce" and not keep:
                 continue
             fe = ET.SubElement(ff, tag, src.attrib)
@@ -287,6 +394,47 @@ def _maybe_add_amber_modres(mol, outdir, extra_xml):
     if isinstance(extra_xml, str):
         return [extra_xml, *paths]
     return list(extra_xml) + list(paths)
+
+
+def _strip_terminal_modrna(mol):
+    """OpenMM counterpart of amber.build's terminal modified-ribonucleotide
+    handling (``amber._detect_modrna_residues``). modrna08 ships only INTERNAL
+    ribonucleotide units, so a terminal modified nucleotide carries chain-terminal
+    atoms PDB2PQR adds that have no counterpart in the converted template: the
+    3'/5' hydroxyl protons (H3T / H5T) and the free-5'-phosphate oxygen (O3P).
+    Strip them in place so the residue matches the internal template with a
+    dangling O3' - exactly what amber builds (its converted ``<RES>3`` variant has
+    the O3' external bond dropped, see ``_amber_modres_ffxml``).
+
+    The OpenMM path supports these modified ribonucleotides only at a 3' terminus.
+    A modified nucleotide in the middle of a chain (its O3' bonded to a downstream
+    phosphate) would need the O3' external bond the template no longer carries, so
+    raise a clear error rather than silently build a broken topology.
+    """
+    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+
+    present = sorted(
+        {str(r) for r in np.unique(mol.resname)} & set(MODIFIED_NUCLEIC_RESIDUE_NAMES)
+    )
+    if not present:
+        return
+    probe = mol.copy()
+    probe.guessBonds()
+    for res in present:
+        for i in np.where((probe.resname == res) & (probe.name == "O3'"))[0]:
+            downstream = [
+                j for j in probe.getNeighbors(int(i))
+                if str(probe.name[j]) == "P"
+            ]
+            if downstream:
+                raise NotImplementedError(
+                    f"In-chain modified ribonucleotide {res} is not yet supported "
+                    "by the OpenMM builder (only 3'-terminal). Build this system "
+                    "with amber.build."
+                )
+    term = np.isin(mol.resname, present) & np.isin(mol.name, ("H3T", "H5T", "O3P"))
+    if term.any():
+        mol.remove(term, _logger=False)
 
 
 def _ffptm_prepi_residues():
@@ -593,6 +741,10 @@ def build(
     # amber14 base has none. Generate an amber14-compatible phosaa XML and load
     # it alongside (both for topology bond defs and the ForceField).
     extra_xml = _maybe_add_phosaa(mol, outdir, extra_xml)
+    # A terminal modified ribonucleotide (5MC, ...) carries chain-terminal atoms
+    # modrna08 has no type for; strip them so it matches the internal template
+    # with a dangling O3' (mirrors amber.build).
+    _strip_terminal_modrna(mol)
     # Same for AMBER-library modified residues openmmforcefields never converted
     # (MSE / ALY / ... from ff14SB_modAA): convert them on the fly.
     extra_xml = _maybe_add_amber_modres(mol, outdir, extra_xml)
@@ -1830,6 +1982,14 @@ def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
                     aname = ext.attrib.get("atomName")
                     if aname == "N" and "N" in atom_names and not skip_n:
                         bonds.append(("-C", "N"))
+                    elif aname == "P" and "P" in atom_names:
+                        # Nucleic phosphodiester: the modified nucleotide's
+                        # phosphate bonds the previous residue's O3'. Encode as
+                        # ``(-O3', P)`` (OpenMM's own nucleic convention) so
+                        # createStandardBonds links it into the chain. Only the
+                        # pull-from-previous direction is emitted; the O3' push-
+                        # to-next side is the next residue's own ``(-O3', P)``.
+                        bonds.append(("-O3'", "P"))
                 Topology._standardBonds[name] = bonds
         yield
     finally:
@@ -2671,6 +2831,19 @@ def _read_built_molecule(outdir, prefix, topology=None, positions=None):
     if os.path.exists(prmtop) and os.path.getsize(prmtop) > 0:
         try:
             molbuilt = Molecule(prmtop, validateElements=False)
+            # The prmtop encodes rigid 3-point water with an explicit H-H bond
+            # (see _rigidify_three_point_water). That is a constraint-encoding
+            # artifact, not a chemical bond, and it breaks the OpenMM ForceField
+            # handoff (its HOH template has no H-H bond). Drop H-H bonds so
+            # molbuilt and the emitted mmCIF/PDB carry standard connectivity.
+            if molbuilt.bonds is not None and len(molbuilt.bonds):
+                is_h = molbuilt.element == "H"
+                hh = is_h[molbuilt.bonds[:, 0]] & is_h[molbuilt.bonds[:, 1]]
+                if hh.any():
+                    keep = ~hh
+                    if molbuilt.bondtype is not None and len(molbuilt.bondtype) == len(hh):
+                        molbuilt.bondtype = molbuilt.bondtype[keep]
+                    molbuilt.bonds = molbuilt.bonds[keep]
             if positions is not None:
                 coords = np.array(
                     positions.value_in_unit(unit.angstrom), dtype=np.float32

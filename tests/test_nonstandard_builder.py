@@ -1271,6 +1271,27 @@ def test_full_pipeline_2dpq_openmm_vs_amber(tmp_path):
 
 
 @pytest.mark.skipif(
+    not (_tleap and _openmm),
+    reason="end-to-end build comparison needs teLeap + openmm",
+)
+def test_full_pipeline_6a6l_openmm_vs_amber(tmp_path):
+    """6A6L (5MC modified RNA): amber and openmm agree once modrna08's over-broad
+    frcmod is prevented from corrupting the base force field. The bug it exposed:
+    loading leaprc.modrna08 (an ff99/GAFF-derived re-parameterization) globally
+    overrode ff14SB/OL3 for the WHOLE system - protein vdW included - so a naive
+    build disagreed by ~76 kcal/mol. Fixed by sourcing modrna08 before the base
+    and pruning its clobbering improper/dihedral overrides (amber side), plus
+    letting the base win in the converter and emitting only the base-lacking
+    terms (openmm side). The residual ~0.5 kcal/mol is 5MC's own
+    modification-specific torsions, where tLeap's and OpenMM's specific-vs-
+    wildcard resolution differ marginally; everything else (protein, standard
+    RNA, charges, bonds, angles, nonbonded) matches to < 1e-3."""
+    mol = Molecule(A6L_CIF)
+    mol.remove("water", _logger=False)
+    _assert_openmm_amber_equivalent(mol, None, None, tmp_path, energy_tol=0.6)
+
+
+@pytest.mark.skipif(
     not (_antechamber and _tleap and _openmm),
     reason="end-to-end build comparison needs antechamber + teLeap + openmm",
 )
@@ -2107,8 +2128,9 @@ def test_full_pipeline_6a6l_5mc(tmp_path):
     auto-loads `leaprc.modrna08`, stripping the 3'-terminal proton PDB2PQR adds
     (modrna08 ships internal-only units, no 5MC3 terminal variant).
 
-    AMBER only: modrna08 has no OpenMM XML, so the openmm builder cannot
-    template it (same gap class as the phospho residues in 1LKK).
+    The OpenMM counterpart (test_full_pipeline_6a6l_5mc_openmm) also builds now,
+    via the AMBER-library->OpenMM converter, but with OL3-consistent params for
+    5MC rather than amber's modrna08 (see that test).
     """
     from moleculekit.tools.autosegment import autoSegment
     from moleculekit.tools.preparation import systemPrepare
@@ -2132,6 +2154,62 @@ def test_full_pipeline_6a6l_5mc(tmp_path):
     # The protein and the rest of the RNA built alongside it.
     assert np.any(built.atomselect("protein"))
     assert np.any(built.atomselect("nucleic"))
+
+
+@pytest.mark.skipif(not _openmm, reason="openmm build needs openmm")
+def test_full_pipeline_6a6l_5mc_openmm(tmp_path):
+    """6A6L through openmm.build - the modified-RIBONUCLEOTIDE openmm path.
+
+    5MC (5-methylcytidine) comes from AMBER's modrna08 library, which
+    openmmforcefields never converted, so the builder converts it on the fly
+    (ParmEd). Two nucleic-specific pieces make it work:
+      * the phosphodiester linkage: a modified nucleotide's phosphate must bond
+        the previous residue's O3'. The converter's bond-def registration now
+        emits the nucleic ``(-O3', P)`` external bond (it previously only handled
+        the peptide ``(-C, N)``), so createStandardBonds links 5MC into the chain.
+      * the 3' terminus: modrna08 ships only internal units, so the terminal
+        H3T/H5T/O3P are stripped and the template's O3' external bond dropped -
+        the residue matches with a dangling O3', exactly amber's linking form.
+
+    modrna08 is an ff99/GAFF-derived set whose frcmod re-states standard
+    chemistry, so a naive load corrupts the base force field (see
+    amber._modrna08_pruned_leaprc for the fixes: source it before the base and
+    prune its clobbering improper/dihedral overrides). With those fixes on the
+    amber side and the converter emitting the base-lacking terms (e.g. the O-P
+    phosphate bond) on the openmm side, this build energy-MATCHES amber (see the
+    _openmm_vs_amber test) - it is not an exception any more. This test asserts a
+    correct BUILD + composition + chain linkage."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.openmm import build as openff_build
+
+    mol = Molecule(A6L_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    assert specs == [], f"expected no specs (5MC is known), got {specs}"
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+
+    built, system = openff_build(
+        pmol.copy(), outdir=str(tmp_path / "openmm"), ionize=False, solvate=False
+    )
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert (built.resname == "5MC").any()
+    assert int(((built.resname == "5MC") & (built.name == "C10")).sum()) == 1
+    assert np.any(built.atomselect("protein"))
+    assert np.any(built.atomselect("nucleic"))
+    # 5MC linked into the RNA chain: its phosphate P bonds the upstream O3'.
+    p_idx = np.where((built.resname == "5MC") & (built.name == "P"))[0]
+    assert len(p_idx) == 1
+    neigh_res = {
+        int(built.resid[n])
+        for n in built.getNeighbors(int(p_idx[0]))
+    }
+    assert len(neigh_res) > 1, "5MC phosphate not bonded to the upstream residue"
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6a6l")
 
 
 # Supported modified ribonucleotides (modrna08 + moleculekit residue_cifs).
