@@ -2671,6 +2671,19 @@ def _read_built_molecule(outdir, prefix, topology=None, positions=None):
     if os.path.exists(prmtop) and os.path.getsize(prmtop) > 0:
         try:
             molbuilt = Molecule(prmtop, validateElements=False)
+            # The prmtop encodes rigid 3-point water with an explicit H-H bond
+            # (see _rigidify_three_point_water). That is a constraint-encoding
+            # artifact, not a chemical bond, and it breaks the OpenMM ForceField
+            # handoff (its HOH template has no H-H bond). Drop H-H bonds so
+            # molbuilt and the emitted mmCIF/PDB carry standard connectivity.
+            if molbuilt.bonds is not None and len(molbuilt.bonds):
+                is_h = molbuilt.element == "H"
+                hh = is_h[molbuilt.bonds[:, 0]] & is_h[molbuilt.bonds[:, 1]]
+                if hh.any():
+                    keep = ~hh
+                    if molbuilt.bondtype is not None and len(molbuilt.bondtype) == len(hh):
+                        molbuilt.bondtype = molbuilt.bondtype[keep]
+                    molbuilt.bonds = molbuilt.bonds[keep]
             if positions is not None:
                 coords = np.array(
                     positions.value_in_unit(unit.angstrom), dtype=np.float32
