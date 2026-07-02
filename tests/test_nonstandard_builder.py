@@ -1256,6 +1256,21 @@ def test_full_pipeline_6lxu_openmm_vs_amber(tmp_path):
 
 
 @pytest.mark.skipif(
+    not (_tleap and _openmm),
+    reason="end-to-end build comparison needs teLeap + openmm",
+)
+def test_full_pipeline_2dpq_openmm_vs_amber(tmp_path):
+    """2DPQ: the five gamma-carboxyglutamates (CGU) are an ff-PTM prepi residue
+    with no OpenMM XML. The builder converts the prepi + frcmod tleap-free into
+    an amber14-compatible template; parameterized this way it must reproduce
+    amber.build's ff-ptm CGU. Same (default) caps and coordinates, energies
+    agree - the strong check that the prepi conversion matches the tleap library."""
+    mol = Molecule(DPQ_CIF)
+    mol.remove("water", _logger=False)
+    _assert_openmm_amber_equivalent(mol, None, None, tmp_path)
+
+
+@pytest.mark.skipif(
     not (_antechamber and _tleap and _openmm),
     reason="end-to-end build comparison needs antechamber + teLeap + openmm",
 )
@@ -2034,6 +2049,44 @@ def test_full_pipeline_2dpq_conantokin(tmp_path):
     neigh = built.getNeighbors(int(nhe_n[0]))
     neigh_names = sorted(str(built.name[n]) for n in neigh)
     assert neigh_names == ["C", "HN1", "HN2"], f"NHE cap not bonded to chain: {neigh_names}"
+
+
+@pytest.mark.skipif(not _openmm, reason="openmm build needs openmm")
+def test_full_pipeline_2dpq_conantokin_openmm(tmp_path):
+    """2DPQ through openmm.build. The five gamma-carboxyglutamates (CGU) are an
+    ff-PTM prepi residue with no OpenMM XML, so the builder converts the prepi +
+    frcmod tleap-free into a minimal amber14-compatible template (charges +
+    the one extra C-CT-C angle over standard ff14SB types), registers a hydrogen
+    definition from the prepi, and strips + rebuilds CGU's hydrogens in that
+    naming (mirroring how amber strips + rebuilds these from the prepi). The
+    C-terminal amide (NH2) is recognised as an existing cap - renamed to NHE for
+    the ff14SB template - so no NME is added, and the three Ca2+ survive.
+    Exercises the ff-PTM prepi -> OpenMM converter; energies match amber to
+    0.05 kcal/mol (see the vs_amber test)."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.openmm import build as openff_build
+
+    mol = Molecule(DPQ_CIF)
+    mol.remove("water", _logger=False)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    assert specs == [], f"CGU is a known modified residue; expected no specs, got {specs}"
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+    built, system = openff_build(
+        pmol.copy(), outdir=str(tmp_path / "openmm"), ionize=False, solvate=False
+    )
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert len(np.unique(built.resid[built.resname == "CGU"])) == 5
+    assert int((built.resname == "CA").sum()) == 3
+    # No spurious NME on top of the C-terminal amide (ParmEd labels the built
+    # amide cap NH2 in the prmtop; the NHE ff14SB template built it).
+    assert int((built.resname == "NME").sum()) == 0
+    assert int(((built.resname == "NH2") | (built.resname == "NHE")).sum()) > 0
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "2dpq")
 
 
 @pytest.mark.skipif(
