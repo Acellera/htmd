@@ -249,15 +249,20 @@ def _amber_modres_ffxml(present, outdir):
     from htmd.builder.amber import defaultAmberHome, _defaultAmberSearchPaths
 
     present = set(present)
-    home = defaultAmberHome()
-    pdir = os.path.join(home, _defaultAmberSearchPaths["param"])
-    ldir = os.path.join(home, _defaultAmberSearchPaths["lib"])
 
     paths = []
+    pdir = ldir = None
     for lib in _amber_modres_libs():
         want = sorted(present & lib["residues"])
         if not want:
             continue
+        if pdir is None:
+            # A modified residue is actually present, so we genuinely need a full
+            # AMBERHOME (AmberTools/teLeap). Standard systems never reach here,
+            # keeping the OpenMM builder usable without AmberTools installed.
+            home = defaultAmberHome()
+            pdir = os.path.join(home, _defaultAmberSearchPaths["param"])
+            ldir = os.path.join(home, _defaultAmberSearchPaths["lib"])
         aps = AmberParameterSet(*[os.path.join(pdir, f) for f in lib["params"]])
         reslib = AmberOFFLibrary.parse(os.path.join(ldir, lib["lib"]))
         omm = OpenMMParameterSet.from_parameterset(aps)
