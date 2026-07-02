@@ -1398,6 +1398,48 @@ def test_full_pipeline_1lkk_ptr(tmp_path):
     assert int(((built.resname == "PTR") & (built.element == "P")).sum()) == 1
 
 
+@pytest.mark.skipif(not _openmm, reason="end-to-end PTR openmm build needs openmm")
+def test_full_pipeline_1lkk_ptr_openmm(tmp_path):
+    """1LKK (pYEEI phosphopeptide) through openmm.build. The OpenMM builder has
+    no phospho parameters in its amber14 base, so it auto-generates an
+    amber14-compatible phosaa14SB (namespacing the bare protein type references
+    to ``protein-*`` and injecting the phosphorus type/nonbonded the
+    protein-only base lacks) and loads it. Capping PTR with ACE (to sit it
+    mid-chain) would strip its backbone amide H, which addHydrogens cannot re-add
+    for a residue with no OpenMM hydrogen definition, so the builder keeps that H
+    for phospho residues.
+
+    Asserts PTR builds with its phosphate + amide H, the ACE cap is present, no
+    over-valent atoms, and the produced System matches its energy reference.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.openmm import build as openff_build
+
+    mol = Molecule(LKK_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    mol.remove("water", _logger=False)
+    pmol, _ = systemPrepare(mol, verbose=False)
+
+    built, system = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+        caps={"P1": ("ACE", "none")},
+    )
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert (built.resname == "ACE").any()
+    assert (built.resname == "PTR").any()
+    assert int(((built.resname == "PTR") & (built.element == "P")).sum()) == 1
+    # PTR kept its single backbone amide H through the ACE capping.
+    assert int(((built.resname == "PTR") & (built.name == "H")).sum()) == 1
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "1lkk")
+
+
 @pytest.mark.skipif(
     not (_antechamber and _tleap),
     reason="end-to-end build needs antechamber + teLeap",

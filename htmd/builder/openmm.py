@@ -58,6 +58,94 @@ def defaultFf() -> list:
     ]
 
 
+def _phosaa_ffxml_namespaced(outdir):
+    """Write a copy of ``openmmforcefields``' ``phosaa14SB.xml`` made compatible
+    with OpenMM's bundled ``amber14/protein.ff14SB.xml`` base, and return its path.
+
+    Two adjustments. (1) amber14 names its protein atom TYPES ``protein-*`` while
+    phosaa references them bare (``N``, ``CX``, ...), so the residue templates'
+    standard-type references are prefixed with ``protein-`` (phosaa's own
+    phosphate types OP/OQ/.../CG and the phosphorus ``P`` are left bare).
+    (2) the protein-only base defines no phosphorus, so the ``P`` atom type and
+    its nonbonded term are copied in from the monolithic ``amber/ff14SB.xml``.
+    Classes stay bare in both, so all bonded/nonbonded terms match unchanged.
+    Generated from the installed package each build, so it tracks its version."""
+    import re
+    import glob
+    import openmmforcefields
+
+    ffdir = os.path.join(os.path.dirname(openmmforcefields.__file__), "ffxml")
+
+    def _find(fn):
+        hits = [
+            m
+            for m in glob.glob(os.path.join(ffdir, "**", fn), recursive=True)
+            if os.path.basename(m) == fn
+        ]
+        if not hits:
+            raise RuntimeError(
+                f"openmmforcefields is missing {fn}; cannot build phosphorylated "
+                "residues (PTR/SEP/TPO) with the OpenMM builder."
+            )
+        return hits[0]
+
+    phos = open(_find("phosaa14SB.xml")).read()
+    mono = open(_find("ff14SB.xml")).read()
+
+    keep_bare = set(re.findall(r'<Type\b[^>]*\bname="([^"]+)"', phos)) | {"P"}
+
+    def _fix_residue(match):
+        def _fix_atom(atom):
+            whole, typ = atom.group(0), atom.group(1)
+            if typ in keep_bare:
+                return whole
+            return whole.replace(f'type="{typ}"', f'type="protein-{typ}"')
+
+        return re.sub(r'<Atom\b[^>]*\btype="([^"]+)"[^>]*/>', _fix_atom, match.group(0))
+
+    phos = re.sub(r"<Residue\b.*?</Residue>", _fix_residue, phos, flags=re.S)
+
+    p_type = next(
+        line for line in re.findall(r"<Type\b[^>]*>", mono) if re.search(r'\bname="P"', line)
+    )
+    p_nonbonded = next(
+        line
+        for line in re.findall(
+            r"<Atom\b[^>]*>",
+            re.search(r"<NonbondedForce\b.*?</NonbondedForce>", mono, re.S).group(0),
+        )
+        if re.search(r'class="P"', line)
+    )
+    phos = phos.replace("</AtomTypes>", f"  {p_type}\n </AtomTypes>")
+    phos = re.sub(r"(<NonbondedForce\b[^>]*>)", rf"\1\n  {p_nonbonded}", phos, count=1)
+
+    out_path = os.path.join(outdir, "phosaa14SB_ff14SBnamespaced.xml")
+    with open(out_path, "w") as fh:
+        fh.write(phos)
+    return out_path
+
+
+def _maybe_add_phosaa(mol, outdir, extra_xml):
+    """If ``mol`` carries a phosphorylated amino acid, generate the amber14-
+    compatible phosaa XML into ``outdir`` and append it to ``extra_xml`` (so it
+    reaches both the topology bond-definitions and the ForceField). Returns the
+    (possibly-augmented) ``extra_xml``."""
+    from htmd.builder.amber import _PHOSAA_RESNAMES
+
+    if not np.any(np.isin(mol.resname, list(_PHOSAA_RESNAMES))):
+        return extra_xml
+    phos_xml = _phosaa_ffxml_namespaced(outdir)
+    logger.info(
+        "Phosphorylated residue(s) detected; auto-loading namespaced "
+        "phosaa14SB for the OpenMM builder."
+    )
+    if not extra_xml:
+        return [phos_xml]
+    if isinstance(extra_xml, str):
+        return [extra_xml, phos_xml]
+    return list(extra_xml) + [phos_xml]
+
+
 def build(
     mol: Molecule,
     ff: list | None = None,
@@ -163,6 +251,11 @@ def build(
     skip_peptide_n = _isopeptide_acceptor_resnames(mol, custombond_ids)
 
     os.makedirs(outdir, exist_ok=True)
+
+    # Phosphorylated residues (PTR/SEP/TPO) need AMBER's phosaa parameters; the
+    # amber14 base has none. Generate an amber14-compatible phosaa XML and load
+    # it alongside (both for topology bond defs and the ForceField).
+    extra_xml = _maybe_add_phosaa(mol, outdir, extra_xml)
 
     topology, positions = _mol_to_openmm(
         mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
@@ -320,9 +413,12 @@ def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
     if extra_xml:
         extra_xml = [extra_xml] if isinstance(extra_xml, str) else list(extra_xml)
         for path in extra_xml:
-            dst = os.path.basename(path)
-            shutil.copy(path, os.path.join(outdir, dst))
-            parameters.append(dst)
+            dst = os.path.join(outdir, os.path.basename(path))
+            # An extra_xml generated straight into outdir (e.g. the auto-added
+            # phosaa XML) is already in place - copying it onto itself errors.
+            if os.path.abspath(path) != os.path.abspath(dst):
+                shutil.copy(path, dst)
+            parameters.append(os.path.basename(path))
 
     for i, xml in enumerate(smallmol_ffxml):
         fname = f"{prefix}.smallmol_{i}.xml"
@@ -1029,6 +1125,7 @@ def _add_caps(mol, caps):
     """
     from moleculekit.molecule import UniqueResidueID
     from htmd.home import home
+    from htmd.builder.amber import _PHOSAA_RESNAMES
 
     if caps is None or len(caps) == 0:
         return
@@ -1076,7 +1173,14 @@ def _add_caps(mol, caps):
         capmol.resid[:] += uqres.resid
         capmol.remove(cap_idx, _logger=False)
 
-        mol.remove(np.isin(mol.name, _remove_atoms[cap]) & mask, _logger=False)
+        remove_names = _remove_atoms[cap]
+        if cap == "ACE" and uqres.resname in _PHOSAA_RESNAMES:
+            # A phospho residue (PTR/SEP/TPO) has no OpenMM hydrogen definition,
+            # so Modeller.addHydrogens cannot re-add the backbone amide H that
+            # capping would strip. Keep it (systemPrepare already placed it);
+            # the extra N-terminal H2/H3 are still dropped.
+            remove_names = [n for n in remove_names if n != "H"]
+        mol.remove(np.isin(mol.name, remove_names) & mask, _logger=False)
 
         res_idx = uqres.selectAtoms(mol, indexes=True)
         insert_pos = res_idx[0] if cap == "ACE" else res_idx[-1] + 1
