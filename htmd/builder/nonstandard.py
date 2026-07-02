@@ -914,6 +914,63 @@ def _warn_if_openff_mismatched_charges(forcefield, charge_method):
         return  # one warning per call is enough
 
 
+def _assert_no_chain_resident_modified_nucleotide(mol, specs):
+    """Refuse a non-canonical residue that is covalently spliced into a
+    nucleic-acid chain by a phosphodiester bond (its ``P`` to a neighbour's
+    ``O3'``, or its ``O3'`` to a neighbour's ``P``).
+
+    Such a residue is a chain-resident MODIFIED NUCLEOTIDE. detect has no nucleic
+    chain-residency rule (only peptide bonds make a residue chain-resident), so
+    it falls through to the standalone scaffold / ligand path - which GAFF-types
+    the whole sugar-phosphate backbone and emits no inter-residue bond, leaving
+    the nucleotide DISCONNECTED from the chain in the built topology (a silent
+    correctness bug). Parameterizing a modified nucleotide in place needs the
+    nucleic analogue of the chain-resident backbone retyping (not yet
+    implemented); library-backed modified nucleotides (modrna08, e.g. 5MC/PSU)
+    are recognised earlier by detect and never reach here. Fail with an
+    actionable message rather than build a broken chain.
+    """
+    from moleculekit.tools.nonstandard_residues import (
+        ScaffoldSpec,
+        CovalentLigandSpec,
+        LigandSpec,
+    )
+
+    if mol.bonds is None or not len(mol.bonds):
+        return
+    standalone = (ScaffoldSpec, CovalentLigandSpec, LigandSpec)
+    spec_resname = {}  # standalone-spec atom index -> resname
+    for spec in specs:
+        if isinstance(spec, standalone):
+            for i in np.where(spec.residue.selectAtoms(mol, indexes=False))[0]:
+                spec_resname[int(i)] = spec.resname
+    if not spec_resname:
+        return
+
+    name, resid, chain, segid = mol.name, mol.resid, mol.chain, mol.segid
+    o3 = ("O3'", "O3*")
+    for a, b in mol.bonds:
+        a, b = int(a), int(b)
+        if resid[a] == resid[b] and chain[a] == chain[b] and segid[a] == segid[b]:
+            continue  # intra-residue
+        for inside, outside in ((a, b), (b, a)):
+            if inside not in spec_resname:
+                continue
+            ni, no = str(name[inside]), str(name[outside])
+            if (ni == "P" and no in o3) or (ni in o3 and no == "P"):
+                raise RuntimeError(
+                    f"Residue {spec_resname[inside]} is a modified nucleotide "
+                    f"covalently linked into a nucleic-acid chain (phosphodiester "
+                    f"at {ni}). Chain-resident modified nucleotides cannot yet be "
+                    f"parameterized de novo - only library-backed ones (modrna08, "
+                    f"e.g. 5MC / PSU) are supported. Building it through the "
+                    f"standalone path would leave it disconnected from the chain. "
+                    f"Supply pre-built parameters (a frcmod + prepi/off named "
+                    f"<RESNAME>) via amber.build's `param` / `topo`, swap in a "
+                    f"supported modified nucleotide, or remove it before building."
+                )
+
+
 def _warn_if_nonalpha_backbone(mol, specs):
     """Loudly warn for every chain-resident residue whose backbone is non-alpha
     - a shortest N -> C path longer than the standard 3-atom ``N-CA-C`` (beta /
@@ -2631,6 +2688,10 @@ def parameterizeFromSpecs(
     # known-approximate. Warn loudly so the user validates / supplies bespoke
     # torsion params.
     _warn_if_nonalpha_backbone(mol, specs)
+
+    # A modified nucleotide spliced into a nucleic chain has no de-novo
+    # parameterization path yet and would silently build disconnected; refuse.
+    _assert_no_chain_resident_modified_nucleotide(mol, specs)
 
     # SMIRNOFF parameters can't be expressed losslessly as AMBER frcmod
     # (e.g. SMIRNOFF supports more torsion periodicities and improper

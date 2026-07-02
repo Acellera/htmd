@@ -368,6 +368,39 @@ def _detect_modrna_residues(mol, ff):
     return present
 
 
+# Phosphorylated amino acids AMBER ships in the phosaa library (PTR / SEP / TPO,
+# their -1 protonation variants S1P / T1P / Y1P, and the phospho-histidines).
+# These are used in preference to htmd's bundled ff-PTM copies (which were
+# removed for exactly these residues): phosaa is fit to be consistent with the
+# ff14SB / ff19SB protein base, whereas ff-PTM is ff03-based.
+_PHOSAA_RESNAMES = frozenset(
+    {"PTR", "SEP", "TPO", "S1P", "T1P", "Y1P", "H1D", "H2D", "H1E", "H2E"}
+)
+
+
+def _detect_phosaa_residues(mol, ff):
+    """Auto-load AMBER's phosphorylated-amino-acid forcefield when such a
+    residue is present. PTR / SEP / TPO (and their protonation / phospho-His
+    variants) live in the phosaa library (loaded by ``leaprc.phosaa14SB`` /
+    ``leaprc.phosaa19SB``), not the base ff14SB/ff19SB libraries. The phosaa
+    leaprc is purely additive (atom types + frcmod + lib) and is matched to the
+    loaded protein ff (phosaa19SB with ff19SB, else phosaa14SB). Appends the
+    leaprc to ``ff`` in place and returns the detected resnames.
+    """
+    present = sorted({str(r) for r in np.unique(mol.resname)} & _PHOSAA_RESNAMES)
+    if not present:
+        return []
+    variant = "phosaa19SB" if any("ff19SB" in str(f) for f in ff) else "phosaa14SB"
+    leaprc = f"leaprc.{variant}"
+    if leaprc not in ff:
+        ff.append(leaprc)
+        logger.info(
+            f"Phosphorylated amino acid(s) {', '.join(present)} detected in "
+            f"system. Automatically loading {leaprc} for AMBER."
+        )
+    return present
+
+
 def _detect_cofactors_ncaa_ptm(mol, param, topo):
     import itertools
     import string
@@ -981,6 +1014,7 @@ def build(
     _detect_cofactors_ncaa_ptm(mol, param, topo)
     _detect_modaa_residues(mol, ff)
     _detect_modrna_residues(mol, ff)
+    _detect_phosaa_residues(mol, ff)
 
     backend, backend_value = _prepare_build(
         mol,

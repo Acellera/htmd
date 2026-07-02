@@ -103,6 +103,13 @@ LXU_CIF = os.path.join(DATA_DIR, "6LXU.cif")
 # N6-(pyridoxal phosphate)-L-lysine: the Lys NZ = PLP C4' Schiff base (imine),
 # the PLP pyridine ring (with 2-methyl and 3-hydroxyl) and the 5'-phosphate.
 LLP_SMILES = r"Cc1ncc(COP(=O)(O)O)c(/C=N/CCCC[C@@H](C(=O)O)N)c1O"
+# 6U17: thymine-DNA-glycosylase + DNA carrying a modified deoxycytidine (1FC,
+# 5-carboxy-2'-fluoro-cytidine) and an oxidized Cys (CSO). Water + acetate
+# additive stripped.
+U17_CIF = os.path.join(DATA_DIR, "6U17.cif")
+# 1FC = 4-amino-1-(2-deoxy-2-fluoro-5-O-phosphono-beta-D-arabinofuranosyl)-2-oxo-
+# 1,2-dihydropyrimidine-5-carboxylic acid (RCSB CCD).
+FC_SMILES = r"NC1=NC(=O)N(C=C1C(O)=O)[C@@H]2O[C@H](COP(=O)(O)O)[C@@H](O)[C@@H]2F"
 # 1IUA: high-potential iron-sulfur protein (HiPIP) with a 4Fe-4S cluster (SF4)
 # ligated by four cysteines (Cys43/46/61/75 SG -> Fe). Water stripped.
 IUA_CIF = os.path.join(DATA_DIR, "1IUA.cif")
@@ -393,6 +400,167 @@ def _run_pipeline(
         topo=out.topo_paths,
         param=out.frcmod_paths,
         **(build_kwargs or {}),
+    )
+
+
+def _run_openmm_pipeline(mol, smiles, tmp_path):
+    """Same flow as :func:`_run_pipeline` but parameterize with GAFF2 and build
+    through ``openmm.build`` (the GAFF cluster path emits per-cluster OpenMM XML
+    consumed via ``extra_xml=``). All segments are left uncapped
+    (``caps=("none", "none")``) since these systems carry their own termini /
+    covalent links."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.openmm import build as openff_build
+
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    for resname, smi in smiles.items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol, _ = systemPrepare(mol, detect_specs=specs)
+    out = parameterizeFromSpecs(
+        specs,
+        pmol,
+        outdir=str(tmp_path / "params"),
+        forcefield="gaff2",
+        charge_method="gasteiger",
+    )
+    caps = {str(s): ("none", "none") for s in set(pmol.segid.tolist())}
+    built, system = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+        extra_xml=list(out.xml_paths),
+        custombonds=out.custombonds,
+        caps=caps,
+    )
+    return built, system
+
+
+# Committed references that every openmm build is checked against, so a change
+# to the builder (e.g. swapping the protein force-field base) cannot silently
+# alter a produced System. Two artifacts per system:
+#   * ``<name>.energies.json`` - per-force-group single-point energies at the
+#     built coordinates; this is the ASSERTED fingerprint. Energy is a physical
+#     quantity (order-invariant, and independent of the serializer's version
+#     header), so it is robust to OpenMM version bumps while still catching any
+#     real parameter change.
+#   * ``<name>.xml.gz`` - the gzipped serialized System, kept only as a
+#     DIAGNOSTIC: when an energy drifts, regenerate and diff the XML to find the
+#     force term that changed. Not asserted byte-for-byte.
+OPENMM_REF_DIR = os.path.join(DATA_DIR, "openmm_system_refs")
+# Tight enough to flag any real parameter drift; loose enough for cross-version
+# floating-point noise in force accumulation (in-env it is bit-reproducible).
+_OPENMM_ENERGY_RTOL = 1e-6
+_OPENMM_ENERGY_ATOL = 1e-4  # kcal/mol
+
+
+def _openmm_forcegroup_energies(openmm_outdir, positions_nm=None, prefix="structure"):
+    """Per-force-group single-point energies (kcal/mol) of the built system,
+    from the ``structure.prmtop`` the openmm builder writes. Energy is invariant
+    to ParmEd atom reordering, so this equals the returned ``System``'s energy
+    while sidestepping particle-order bookkeeping.
+
+    ``positions_nm`` (Nx3 nm array) fixes the geometry: the reference COMMITS a
+    coordinate set and every later build is evaluated at it, so the energy
+    depends only on the force-field PARAMETERS and is immune to run-to-run H
+    placement jitter (systemPrepare / addHydrogens are not bit-reproducible for
+    all systems). When None, the build's own ``structure.inpcrd`` is used (that
+    is what the reference captures). Reference platform, double precision.
+    Returns ``(energies, positions_nm)``."""
+    from openmm import app, unit, Platform, VerletIntegrator, Context
+
+    prm = app.AmberPrmtopFile(os.path.join(openmm_outdir, f"{prefix}.prmtop"))
+    system = prm.createSystem(
+        nonbondedMethod=app.NoCutoff, constraints=None, rigidWater=False
+    )
+    n = system.getNumParticles()
+    if positions_nm is None:
+        crd = app.AmberInpcrdFile(os.path.join(openmm_outdir, f"{prefix}.inpcrd"))
+        positions_nm = np.array(crd.positions.value_in_unit(unit.nanometer))
+    assert positions_nm.shape == (n, 3), (
+        f"reference has {positions_nm.shape[0]} atoms but the rebuilt system has "
+        f"{n} - the topology changed (regenerate the reference if intended)."
+    )
+    forces = list(system.getForces())
+    for i, f in enumerate(forces):
+        f.setForceGroup(i)
+    ctx = Context(
+        system, VerletIntegrator(0.001), Platform.getPlatformByName("Reference")
+    )
+    ctx.setPositions(positions_nm * unit.nanometer)
+    kcal = unit.kilocalorie_per_mole
+    energies = {}
+    for i, f in enumerate(forces):
+        e = ctx.getState(getEnergy=True, groups=1 << i).getPotentialEnergy()
+        name = type(f).__name__
+        energies[name] = energies.get(name, 0.0) + e.value_in_unit(kcal)
+    energies["total"] = (
+        ctx.getState(getEnergy=True).getPotentialEnergy().value_in_unit(kcal)
+    )
+    return energies, positions_nm
+
+
+def _assert_openmm_build_matches_reference(system, openmm_outdir, ref_name):
+    """Assert the openmm build's per-force-group energies match the committed
+    ``<ref_name>.energies.json``, and keep the serialized System as a gzipped
+    diagnostic. Set ``HTMD_REGEN_OPENMM_REFS=1`` to (re)write both references -
+    do that only when a change is intended (or on an OpenMM / forcefield version
+    bump that legitimately shifts energies)."""
+    import gzip
+    import json
+    import math
+    from openmm import XmlSerializer
+
+    energy_path = os.path.join(OPENMM_REF_DIR, f"{ref_name}.energies.json")
+    coords_path = os.path.join(OPENMM_REF_DIR, f"{ref_name}.coords.npy")
+    xml_path = os.path.join(OPENMM_REF_DIR, f"{ref_name}.xml.gz")
+
+    if os.environ.get("HTMD_REGEN_OPENMM_REFS"):
+        os.makedirs(OPENMM_REF_DIR, exist_ok=True)
+        energies, positions_nm = _openmm_forcegroup_energies(openmm_outdir)
+        np.save(coords_path, positions_nm)
+        with open(energy_path, "w") as fh:
+            json.dump(energies, fh, indent=2, sort_keys=True)
+        with gzip.open(xml_path, "wt") as fh:
+            fh.write(XmlSerializer.serialize(system))
+        pytest.skip(f"regenerated OpenMM references for {ref_name}")
+
+    assert os.path.isfile(energy_path) and os.path.isfile(coords_path), (
+        f"missing OpenMM reference for {ref_name}; regenerate with "
+        f"HTMD_REGEN_OPENMM_REFS=1 pytest -k {ref_name}"
+    )
+    # Evaluate the freshly-built system at the COMMITTED reference coordinates,
+    # so the comparison sees only force-field parameter changes.
+    ref_coords = np.load(coords_path)
+    energies, _ = _openmm_forcegroup_energies(openmm_outdir, positions_nm=ref_coords)
+    with open(energy_path) as fh:
+        ref = json.load(fh)
+    assert set(energies) == set(ref), (
+        f"OpenMM force groups for {ref_name} changed: built {sorted(energies)} "
+        f"vs reference {sorted(ref)}. Regenerate with HTMD_REGEN_OPENMM_REFS=1 "
+        f"if intended."
+    )
+    mismatches = [
+        f"  {k}: built {energies[k]:.6f} vs ref {ref[k]:.6f} "
+        f"(|d|={abs(energies[k] - ref[k]):.2e} kcal/mol)"
+        for k in ref
+        if not math.isclose(
+            energies[k], ref[k],
+            rel_tol=_OPENMM_ENERGY_RTOL, abs_tol=_OPENMM_ENERGY_ATOL,
+        )
+    ]
+    assert not mismatches, (
+        f"OpenMM energies for {ref_name} drifted from the committed reference:\n"
+        + "\n".join(mismatches)
+        + f"\nDiff the serialized System against {xml_path} (gunzip) to find the "
+        f"changed force term. If the change is intended, regenerate with "
+        f"HTMD_REGEN_OPENMM_REFS=1."
     )
 
 
@@ -885,7 +1053,7 @@ def test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         param=out.frcmod_paths,
         caps=caps,
     )
-    openmm_built, _ = openff_build(
+    openmm_built, openmm_system = openff_build(
         pmol.copy(),
         outdir=str(tmp_path / "openmm"),
         extra_xml=list(out.xml_paths),
@@ -894,6 +1062,7 @@ def test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         solvate=False,
         caps=caps,
     )
+    _assert_openmm_build_matches_reference(openmm_system, str(tmp_path / "openmm"), "5vbl")
 
     # NCAA + Zn + 4 disulfides; observed gap ~0.024 kcal/mol on
     # 6000 atoms. 0.05 leaves ~2x headroom.
@@ -933,12 +1102,13 @@ def test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
         outdir=str(tmp_path / "amber"),
         ionize=False,
     )
-    openmm_built, _ = openff_build(
+    openmm_built, openmm_system = openff_build(
         pmol.copy(),
         outdir=str(tmp_path / "openmm"),
         ionize=False,
         solvate=False,
     )
+    _assert_openmm_build_matches_reference(openmm_system, str(tmp_path / "openmm"), "6a5j")
 
     # Canonical-only ~270-atom peptide; observed gap is ~5e-5 kcal/mol.
     # 0.001 still gives ~20x headroom and catches any real regression.
@@ -1015,7 +1185,7 @@ def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
         param=out.frcmod_paths,
         caps=caps,
     )
-    openmm_built, _ = openff_build(
+    openmm_built, openmm_system = openff_build(
         pmol.copy(),
         outdir=str(tmp_path / "openmm"),
         ionize=False,
@@ -1024,6 +1194,7 @@ def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
         custombonds=out.custombonds,
         caps=caps,
     )
+    _assert_openmm_build_matches_reference(openmm_system, str(tmp_path / "openmm"), "7bti")
 
     # Both builders must produce the same topology.
     assert openmm_built.numAtoms == amber_built.numAtoms, (
@@ -1132,7 +1303,7 @@ def test_full_pipeline_1fjm_microcystin_openmm(tmp_path):
     )
     caps = {str(s): ("none", "none") for s in set(pmol.segid.tolist())}
 
-    built, _ = openff_build(
+    built, system = openff_build(
         pmol.copy(),
         outdir=str(tmp_path / "openmm"),
         ionize=False,
@@ -1143,6 +1314,7 @@ def test_full_pipeline_1fjm_microcystin_openmm(tmp_path):
     )
     assert built is not None
     _check_no_overvalent_atoms(built)
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "1fjm")
 
     # Both microcystin macrocycles close head-to-tail (DAL.N - DAM.C).
     pairs = _backbone_closure_resname_pairs(built)
@@ -1347,6 +1519,28 @@ def test_full_pipeline_5emz_k48_diubiquitin(tmp_path):
 
 
 @pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end isopeptide openmm build needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_5emz_k48_diubiquitin_openmm(tmp_path):
+    """5EMZ K48 diubiquitin through openmm.build. The GAFF cluster for the
+    Gly76.C -> Lys48.NZ isopeptide emits OpenMM XML; the build must keep the
+    C-NZ amide and not over-coordinate the donor carbonyl."""
+    built, system = _run_openmm_pipeline(Molecule(EMZ_CIF), {}, tmp_path)
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    c = set(np.where(built.name == "C")[0].tolist())
+    nz = set(np.where(built.name == "NZ")[0].tolist())
+    n_iso = sum(
+        1
+        for a, b in built.bonds
+        if ({int(a), int(b)} & c) and ({int(a), int(b)} & nz)
+    )
+    assert n_iso == 1, "Gly76.C - Lys48.NZ isopeptide bond missing in openmm build"
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "5emz")
+
+
+@pytest.mark.skipif(
     not (_antechamber and _tleap),
     reason="end-to-end isopeptide build needs antechamber + teLeap",
 )
@@ -1414,6 +1608,28 @@ def test_full_pipeline_6jch_pilin_isopeptide(tmp_path):
 
 
 @pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end isopeptide openmm build needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_6jch_pilin_isopeptide_openmm(tmp_path):
+    """6JCH pilin through openmm.build: both Asn.CG -> Lys.NZ isopeptides must
+    survive as single bonds with clean donor carbonyls."""
+    built, system = _run_openmm_pipeline(Molecule(JCH_CIF), {}, tmp_path)
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    donor_cgs = set()
+    for a, b in built.bonds:
+        a, b = int(a), int(b)
+        if {str(built.name[a]), str(built.name[b])} == {"CG", "NZ"}:
+            donor_cgs.add(a if str(built.name[a]) == "CG" else b)
+    assert len(donor_cgs) == 2, "expected two Asn.CG - Lys.NZ isopeptides in openmm build"
+    for cg in donor_cgs:
+        neigh = sorted(str(built.name[n]) for n in built.getNeighbors(cg))
+        assert neigh == ["CB", "NZ", "OD1"], f"donor CG mis-bonded: {neigh}"
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6jch")
+
+
+@pytest.mark.skipif(
     not (_antechamber and _tleap),
     reason="end-to-end NCAA build needs antechamber + teLeap",
 )
@@ -1450,6 +1666,64 @@ def test_full_pipeline_6lxu_plp_lysine(tmp_path):
     assert n_sb == 1, "Lys NZ = PLP C4' Schiff base missing"
     # The 5'-phosphate rode through intact.
     assert int(((built.resname == "LLP") & (built.element == "P")).sum()) == 1
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end NCAA openmm build needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_6lxu_plp_lysine_openmm(tmp_path):
+    """6LXU PLP-lysine (LLP) through openmm.build: the large chain-resident NCAA
+    parameterizes via GAFF and emits OpenMM XML; the Schiff base (NZ=C4') and
+    the 5'-phosphate must survive."""
+    built, system = _run_openmm_pipeline(Molecule(LXU_CIF), {"LLP": LLP_SMILES}, tmp_path)
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert (built.resname == "LLP").any()
+    nz = set(np.where(built.name == "NZ")[0].tolist())
+    c4p = set(np.where(built.name == "C4'")[0].tolist())
+    n_sb = sum(
+        1
+        for a, b in built.bonds
+        if ({int(a), int(b)} & nz) and ({int(a), int(b)} & c4p)
+    )
+    assert n_sb == 1, "Lys NZ = PLP C4' Schiff base missing in openmm build"
+    assert int(((built.resname == "LLP") & (built.element == "P")).sum()) == 1
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6lxu")
+
+
+def test_6u17_chain_resident_modified_nucleotide_clear_error(tmp_path):
+    """6U17: thymine-DNA-glycosylase + DNA with a modified deoxycytidine (1FC,
+    5-carboxy-2'-fluoro-cytidine) phosphodiester-linked inside the DNA strand.
+
+    A chain-resident MODIFIED NUCLEOTIDE. detect has no nucleic chain-residency
+    rule (only peptide bonds make a residue chain-resident), so 1FC falls to the
+    standalone scaffold path - which GAFF-types its whole sugar-phosphate
+    backbone and emits no inter-residue bond, so it would build DISCONNECTED
+    from the strand. De-novo parameterization of an in-chain modified nucleotide
+    needs the nucleic analogue of the protein chain-resident backbone retyping
+    (not yet implemented); library-backed modified nucleotides (modrna08, e.g.
+    5MC) are handled. Until then the contract is a clear, actionable error
+    rather than a silently broken chain.
+
+    The oxidized Cys (CSO) in the same structure is a known ff-ptm residue and
+    is handled fine; only the modified nucleotide is unsupported.
+    """
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+
+    mol = Molecule(U17_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    mol.templateResidueFromSmiles('resname "1FC"', FC_SMILES, addHs=True, _logger=False)
+
+    specs = detectNonStandardResidues(mol)
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+
+    with pytest.raises(RuntimeError, match=r"(?i)modified nucleotide.*nucleic-acid chain"):
+        parameterizeFromSpecs(
+            specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
+        )
 
 
 def test_1iua_fes_cluster_clear_error(tmp_path):
