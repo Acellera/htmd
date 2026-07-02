@@ -291,9 +291,16 @@ def _normalised_atom_name(name, resname):
 
 def _assert_builds_equivalent(
     amber_built, openmm_built, amber_prmtop, openmm_prmtop, energy_tol=0.05,
+    rel_tol=None,
 ):
     """Assert that the two prmtops produce the same potential energy on
-    the same physical coordinates (within ``energy_tol`` kcal/mol).
+    the same physical coordinates (within ``energy_tol`` kcal/mol, or within
+    ``rel_tol`` relative when given).
+
+    ``rel_tol`` is for structures with a steric clash in the built geometry
+    (e.g. 6MDX's un-optimized Zn contact): the absolute energy is enormous and
+    hyper-sensitive to sub-angstrom differences, so only the relative agreement
+    is meaningful evidence that the two parameterizations match.
 
     The builds may differ in atom ORDER, so we pair atoms by
     ``(sequenceID, normalised name)`` and feed each system its own
@@ -327,12 +334,27 @@ def _assert_builds_equivalent(
         f"in openmm not amber = {len(set(om_ids) - set(am_ids))}"
     )
 
-    am_idx = {k: i for i, k in enumerate(am_ids)}
-    om_idx = {k: i for i, k in enumerate(om_ids)}
+    # Pair by key; a key may repeat within a residue (e.g. a modified residue
+    # with both a backbone "H" and an "H1" that normalise together), so group
+    # and pair positionally rather than via a dict (which would drop duplicates
+    # and mis-place an atom into a clash).
+    from collections import defaultdict
+
+    am_groups, om_groups = defaultdict(list), defaultdict(list)
+    for i, k in enumerate(am_ids):
+        am_groups[k].append(i)
+    for i, k in enumerate(om_ids):
+        om_groups[k].append(i)
     shared = amber_built.coords[:, :, 0].astype(np.float64)
     om_coords = np.empty_like(shared)
-    for k, j in om_idx.items():
-        om_coords[j] = shared[am_idx[k]]
+    for k, o_list in om_groups.items():
+        a_list = am_groups[k]
+        assert len(a_list) == len(o_list), (
+            f"atom multiplicity for {k} differs: amber {len(a_list)}, "
+            f"openmm {len(o_list)}"
+        )
+        for ia, io in zip(a_list, o_list):
+            om_coords[io] = shared[ia]
 
     def _energy(prmtop, coords):
         system = omm_app.AmberPrmtopFile(prmtop).createSystem(
@@ -351,10 +373,17 @@ def _assert_builds_equivalent(
     e_amber = _energy(amber_prmtop, shared)
     e_openff = _energy(openmm_prmtop, om_coords)
 
-    assert abs(e_amber - e_openff) < energy_tol, (
-        f"amber and openff builds disagree by more than {energy_tol} kcal/mol\n"
-        f"  amber : {e_amber:.4f} kcal/mol\n"
-        f"  openff: {e_openff:.4f} kcal/mol"
+    diff = abs(e_amber - e_openff)
+    ok = diff < energy_tol
+    if not ok and rel_tol is not None:
+        ok = diff <= rel_tol * max(abs(e_amber), abs(e_openff))
+    assert ok, (
+        f"amber and openff builds disagree by more than "
+        f"{energy_tol} kcal/mol"
+        + (f" / {rel_tol} rel" if rel_tol is not None else "")
+        + f"\n  amber : {e_amber:.4f} kcal/mol\n"
+        f"  openff: {e_openff:.4f} kcal/mol\n"
+        f"  |diff|: {diff:.4f} kcal/mol ({diff / max(abs(e_amber), 1e-9):.2e} rel)"
     )
 
 
@@ -440,6 +469,65 @@ def _run_openmm_pipeline(mol, smiles, tmp_path):
         caps=caps,
     )
     return built, system
+
+
+def _assert_openmm_amber_equivalent(mol, smiles, caps, tmp_path, energy_tol=0.05, rel_tol=None):
+    """Build ``mol`` through BOTH amber.build and openmm.build with identical
+    caps and GAFF2/Gasteiger parameters, then assert their single-point energies
+    agree (within ``energy_tol`` kcal/mol on shared coordinates). This is the
+    strong cross-builder check: the same modified-residue chemistry parameterized
+    two ways (tleap libraries vs the converted/namespaced OpenMM XML) must give
+    the same potential. ``caps`` may be a dict, ``None`` (each builder's default),
+    or the string ``"none"`` (every segment uncapped)."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+    from htmd.builder.openmm import build as openff_build
+
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    if caps == "none":
+        caps = {str(s): ("none", "none") for s in np.unique(mol.segid)}
+
+    specs = detectNonStandardResidues(mol)
+    for resname, smi in (smiles or {}).items():
+        if (mol.resname == resname).any():
+            mol.templateResidueFromSmiles(
+                f'resname "{resname}"', smi, addHs=True, _logger=False
+            )
+    pmol, _ = systemPrepare(mol, detect_specs=specs)
+
+    out = (
+        parameterizeFromSpecs(
+            specs, pmol, outdir=str(tmp_path / "params"),
+            forcefield="gaff2", charge_method="gasteiger",
+        )
+        if specs
+        else None
+    )
+    cluster = (
+        dict(custombonds=out.custombonds, topo=out.topo_paths, param=out.frcmod_paths)
+        if out
+        else {}
+    )
+    amb = amber_build(
+        pmol.copy(), outdir=str(tmp_path / "amber"), ionize=False, caps=caps, **cluster
+    )
+    omm, _ = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+        caps=caps,
+        **(dict(extra_xml=list(out.xml_paths), custombonds=out.custombonds) if out else {}),
+    )
+    _assert_builds_equivalent(
+        amb, omm,
+        str(tmp_path / "amber" / "structure.prmtop"),
+        str(tmp_path / "openmm" / "structure.prmtop"),
+        energy_tol=energy_tol,
+        rel_tol=rel_tol,
+    )
 
 
 # Committed references that every openmm build is checked against, so a change
@@ -1125,6 +1213,52 @@ def test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
     not (_antechamber and _tleap and _openmm),
     reason="end-to-end build comparison needs antechamber + teLeap + openmm",
 )
+def test_full_pipeline_1lkk_openmm_vs_amber(tmp_path):
+    """Phosphotyrosine (PTR) parameterized both ways - amber's phosaa14SB and
+    the OpenMM builder's namespaced phosaa - must give the same energy."""
+    mol = Molecule(LKK_CIF)
+    mol.remove("water", _logger=False)
+    _assert_openmm_amber_equivalent(mol, None, {"P1": ("ACE", "none")}, tmp_path)
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build comparison needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_5emz_openmm_vs_amber(tmp_path):
+    """K48 diubiquitin: the Gly76.C->Lys48.NZ isopeptide GAFF cluster gives the
+    same energy through amber.build and openmm.build (uncapped chains)."""
+    _assert_openmm_amber_equivalent(Molecule(EMZ_CIF), None, "none", tmp_path)
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build comparison needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_6mdx_openmm_vs_amber(tmp_path):
+    """6MDX: MSE (converted ff14SB_modAA) + the MLZ GAFF crosslink give the same
+    energy through both builders. (The built geometry has a steric clash, so the
+    absolute energy is huge and hyper-sensitive, so the check is on the RELATIVE
+    agreement, which is ~1e-7 - i.e. the two parameterizations are identical.)"""
+    _assert_openmm_amber_equivalent(
+        Molecule(MDX_CIF), None, None, tmp_path, energy_tol=1.0, rel_tol=1e-6
+    )
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build comparison needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_6lxu_openmm_vs_amber(tmp_path):
+    """6LXU: the PLP-lysine (LLP) GAFF cluster gives the same energy through
+    amber.build and openmm.build."""
+    _assert_openmm_amber_equivalent(Molecule(LXU_CIF), {"LLP": LLP_SMILES}, None, tmp_path)
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build comparison needs antechamber + teLeap + openmm",
+)
 def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
     """7BTI single-copy subset: the bicyclic toxin phalloidin (one chain,
     residues HYP-ALA-TRP-G5G-ALA-ALO-CYS) plus one ADP cofactor and its
@@ -1485,6 +1619,55 @@ def test_full_pipeline_6mdx_mlz(tmp_path):
     # Both structural zincs are retained and selenomethionine survives.
     assert int((built.resname == "ZN").sum()) == 2
     assert (built.resname == "MSE").any()
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end 6MDX openmm build needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_6mdx_mlz_openmm(tmp_path):
+    """6MDX through openmm.build. MSE (selenomethionine) comes from AMBER's
+    ff14SB_modAA library, which openmmforcefields never converted, so the
+    builder converts it on the fly (ParmEd) into a minimal amber14-compatible
+    ffxml. The Cys-methyllysine (MLZ) thioether crosslink is a GAFF cluster.
+    Default ACE/NME caps move the N-terminal MSE off its terminus, and its amide
+    H is kept (converted modres have no OpenMM hydrogen definition for
+    addHydrogens). Exercises the general AMBER-library->OpenMM converter."""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.openmm import build as openff_build
+
+    mol = Molecule(MDX_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
+    specs = detectNonStandardResidues(mol)
+    pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
+    out = parameterizeFromSpecs(
+        specs, pmol, outdir=str(tmp_path / "params"),
+        forcefield="gaff2", charge_method="gasteiger",
+    )
+    built, system = openff_build(
+        pmol.copy(),
+        outdir=str(tmp_path / "openmm"),
+        ionize=False,
+        solvate=False,
+        extra_xml=list(out.xml_paths),
+        custombonds=out.custombonds,
+    )  # default ACE/NME caps move the N-terminal MSE off the terminus
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert (built.resname == "MSE").any()
+    assert int((built.resname == "ZN").sum()) == 2
+    sg = set(np.where(built.name == "SG")[0].tolist())
+    cm = set(np.where(built.name == "CM")[0].tolist())
+    n_xlink = sum(
+        1
+        for a, b in built.bonds
+        if ({int(a), int(b)} & sg) and ({int(a), int(b)} & cm)
+    )
+    assert n_xlink == 1, "Cys-SG - MLZ-CM crosslink missing in openmm build"
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6mdx")
 
 
 @pytest.mark.skipif(

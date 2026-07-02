@@ -146,6 +146,149 @@ def _maybe_add_phosaa(mol, outdir, extra_xml):
     return list(extra_xml) + [phos_xml]
 
 
+# AMBER modified-residue libraries that openmmforcefields never converted to
+# OpenMM XML. Each is converted at build time (ParmEd) to a minimal
+# amber14-compatible ffxml. ``params`` / ``lib`` are relative to AMBER's
+# dat/leap/{parm,lib}; ``prefix`` is the base ff's type namespace (e.g. amber14
+# names protein types ``protein-*``).
+def _amber_modres_libs():
+    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+
+    return (
+        {
+            "params": ("parm10.dat", "frcmod.ff14SB", "frcmod.ff14SBmodAA"),
+            "lib": "mod_amino.lib",
+            "residues": frozenset({"ALY", "AZF", "CYF", "CNX", "MSE"}),
+            "base_xml": "amber14/protein.ff14SB.xml",
+            "prefix": "protein",
+        },
+        {
+            "params": ("parm10.dat", "all_modrna08.frcmod"),
+            "lib": "all_modrna08.lib",
+            "residues": frozenset(MODIFIED_NUCLEIC_RESIDUE_NAMES),
+            "base_xml": "amber14/RNA.OL3.xml",
+            "prefix": "RNA",
+        },
+    )
+
+
+def _amber14_base_classes(base_xml):
+    import re
+    import openmm.app as app
+
+    txt = open(os.path.join(os.path.dirname(app.__file__), "data", base_xml)).read()
+    return set(re.findall(r'<Type[^>]*\bclass="([^"]+)"', txt))
+
+
+def _amber_modres_ffxml(present, outdir):
+    """Convert every AMBER modified-residue library that provides a resname in
+    ``present`` to a MINIMAL amber14-compatible OpenMM ffxml, and return the
+    written paths.
+
+    ParmEd converts the library (params + OFF residue templates); from that we
+    keep only the target residue templates, the atom types they introduce that
+    the base ff lacks (a "new" class), and the force terms touching a new class.
+    Standard-type references in the residue templates are namespaced to the base
+    convention (``protein-CT`` ...) so the modified residue's peptide junction to
+    ordinary residues resolves; charge comes from the residue template
+    (``UseAttributeFromResidue``), matching amber14."""
+    import xml.etree.ElementTree as ET
+    from parmed.amber import AmberParameterSet, AmberOFFLibrary
+    from parmed.openmm import OpenMMParameterSet
+    from htmd.builder.amber import defaultAmberHome, _defaultAmberSearchPaths
+
+    present = set(present)
+    home = defaultAmberHome()
+    pdir = os.path.join(home, _defaultAmberSearchPaths["param"])
+    ldir = os.path.join(home, _defaultAmberSearchPaths["lib"])
+
+    paths = []
+    for lib in _amber_modres_libs():
+        want = sorted(present & lib["residues"])
+        if not want:
+            continue
+        aps = AmberParameterSet(*[os.path.join(pdir, f) for f in lib["params"]])
+        reslib = AmberOFFLibrary.parse(os.path.join(ldir, lib["lib"]))
+        omm = OpenMMParameterSet.from_parameterset(aps)
+        for r in want:
+            omm.residues[r] = reslib[r]
+        full = os.path.join(outdir, f"_full_{lib['lib']}.xml")
+        omm.write(full, provenance=None)
+        root = ET.parse(full).getroot()
+        os.remove(full)
+
+        base_cls = _amber14_base_classes(lib["base_xml"])
+        prefix = lib["prefix"]
+        type_def = {t.get("name"): t for t in root.findall(".//AtomTypes/Type")}
+        res_elems = [
+            res for res in root.findall(".//Residues/Residue") if res.get("name") in want
+        ]
+        used = {a.get("type") for res in res_elems for a in res.findall("Atom")}
+        new_types = {t for t in used if type_def[t].get("class") not in base_cls}
+        new_classes = {type_def[t].get("class") for t in new_types}
+
+        ff = ET.Element("ForceField")
+        atblock = ET.SubElement(ff, "AtomTypes")
+        for t in sorted(new_types):
+            atblock.append(type_def[t])
+        resblock = ET.SubElement(ff, "Residues")
+        for res in res_elems:
+            for a in res.findall("Atom"):
+                if a.get("type") not in new_types:
+                    a.set("type", f"{prefix}-{a.get('type')}")
+            resblock.append(res)
+
+        def _touches_new(el):
+            vals = set()
+            for k, v in el.attrib.items():
+                if k.startswith("class"):
+                    vals.add(v)
+                elif k == "type":
+                    vals.add(type_def[v].get("class") if v in type_def else v)
+            return bool(vals & new_classes)
+
+        for tag in (
+            "HarmonicBondForce", "HarmonicAngleForce",
+            "PeriodicTorsionForce", "NonbondedForce",
+        ):
+            src = root.find(f".//{tag}")
+            if src is None:
+                continue
+            keep = [c for c in list(src) if _touches_new(c)]
+            if tag == "NonbondedForce" and not keep:
+                continue
+            fe = ET.SubElement(ff, tag, src.attrib)
+            if tag == "NonbondedForce":
+                # amber14 supplies charge via the residue template.
+                ET.SubElement(fe, "UseAttributeFromResidue", {"name": "charge"})
+            for c in keep:
+                if tag == "NonbondedForce":
+                    c.attrib.pop("charge", None)
+                fe.append(c)
+
+        out_path = os.path.join(outdir, f"{lib['lib'].split('.')[0]}_ff14SBnamespaced.xml")
+        ET.ElementTree(ff).write(out_path)
+        paths.append(out_path)
+    return paths
+
+
+def _maybe_add_amber_modres(mol, outdir, extra_xml):
+    """Auto-convert + load any AMBER-library modified residue present in ``mol``
+    (MSE / ALY / ... from ff14SB_modAA). Returns the augmented ``extra_xml``."""
+    paths = _amber_modres_ffxml({str(r) for r in np.unique(mol.resname)}, outdir)
+    if not paths:
+        return extra_xml
+    logger.info(
+        "AMBER-library modified residue(s) detected; auto-loading converted "
+        f"OpenMM XML: {[os.path.basename(p) for p in paths]}."
+    )
+    if not extra_xml:
+        return list(paths)
+    if isinstance(extra_xml, str):
+        return [extra_xml, *paths]
+    return list(extra_xml) + list(paths)
+
+
 def build(
     mol: Molecule,
     ff: list | None = None,
@@ -256,6 +399,9 @@ def build(
     # amber14 base has none. Generate an amber14-compatible phosaa XML and load
     # it alongside (both for topology bond defs and the ForceField).
     extra_xml = _maybe_add_phosaa(mol, outdir, extra_xml)
+    # Same for AMBER-library modified residues openmmforcefields never converted
+    # (MSE / ALY / ... from ff14SB_modAA): convert them on the fly.
+    extra_xml = _maybe_add_amber_modres(mol, outdir, extra_xml)
 
     topology, positions = _mol_to_openmm(
         mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
@@ -1127,6 +1273,14 @@ def _add_caps(mol, caps):
     from htmd.home import home
     from htmd.builder.amber import _PHOSAA_RESNAMES
 
+    # Modified protein residues whose OpenMM template comes from a converted
+    # AMBER library (phosaa or ff14SB_modAA) have no OpenMM hydrogen definition,
+    # so addHydrogens can't re-add the backbone amide H that capping strips -
+    # keep it for them (standard residues are unaffected).
+    keep_amide_h = set(_PHOSAA_RESNAMES) | {
+        r for lib in _amber_modres_libs() if lib["prefix"] == "protein" for r in lib["residues"]
+    }
+
     if caps is None or len(caps) == 0:
         return
 
@@ -1174,11 +1328,11 @@ def _add_caps(mol, caps):
         capmol.remove(cap_idx, _logger=False)
 
         remove_names = _remove_atoms[cap]
-        if cap == "ACE" and uqres.resname in _PHOSAA_RESNAMES:
-            # A phospho residue (PTR/SEP/TPO) has no OpenMM hydrogen definition,
-            # so Modeller.addHydrogens cannot re-add the backbone amide H that
-            # capping would strip. Keep it (systemPrepare already placed it);
-            # the extra N-terminal H2/H3 are still dropped.
+        if cap == "ACE" and uqres.resname in keep_amide_h:
+            # Converted-library modified residues have no OpenMM hydrogen
+            # definition, so Modeller.addHydrogens cannot re-add the backbone
+            # amide H that capping would strip. Keep it (systemPrepare already
+            # placed it); the extra N-terminal H2/H3 are still dropped.
             remove_names = [n for n in remove_names if n != "H"]
         mol.remove(np.isin(mol.name, remove_names) & mask, _logger=False)
 
