@@ -153,30 +153,32 @@ def _maybe_add_phosaa(mol, outdir, extra_xml):
 # names protein types ``protein-*``).
 def _amber_modres_libs():
     from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+    import modrna_params as mp
 
     return (
         {
             "params": ("parm10.dat", "frcmod.ff14SB", "frcmod.ff14SBmodAA"),
-            "lib": "mod_amino.lib",
+            "lib": ("mod_amino.lib",),
             "residues": frozenset({"ALY", "AZF", "CYF", "CNX", "MSE"}),
             "base_xml": "amber14/protein.ff14SB.xml",
             "prefix": "protein",
+            "amber_relative": True,   # resolve under AMBERHOME
         },
         {
-            # parm10 is listed AFTER all_modrna08.frcmod on purpose: ParmEd is
-            # last-wins, and all_modrna08.frcmod is an ff99/GAFF-derived set whose
-            # broad NONBON/BOND/ANGLE/DIHE sections re-state (and would clobber)
-            # standard atom types. Loading parm10 last lets the standard base win
-            # for shared type-combos while modrna08 only fills the genuinely-new
-            # modified-nucleotide terms - matching amber, which sources
-            # leaprc.modrna08 BEFORE the base for the same reason (see
-            # amber._detect_modrna_residues). Contrast the modAA entry above,
-            # where frcmod.ff14SBmodAA is a clean add-on that SHOULD win.
-            "params": ("all_modrna08.frcmod", "parm10.dat"),
-            "lib": "all_modrna08.lib",
+            # Modified ribonucleotides come from acellera-modrna-params: its
+            # frcmod is additive and OL3-typed (no clobber), so - unlike modrna08 -
+            # parm10 is NOT needed to out-vote it. Every present residue's three
+            # forms (internal / 5' / 3') are converted, and OpenMM graph-matches
+            # each residue in the topology to the right form (e.g. a 3'-terminal
+            # 5MC, which carries H3T, matches the 5MC3 template), just as the amber
+            # path relies on tleap's addPdbResMap.
+            "params": (mp.frcmod_path(),),
+            "lib": tuple(mp.lib_path(r, t) for r in mp.RESIDUES
+                         for t in mp.TERMINI),
             "residues": frozenset(MODIFIED_NUCLEIC_RESIDUE_NAMES),
             "base_xml": "amber14/RNA.OL3.xml",
             "prefix": "RNA",
+            "amber_relative": False,  # absolute paths (package data)
         },
     )
 
@@ -253,8 +255,8 @@ def _amber_modres_ffxml(present, outdir):
     paths = []
     pdir = ldir = None
     for lib in _amber_modres_libs():
-        want = sorted(present & lib["residues"])
-        if not want:
+        base_present = sorted(present & lib["residues"])
+        if not base_present:
             continue
         if pdir is None:
             # A modified residue is actually present, so we genuinely need a full
@@ -263,12 +265,30 @@ def _amber_modres_ffxml(present, outdir):
             home = defaultAmberHome()
             pdir = os.path.join(home, _defaultAmberSearchPaths["param"])
             ldir = os.path.join(home, _defaultAmberSearchPaths["lib"])
-        aps = AmberParameterSet(*[os.path.join(pdir, f) for f in lib["params"]])
-        reslib = AmberOFFLibrary.parse(os.path.join(ldir, lib["lib"]))
+        if lib.get("amber_relative", True):
+            param_files = [os.path.join(pdir, f) for f in lib["params"]]
+            lib_files = [os.path.join(ldir, f) for f in lib["lib"]]
+            want = base_present
+        else:
+            # acellera-modrna-params (absolute paths). parm10.dat is loaded first
+            # to DEFINE the standard atom types (HC, CT, N*, ...) the residue
+            # templates reference; frcmod.modxna then adds the modification terms
+            # (additive and OL3-typed, so no clobber - unlike modrna08). Convert
+            # every form (internal / 5' / 3') of each present base residue so
+            # OpenMM graph-matches terminal nucleotides to the right template.
+            import modrna_params as mp
+
+            param_files = [os.path.join(pdir, "parm10.dat"), *lib["params"]]
+            lib_files = list(lib["lib"])
+            want = [mp.unit_name(r, t) for r in base_present for t in mp.TERMINI]
+        aps = AmberParameterSet(*param_files)
+        reslib = {}
+        for lf in lib_files:
+            reslib.update(AmberOFFLibrary.parse(lf))
         omm = OpenMMParameterSet.from_parameterset(aps)
         for r in want:
             omm.residues[r] = reslib[r]
-        full = os.path.join(outdir, f"_full_{lib['lib']}.xml")
+        full = os.path.join(outdir, f"_full_{lib['prefix']}.xml")
         omm.write(full, provenance=None)
         root = ET.parse(full).getroot()
         os.remove(full)
@@ -324,16 +344,6 @@ def _amber_modres_ffxml(present, outdir):
             for a in res.findall("Atom"):
                 if a.get("type") not in new_types:
                     a.set("type", f"{prefix}-{a.get('type')}")
-            if prefix == "RNA":
-                # modrna08 ships only internal units; the OpenMM builder supports
-                # these modified ribonucleotides only at a 3' terminus, where the
-                # O3' carries no downstream phosphate. Drop its external bond so
-                # the residue matches with a dangling O3' - exactly the linking
-                # form amber builds (its terminal H3T is stripped, see
-                # _strip_terminal_modrna). In-chain use is rejected upstream.
-                for eb in res.findall("ExternalBond"):
-                    if eb.get("atomName") == "O3'":
-                        res.remove(eb)
             resblock.append(res)
 
         def _touches_new(el):
@@ -378,7 +388,7 @@ def _amber_modres_ffxml(present, outdir):
                     c.attrib.pop("charge", None)
                 fe.append(c)
 
-        out_path = os.path.join(outdir, f"{lib['lib'].split('.')[0]}_ff14SBnamespaced.xml")
+        out_path = os.path.join(outdir, f"{lib['prefix']}_ff14SBnamespaced.xml")
         ET.ElementTree(ff).write(out_path)
         paths.append(out_path)
     return paths
@@ -386,7 +396,25 @@ def _amber_modres_ffxml(present, outdir):
 
 def _maybe_add_amber_modres(mol, outdir, extra_xml):
     """Auto-convert + load any AMBER-library modified residue present in ``mol``
-    (MSE / ALY / ... from ff14SB_modAA). Returns the augmented ``extra_xml``."""
+    (MSE / ALY / ... from ff14SB_modAA). Returns the augmented ``extra_xml``.
+
+    Modified ribonucleotides (5MC, PSU, ...) are gated off: their parameterization
+    via acellera-modrna-params is a work in progress (glycosidic-chi typing is not
+    yet OL3-consistent), so building one raises rather than emitting suspect
+    parameters. Standard nucleic acids and protein modified residues are
+    unaffected."""
+    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+
+    present_modrna = sorted(
+        {str(r) for r in np.unique(mol.resname)} & set(MODIFIED_NUCLEIC_RESIDUE_NAMES)
+    )
+    if present_modrna:
+        raise BuildError(
+            f"Building modified ribonucleotide(s) {', '.join(present_modrna)} is not "
+            "yet supported in the OpenMM builder. Modified-RNA parameterization is a "
+            "work in progress and is gated off; remove these residues (or mutate them "
+            "to their canonical parent) to build."
+        )
     paths = _amber_modres_ffxml({str(r) for r in np.unique(mol.resname)}, outdir)
     if not paths:
         return extra_xml
@@ -399,47 +427,6 @@ def _maybe_add_amber_modres(mol, outdir, extra_xml):
     if isinstance(extra_xml, str):
         return [extra_xml, *paths]
     return list(extra_xml) + list(paths)
-
-
-def _strip_terminal_modrna(mol):
-    """OpenMM counterpart of amber.build's terminal modified-ribonucleotide
-    handling (``amber._detect_modrna_residues``). modrna08 ships only INTERNAL
-    ribonucleotide units, so a terminal modified nucleotide carries chain-terminal
-    atoms PDB2PQR adds that have no counterpart in the converted template: the
-    3'/5' hydroxyl protons (H3T / H5T) and the free-5'-phosphate oxygen (O3P).
-    Strip them in place so the residue matches the internal template with a
-    dangling O3' - exactly what amber builds (its converted ``<RES>3`` variant has
-    the O3' external bond dropped, see ``_amber_modres_ffxml``).
-
-    The OpenMM path supports these modified ribonucleotides only at a 3' terminus.
-    A modified nucleotide in the middle of a chain (its O3' bonded to a downstream
-    phosphate) would need the O3' external bond the template no longer carries, so
-    raise a clear error rather than silently build a broken topology.
-    """
-    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
-
-    present = sorted(
-        {str(r) for r in np.unique(mol.resname)} & set(MODIFIED_NUCLEIC_RESIDUE_NAMES)
-    )
-    if not present:
-        return
-    probe = mol.copy()
-    probe.guessBonds()
-    for res in present:
-        for i in np.where((probe.resname == res) & (probe.name == "O3'"))[0]:
-            downstream = [
-                j for j in probe.getNeighbors(int(i))
-                if str(probe.name[j]) == "P"
-            ]
-            if downstream:
-                raise NotImplementedError(
-                    f"In-chain modified ribonucleotide {res} is not yet supported "
-                    "by the OpenMM builder (only 3'-terminal). Build this system "
-                    "with amber.build."
-                )
-    term = np.isin(mol.resname, present) & np.isin(mol.name, ("H3T", "H5T", "O3P"))
-    if term.any():
-        mol.remove(term, _logger=False)
 
 
 def _ffptm_prepi_residues():
@@ -746,12 +733,11 @@ def build(
     # amber14 base has none. Generate an amber14-compatible phosaa XML and load
     # it alongside (both for topology bond defs and the ForceField).
     extra_xml = _maybe_add_phosaa(mol, outdir, extra_xml)
-    # A terminal modified ribonucleotide (5MC, ...) carries chain-terminal atoms
-    # modrna08 has no type for; strip them so it matches the internal template
-    # with a dangling O3' (mirrors amber.build).
-    _strip_terminal_modrna(mol)
-    # Same for AMBER-library modified residues openmmforcefields never converted
-    # (MSE / ALY / ... from ff14SB_modAA): convert them on the fly.
+    # AMBER-library modified residues openmmforcefields never converted: the
+    # protein modAA set (MSE / ALY / ... from ff14SB_modAA) and the modified
+    # ribonucleotides (5MC, ...) from acellera-modrna-params. Convert them on the
+    # fly; all three ribonucleotide forms (internal / 5' / 3') are emitted and
+    # OpenMM graph-matches each residue to the right one by chain context.
     extra_xml = _maybe_add_amber_modres(mol, outdir, extra_xml)
     # ff-PTM prepi residues (CGU, CSO, ...): convert the prepi + frcmod straight
     # to an OpenMM template, register a hydrogen definition, and strip their
@@ -1942,6 +1928,7 @@ def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
     builds in the same Python process see a pristine dict.
     """
     from openmm.app import Topology
+    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
     import xml.etree.ElementTree as ET
 
     if extra_xml is None:
@@ -1995,6 +1982,15 @@ def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
                         # pull-from-previous direction is emitted; the O3' push-
                         # to-next side is the next residue's own ``(-O3', P)``.
                         bonds.append(("-O3'", "P"))
+                if name in MODIFIED_NUCLEIC_RESIDUE_NAMES:
+                    # A terminal modified ribonucleotide keeps its base resname
+                    # (e.g. 5MC) but carries the 3'/5' hydroxyl proton (H3T/H5T),
+                    # whose O-H bond the base (internal) def lacks. Add both
+                    # pairs; createStandardBonds inserts a bond only when both
+                    # atoms are present, so it is a no-op for the internal form
+                    # and adds exactly the terminal O-H bond for a 3'/5' end.
+                    bonds.append(("O3'", "H3T"))
+                    bonds.append(("O5'", "H5T"))
                 Topology._standardBonds[name] = bonds
         yield
     finally:

@@ -1275,20 +1275,28 @@ def test_full_pipeline_2dpq_openmm_vs_amber(tmp_path):
     reason="end-to-end build comparison needs teLeap + openmm",
 )
 def test_full_pipeline_6a6l_openmm_vs_amber(tmp_path):
-    """6A6L (5MC modified RNA): amber and openmm agree once modrna08's over-broad
-    frcmod is prevented from corrupting the base force field. The bug it exposed:
-    loading leaprc.modrna08 (an ff99/GAFF-derived re-parameterization) globally
-    overrode ff14SB/OL3 for the WHOLE system - protein vdW included - so a naive
-    build disagreed by ~76 kcal/mol. Fixed by sourcing modrna08 before the base
-    and pruning its clobbering improper/dihedral overrides (amber side), plus
-    letting the base win in the converter and emitting only the base-lacking
-    terms (openmm side). The residual ~0.5 kcal/mol is 5MC's own
-    modification-specific torsions, where tLeap's and OpenMM's specific-vs-
-    wildcard resolution differ marginally; everything else (protein, standard
-    RNA, charges, bonds, angles, nonbonded) matches to < 1e-3."""
+    """6A6L carries a 3'-terminal 5-methylcytidine (5MC). Building modified
+    ribonucleotides is a work in progress and is gated off, so BOTH amber.build
+    and openmm.build raise a BuildError for it. (When the feature is completed
+    this becomes an amber-vs-openmm energy-equivalence test again.)"""
+    from moleculekit.tools.autosegment import autoSegment
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+    from htmd.builder.openmm import build as openff_build
+    from htmd.builder.builder import BuildError
+
     mol = Molecule(A6L_CIF)
+    mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
+    mol.remove("element H", _logger=False)
     mol.remove("water", _logger=False)
-    _assert_openmm_amber_equivalent(mol, None, None, tmp_path, energy_tol=0.6)
+    pmol, _ = systemPrepare(mol, detect_specs=detectNonStandardResidues(mol), verbose=False)
+    with pytest.raises(BuildError, match="not yet supported"):
+        amber_build(pmol.copy(), outdir=str(tmp_path / "amber"), ionize=False)
+    if _openmm:
+        with pytest.raises(BuildError, match="not yet supported"):
+            openff_build(
+                pmol.copy(), outdir=str(tmp_path / "openmm"), ionize=False, solvate=False
+            )
 
 
 @pytest.mark.skipif(
@@ -2115,26 +2123,15 @@ def test_full_pipeline_2dpq_conantokin_openmm(tmp_path):
     reason="end-to-end RNA build needs teLeap",
 )
 def test_full_pipeline_6a6l_5mc(tmp_path):
-    """6A6L: YB-1 cold-shock domain bound to RNA carrying 5-methylcytidine
-    (5MC) at the 3' end - the first end-to-end test of the MODIFIED
-    RIBONUCLEOTIDE path.
-
-    Exercises the nucleic counterpart of the modified-amino-acid support:
-    detect now recognises 5MC as a known modified ribonucleotide (so it is no
-    longer mis-classified as a free ligand); systemPrepare normalises its atom
-    names to the AMBER/modrna08 convention (OP1 -> O1P, CM5 -> C10) and
-    registers it with PDB2PQR through its reference cif on the NUCLEIC side
-    (a `CustomNucleicResidue`, not the amino-acid path); and amber.build
-    auto-loads `leaprc.modrna08`, stripping the 3'-terminal proton PDB2PQR adds
-    (modrna08 ships internal-only units, no 5MC3 terminal variant).
-
-    The OpenMM counterpart (test_full_pipeline_6a6l_5mc_openmm) also builds now,
-    via the AMBER-library->OpenMM converter, but with OL3-consistent params for
-    5MC rather than amber's modrna08 (see that test).
-    """
+    """6A6L: YB-1 cold-shock domain bound to RNA carrying 5-methylcytidine (5MC)
+    at the 3' end. Building modified ribonucleotides is a work in progress and is
+    gated off, so amber.build raises a BuildError. 5MC is still recognised as a
+    known modified ribonucleotide (detect returns no ligand specs) and
+    systemPrepare handles it; only the final build is gated."""
     from moleculekit.tools.autosegment import autoSegment
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.amber import build as amber_build
+    from htmd.builder.builder import BuildError
 
     mol = Molecule(A6L_CIF)
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
@@ -2145,43 +2142,20 @@ def test_full_pipeline_6a6l_5mc(tmp_path):
     assert specs == [], f"expected no specs (5MC is known), got {specs}"
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
 
-    built = amber_build(pmol, outdir=str(tmp_path / "amber"), ionize=False)
-
-    _check_no_overvalent_atoms(built)
-    # The 5-methylcytidine survives the build with its methyl (C10) intact.
-    assert (built.resname == "5MC").any()
-    assert int(((built.resname == "5MC") & (built.name == "C10")).sum()) == 1
-    # The protein and the rest of the RNA built alongside it.
-    assert np.any(built.atomselect("protein"))
-    assert np.any(built.atomselect("nucleic"))
+    with pytest.raises(BuildError, match="not yet supported"):
+        amber_build(pmol, outdir=str(tmp_path / "amber"), ionize=False)
 
 
 @pytest.mark.skipif(not _openmm, reason="openmm build needs openmm")
 def test_full_pipeline_6a6l_5mc_openmm(tmp_path):
-    """6A6L through openmm.build - the modified-RIBONUCLEOTIDE openmm path.
-
-    5MC (5-methylcytidine) comes from AMBER's modrna08 library, which
-    openmmforcefields never converted, so the builder converts it on the fly
-    (ParmEd). Two nucleic-specific pieces make it work:
-      * the phosphodiester linkage: a modified nucleotide's phosphate must bond
-        the previous residue's O3'. The converter's bond-def registration now
-        emits the nucleic ``(-O3', P)`` external bond (it previously only handled
-        the peptide ``(-C, N)``), so createStandardBonds links 5MC into the chain.
-      * the 3' terminus: modrna08 ships only internal units, so the terminal
-        H3T/H5T/O3P are stripped and the template's O3' external bond dropped -
-        the residue matches with a dangling O3', exactly amber's linking form.
-
-    modrna08 is an ff99/GAFF-derived set whose frcmod re-states standard
-    chemistry, so a naive load corrupts the base force field (see
-    amber._modrna08_pruned_leaprc for the fixes: source it before the base and
-    prune its clobbering improper/dihedral overrides). With those fixes on the
-    amber side and the converter emitting the base-lacking terms (e.g. the O-P
-    phosphate bond) on the openmm side, this build energy-MATCHES amber (see the
-    _openmm_vs_amber test) - it is not an exception any more. This test asserts a
-    correct BUILD + composition + chain linkage."""
+    """6A6L through openmm.build. Building modified ribonucleotides is a work in
+    progress and is gated off, so openmm.build raises a BuildError for the 5MC.
+    5MC is still recognised (detect returns no ligand specs) and systemPrepare
+    handles it; only the final build is gated."""
     from moleculekit.tools.autosegment import autoSegment
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.openmm import build as openff_build
+    from htmd.builder.builder import BuildError
 
     mol = Molecule(A6L_CIF)
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
@@ -2191,25 +2165,10 @@ def test_full_pipeline_6a6l_5mc_openmm(tmp_path):
     assert specs == [], f"expected no specs (5MC is known), got {specs}"
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
 
-    built, system = openff_build(
-        pmol.copy(), outdir=str(tmp_path / "openmm"), ionize=False, solvate=False
-    )
-
-    assert built is not None
-    _check_no_overvalent_atoms(built)
-    assert (built.resname == "5MC").any()
-    assert int(((built.resname == "5MC") & (built.name == "C10")).sum()) == 1
-    assert np.any(built.atomselect("protein"))
-    assert np.any(built.atomselect("nucleic"))
-    # 5MC linked into the RNA chain: its phosphate P bonds the upstream O3'.
-    p_idx = np.where((built.resname == "5MC") & (built.name == "P"))[0]
-    assert len(p_idx) == 1
-    neigh_res = {
-        int(built.resid[n])
-        for n in built.getNeighbors(int(p_idx[0]))
-    }
-    assert len(neigh_res) > 1, "5MC phosphate not bonded to the upstream residue"
-    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6a6l")
+    with pytest.raises(BuildError, match="not yet supported"):
+        openff_build(
+            pmol.copy(), outdir=str(tmp_path / "openmm"), ionize=False, solvate=False
+        )
 
 
 # Supported modified ribonucleotides (modrna08 + moleculekit residue_cifs).
@@ -2223,13 +2182,13 @@ _MODRNA_RESIDUES = [
 @pytest.mark.skipif(not _tleap, reason="modified-nucleotide build needs teLeap")
 @pytest.mark.parametrize("resname", _MODRNA_RESIDUES)
 def test_prepare_modified_ribonucleotide_from_pdb(resname, tmp_path):
-    """Each supported modified ribonucleotide, starting from its PDB-v3-named
-    RCSB chemical component, flows through the full pipeline: detect recognises
-    it as a known modified nucleotide (no spec), systemPrepare normalises its
-    atom names to the AMBER/modrna08 convention and protonates it via PDB2PQR on
-    the nucleic side, and amber.build auto-loads leaprc.modrna08. AMBER only."""
+    """Each supported modified ribonucleotide is recognised as a known modified
+    nucleotide (detect returns no spec) and normalised by systemPrepare, but
+    building it is a work in progress and is gated off, so amber.build raises a
+    BuildError. AMBER only."""
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.amber import build as amber_build
+    from htmd.builder.builder import BuildError
 
     mol = Molecule(os.path.join(_MODRNA_PDB_DIR, f"{resname}.cif"))
     mol.resname[:] = resname
@@ -2241,10 +2200,8 @@ def test_prepare_modified_ribonucleotide_from_pdb(resname, tmp_path):
     specs = detectNonStandardResidues(mol)
     assert specs == [], f"{resname} should be a known modified nucleotide"
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
-    built = amber_build(pmol, outdir=str(tmp_path / "build"), ionize=False)
-
-    assert (built.resname == resname).any(), f"{resname} missing after build"
-    _check_no_overvalent_atoms(built)
+    with pytest.raises(BuildError, match="not yet supported"):
+        amber_build(pmol, outdir=str(tmp_path / "build"), ionize=False)
 
 
 # Newly-supported modified amino acids (AMBER ff-ptm) - RCSB components in

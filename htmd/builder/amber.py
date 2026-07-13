@@ -331,167 +331,119 @@ def _detect_modaa_residues(mol, ff):
     return present
 
 
-_MODRNA08_PRUNED_LEAPRC = None
+def _assign_modrna_terminal_forms(mol):
+    """Rename each modified ribonucleotide to its acellera-modrna-params unit by
+    chain position: internal ``<RES>``, 5'-terminal ``<RES>5``, 3'-terminal
+    ``<RES>3``. Renames ``mol.resname`` in place and returns
+    ``{first_atom_index: new_resname}``. Raises BuildError for a lone
+    one-residue chain (no "N" form is shipped).
 
+    Terminal state is read from the bond graph: a residue is 3'-terminal when its
+    O3' is not bonded to a P in another residue, and 5'-terminal when it has no P
+    bonded to another residue's O3' (nothing upstream).
+    """
+    import modrna_params as mp
 
-def _modrna08_modification_types():
-    """Atom types that appear in modrna08's modified-nucleotide units but NOT in
-    the base RNA library - i.e. types distinctive to the modifications (e.g. the
-    5-methyl aromatic ``CM`` where standard RNA uses ``C4``). Used to tell
-    modrna08's genuine modified-nucleotide dihedrals apart from the standard-
-    chemistry re-statements that clobber the base (see _modrna08_pruned_leaprc)."""
-    from parmed.amber import AmberOFFLibrary
+    base = set(mp.RESIDUES)
+    present = {str(r) for r in np.unique(mol.resname)} & base
+    if not present:
+        return {}
 
-    ldir = os.path.join(defaultAmberHome(), _defaultAmberSearchPaths["lib"])
-    std = AmberOFFLibrary.parse(os.path.join(ldir, "RNA.lib"))
-    mod = AmberOFFLibrary.parse(os.path.join(ldir, "all_modrna08.lib"))
-    std_types = {a.type for u in std.values() for a in u.atoms}
-    mod_types = {a.type for u in mod.values() for a in u.atoms}
-    return mod_types - std_types
+    probe = mol.copy()
+    probe.guessBonds()
+    resid_key = np.array([
+        f"{s}:{c}:{r}:{i}"
+        for s, c, r, i in zip(probe.segid, probe.chain, probe.resid, probe.insertion)
+    ])
 
-
-def _base_dihedral_covers():
-    """Return a predicate ``covers(t1, t2, t3, t4)`` that is True when the base
-    force field (parm10 + frcmod.ff14SB, what the base leaprcs load) already
-    defines a proper dihedral matching the four atom types, wildcard-aware
-    (``X`` matches anything, either atom order). Used to keep modrna08's
-    genuinely base-lacking dihedrals while dropping the ones that merely re-state
-    (and, being specific, clobber) base chemistry."""
-    from parmed.amber import AmberParameterSet
-
-    pdir = os.path.join(defaultAmberHome(), _defaultAmberSearchPaths["param"])
-    base = AmberParameterSet(
-        os.path.join(pdir, "parm10.dat"), os.path.join(pdir, "frcmod.ff14SB")
-    )
-    keys = list(base.dihedral_types.keys())
-
-    def covers(a, b, c, d):
-        for k1, k2, k3, k4 in keys:
-            for x1, x2, x3, x4 in ((a, b, c, d), (d, c, b, a)):
-                if (k1 in (x1, "X") and k2 in (x2, "X")
-                        and k3 in (x3, "X") and k4 in (x4, "X")):
-                    return True
+    def _has_neighbor(atom_i, other_name):
+        for j in probe.getNeighbors(int(atom_i)):
+            if str(probe.name[j]) == other_name and resid_key[j] != resid_key[atom_i]:
+                return True
         return False
 
-    return covers
+    renames = {}
+    for res in sorted(present):
+        mask = mol.resname == res
+        for key in np.unique(resid_key[mask]):
+            idx = np.where((resid_key == key) & mask)[0]
+            o3 = [i for i in idx if str(probe.name[i]) == "O3'"]
+            p = [i for i in idx if str(probe.name[i]) == "P"]
+            downstream = any(_has_neighbor(i, "P") for i in o3)
+            upstream = any(_has_neighbor(i, "O3'") for i in p)
+            three = not downstream
+            five = not upstream
+            if three and five:
+                raise BuildError(
+                    f"Modified ribonucleotide {res} is a lone one-residue chain; "
+                    "acellera-modrna-params ships no single-residue (N) form."
+                )
+            suffix = "5" if five else ("3" if three else "")
+            new = res + suffix
+            if new != res:
+                mol.resname[idx] = new
+                renames[int(idx[0])] = new
+    if renames:
+        logger.info(
+            "Assigned modified-ribonucleotide terminal forms: "
+            + ", ".join(sorted(set(renames.values())))
+        )
+    return renames
 
 
-def _modrna08_pruned_leaprc():
-    """Write (once) and return the path to a modrna08 leaprc that loads a PRUNED
-    frcmod, so modrna08's over-broad terms cannot corrupt the base force field.
-
-    ``all_modrna08.frcmod`` is an ff99/GAFF-derived set that re-states standard
-    chemistry, not a minimal add-on. Two of its section types clobber the base
-    via tleap's specific-beats-generic rule, which the load-order fix (source
-    modrna08 first) cannot undo because a specific term always beats the base's
-    generic/wildcard one regardless of load order:
-
-    * IMPROPER: every entry is an auto-generated placeholder (``k=1.1``, "Using
-      default value"). Being residue-specific, they override the base's correct
-      generic carbonyl / ring impropers (``k=10.5``) for EVERY matching center,
-      standard nucleotides included. Dropped wholesale - the base is comprehensive
-      for sp2 impropers.
-    * DIHE: modrna08's dihedrals over shared standard types (e.g. ``OS-CT-N*-C``)
-      are specific and beat the base's wildcards, silently reparameterizing the
-      ordinary protein / RNA torsions with ff99/GAFF values. A dihedral is kept
-      only if it touches a MODIFICATION-distinctive type
-      (:func:`_modrna08_modification_types`, e.g. ``CM``) OR the base does not
-      already define it (:func:`_base_dihedral_covers`) - i.e. it is genuinely
-      needed by a modification. The rest are dropped so the base's torsions apply
-      to standard residues. (Keeping base-lacking standard-typed dihedrals is
-      necessary: some modifications, e.g. 1MG / 4AC, need dihedrals the base has
-      no wildcard for, and tLeap errors if they are missing.)
-
-    MASS / BOND / ANGLE / NONBON are kept: they carry no wildcards, so the
-    load-order fix already lets the base win for shared types while modrna08
-    still supplies the genuinely base-lacking terms (e.g. the ``O-P`` phosphate
-    bond). The lib is loaded unchanged.
-    """
-    global _MODRNA08_PRUNED_LEAPRC
-    if _MODRNA08_PRUNED_LEAPRC is not None and os.path.isfile(_MODRNA08_PRUNED_LEAPRC):
-        return _MODRNA08_PRUNED_LEAPRC
+def _modrna_params_leaprc(present):
+    """Write a temp leaprc that loads acellera-modrna-params for ``present``: the
+    shared ``frcmod.modxna``, the internal / 5' / 3' ``.lib`` units, and an
+    ``addPdbResMap`` so tleap selects each residue's terminal form by chain
+    position (5' -> ``<RES>5``, 3' -> ``<RES>3``, internal -> ``<RES>``), exactly
+    as it does for standard RNA (``RC`` -> ``C5`` / ``C3`` / ``C``). The map is
+    what folds the modified residue into tleap's RNA-chain perception, so the
+    neighbouring standard residues get the correct terminal state too. Returns the
+    leaprc path. The package is a hard dependency, so a missing import is a real
+    error."""
     import tempfile
+    import modrna_params as mp
 
-    home = defaultAmberHome()
-    frc = os.path.join(home, _defaultAmberSearchPaths["param"], "all_modrna08.frcmod")
-    lib = os.path.join(home, _defaultAmberSearchPaths["lib"], "all_modrna08.lib")
-    mod_types = _modrna08_modification_types()
-    base_covers = _base_dihedral_covers()
-    kept, sec = [], None
-    for line in open(frc):
-        s = line.strip()
-        if s in ("MASS", "BOND", "ANGLE", "DIHE", "IMPROPER", "NONBON"):
-            sec = s
-        if sec == "IMPROPER" and s != "IMPROPER":
-            continue  # drop all impropers (auto-default placeholders)
-        if sec == "DIHE" and s and s != "DIHE":
-            t = (line[0:2].strip(), line[3:5].strip(),
-                 line[6:8].strip(), line[9:11].strip())
-            # keep only modification-distinctive or genuinely base-lacking
-            # dihedrals; drop standard-chemistry re-statements (they clobber).
-            if not any(x in mod_types for x in t) and base_covers(*t):
-                continue
-        kept.append(line)
-    d = tempfile.mkdtemp(prefix="htmd_modrna08_")
-    pruned = os.path.join(d, "all_modrna08_pruned.frcmod")
-    with open(pruned, "w") as fh:
-        fh.write("".join(kept))
-    leaprc = os.path.join(d, "leaprc.modrna08_pruned")
+    covered = sorted(set(present) & set(mp.RESIDUES))
+    lines = [f"loadamberparams {mp.frcmod_path()}"]
+    for r in covered:
+        for t in mp.TERMINI:
+            lines.append(f"loadoff {mp.lib_path(r, t)}")
+    lines.append("addPdbResMap {")
+    for r in covered:
+        lines.append(f'    {{ 0 "{r}" "{r}5" }}')
+        lines.append(f'    {{ 1 "{r}" "{r}3" }}')
+    lines.append("}")
+    d = tempfile.mkdtemp(prefix="htmd_modrnaparams_")
+    leaprc = os.path.join(d, "leaprc.modrna_params")
     with open(leaprc, "w") as fh:
-        fh.write(f"loadAmberParams {pruned}\nloadOff {lib}\n")
-    _MODRNA08_PRUNED_LEAPRC = leaprc
+        fh.write("\n".join(lines) + "\n")
     return leaprc
 
 
 def _detect_modrna_residues(mol, ff):
-    """Auto-load AMBER's modified-RNA forcefield when such a residue is present.
+    """Gate: building modified ribonucleotides is not yet supported.
 
-    Supported modified ribonucleotides (5MC, ...) live in ``all_modrna08.lib``
-    (loaded by ``leaprc.modrna08``), not the base ``leaprc.RNA.OL3`` library, so
-    without this tleap reports "Unknown residue". The modrna08 leaprc is purely
-    additive (atom types + frcmod + lib), designed to load alongside the base
-    RNA ff. Appends the leaprc to ``ff`` in place and returns the detected
-    resnames.
-
-    Also strips the chain-terminal atoms PDB2PQR adds to a terminal modified
-    ribonucleotide - the 3'/5' hydroxyl protons (H3T / H5T) and the extra
-    free-5'-phosphate oxygen (O3P): modrna08 ships only internal units (no
-    5MC3 / 5MC5 terminal variant), so those atoms have no atom type and tLeap
-    would reject them. An in-chain residue never carries them, so this only
-    affects genuine 5'/3' termini, which are left as the linking form.
+    Modified-RNA parameterization via acellera-modrna-params is a work in progress
+    (its glycosidic-chi typing is not yet OL3-consistent), so building any modified
+    ribonucleotide raises here rather than silently producing suspect parameters.
+    Standard ribonucleotides are unaffected. The parameterization machinery
+    (``_modrna_params_leaprc``, ``_assign_modrna_terminal_forms``) is retained for
+    when the feature is completed; only this entry point is gated.
     """
     from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
 
     present = sorted(
         {str(r) for r in np.unique(mol.resname)} & set(MODIFIED_NUCLEIC_RESIDUE_NAMES)
     )
-    if not present:
-        return []
-    term = np.isin(mol.resname, present) & np.isin(mol.name, ("H3T", "H5T", "O3P"))
-    if term.any():
-        mol.remove(term, _logger=False)
-    if not any("modrna08" in str(f) for f in ff):
-        # Source modrna08 BEFORE the base force fields, not after. Its frcmod
-        # (all_modrna08.frcmod) is an ff99/GAFF-derived set whose NONBON / BOND /
-        # ANGLE / DIHE sections redefine STANDARD atom types (H1, HC, OS-P, ...);
-        # loaded after ff14SB/OL3 it would override them for the WHOLE system -
-        # including the protein (e.g. HA vdW Rmin/2 1.387 -> 1.487) - silently
-        # corrupting the base force field. Loading it first lets parm10 / OL3 /
-        # ff14SB re-override those standard types back to their correct values,
-        # while modrna08's genuinely-new modified-nucleotide terms (type-combos
-        # the base lacks) survive. (The leaprc header's "load after" advice
-        # assumes modrna08 IS your RNA force field; here it is an add-on.) The
-        # frcmod's IMPROPER section and its standard-chemistry DIHE terms are
-        # additionally pruned - see _modrna08_pruned_leaprc - because those are
-        # specific and beat the base's generic/wildcard terms regardless of load
-        # order, corrupting even standard protein/RNA torsions otherwise.
-        ff.insert(0, _modrna08_pruned_leaprc())
-        logger.info(
-            f"Modified ribonucleotide(s) {', '.join(present)} detected in system. "
-            "Automatically loading modrna08 (before the base force field, with its "
-            "over-broad NONBON/improper/dihedral overrides neutralised) for AMBER."
+    if present:
+        raise BuildError(
+            f"Building modified ribonucleotide(s) {', '.join(present)} is not yet "
+            "supported. Modified-RNA parameterization is a work in progress and is "
+            "gated off; remove these residues (or mutate them to their canonical "
+            "parent) to build."
         )
-    return present
+    return []
 
 
 # Phosphorylated amino acids AMBER ships in the phosaa library (PTR / SEP / TPO,
