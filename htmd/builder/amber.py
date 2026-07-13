@@ -331,66 +331,6 @@ def _detect_modaa_residues(mol, ff):
     return present
 
 
-def _assign_modrna_terminal_forms(mol):
-    """Rename each modified ribonucleotide to its acellera-modrna-params unit by
-    chain position: internal ``<RES>``, 5'-terminal ``<RES>5``, 3'-terminal
-    ``<RES>3``. Renames ``mol.resname`` in place and returns
-    ``{first_atom_index: new_resname}``. Raises BuildError for a lone
-    one-residue chain (no "N" form is shipped).
-
-    Terminal state is read from the bond graph: a residue is 3'-terminal when its
-    O3' is not bonded to a P in another residue, and 5'-terminal when it has no P
-    bonded to another residue's O3' (nothing upstream).
-    """
-    import modrna_params as mp
-
-    base = set(mp.RESIDUES)
-    present = {str(r) for r in np.unique(mol.resname)} & base
-    if not present:
-        return {}
-
-    probe = mol.copy()
-    probe.guessBonds()
-    resid_key = np.array([
-        f"{s}:{c}:{r}:{i}"
-        for s, c, r, i in zip(probe.segid, probe.chain, probe.resid, probe.insertion)
-    ])
-
-    def _has_neighbor(atom_i, other_name):
-        for j in probe.getNeighbors(int(atom_i)):
-            if str(probe.name[j]) == other_name and resid_key[j] != resid_key[atom_i]:
-                return True
-        return False
-
-    renames = {}
-    for res in sorted(present):
-        mask = mol.resname == res
-        for key in np.unique(resid_key[mask]):
-            idx = np.where((resid_key == key) & mask)[0]
-            o3 = [i for i in idx if str(probe.name[i]) == "O3'"]
-            p = [i for i in idx if str(probe.name[i]) == "P"]
-            downstream = any(_has_neighbor(i, "P") for i in o3)
-            upstream = any(_has_neighbor(i, "O3'") for i in p)
-            three = not downstream
-            five = not upstream
-            if three and five:
-                raise BuildError(
-                    f"Modified ribonucleotide {res} is a lone one-residue chain; "
-                    "acellera-modrna-params ships no single-residue (N) form."
-                )
-            suffix = "5" if five else ("3" if three else "")
-            new = res + suffix
-            if new != res:
-                mol.resname[idx] = new
-                renames[int(idx[0])] = new
-    if renames:
-        logger.info(
-            "Assigned modified-ribonucleotide terminal forms: "
-            + ", ".join(sorted(set(renames.values())))
-        )
-    return renames
-
-
 def _modrna_params_leaprc(present):
     """Write a temp leaprc that loads acellera-modrna-params for ``present``: the
     shared ``frcmod.modxna``, the internal / 5' / 3' ``.lib`` units, and an
@@ -428,8 +368,8 @@ def _detect_modrna_residues(mol, ff):
     (its glycosidic-chi typing is not yet OL3-consistent), so building any modified
     ribonucleotide raises here rather than silently producing suspect parameters.
     Standard ribonucleotides are unaffected. The parameterization machinery
-    (``_modrna_params_leaprc``, ``_assign_modrna_terminal_forms``) is retained for
-    when the feature is completed; only this entry point is gated.
+    (``_modrna_params_leaprc``) is retained for when the feature is completed;
+    only this entry point is gated.
     """
     from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
 
