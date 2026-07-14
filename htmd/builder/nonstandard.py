@@ -2471,10 +2471,7 @@ def _check_specs_templated(mol, specs):
     UntemplatedResidueError
         If any non-canonical residue is missing internal bonds or bond orders.
     """
-    from moleculekit.tools.nonstandard_residues import (
-        ChainResidueSpec,
-        PROTEIN_RESNAMES,
-    )
+    from moleculekit.tools.nonstandard_residues import requiresTemplate
 
     bonds = mol.bonds if mol.bonds is not None else np.empty((0, 2), dtype=int)
     bondtypes = (
@@ -2485,10 +2482,11 @@ def _check_specs_templated(mol, specs):
 
     missing_bonds, missing_orders = [], []
     for spec in specs:
-        # Canonical amino acids renamed at a non-peptide junction (e.g. a
-        # CYS->CYX disulfide, a GLU-LYS isopeptide rename) build from ff14SB
-        # templates, so the force field already knows their bonds.
-        if isinstance(spec, ChainResidueSpec) and spec.resname in PROTEIN_RESNAMES:
+        # Only residues that need a supplied template must carry explicit bonds
+        # and bond orders. Canonical residues renamed at a junction (CYS->CYX, a
+        # glycosylated ASN) and force-field-shipped modified residues build from
+        # their own templates, so they are skipped.
+        if not requiresTemplate(spec):
             continue
         rid = spec.residue
         res_idx = np.where(
