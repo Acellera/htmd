@@ -1962,10 +1962,14 @@ def _add_caps(mol: Molecule, caps: dict):
 def _defaultProteinCaps(mol):
     # Defines ACE and NME (neutral terminals) as default for protein segments
     # Of course, this might not be ideal for proteins that require charged terminals
-    from moleculekit.residues import (
-        N_TERMINAL_CAP_RESIDUE_NAMES,
-        C_TERMINAL_CAP_RESIDUE_NAMES,
-    )
+    from moleculekit.residues import PROTEIN_RESIDUES, MODIFIED_PROTEIN_RESIDUES
+
+    # Residue names the force field can build a backbone cap onto: canonical
+    # residues, their protonation / naming variants and modified residues.
+    known_protein = set()
+    for rr in (*PROTEIN_RESIDUES, *MODIFIED_PROTEIN_RESIDUES):
+        known_protein.add(rr.resname)
+        known_protein.update(rr.resname_variants)
 
     segsProt = np.unique(mol.get("segid", sel="protein"))
     caps = dict()
@@ -1974,20 +1978,21 @@ def _defaultProteinCaps(mol):
         if len(np.unique(mol.resid[segmask])) < 10:
             logger.warning(
                 f"Segment {s} consists of a peptide with less than 10 residues. It will not be capped by "
-                "default. If you want to cap it use the caps argument of amber.build to manually define caps "
+                "default. If you want to cap it use the caps argument of the builder to manually define caps "
                 "for all segments."
             )
             continue
-        # A segment that already carries a terminal cap (e.g. a deposited
-        # C-terminal amide NH2 / NHE) must not be re-capped: adding NME onto an
-        # existing cap residue tries to build a backbone on it and tLeap then
-        # fails for the cap's missing atom types. The NH2 -> NHE rename has
-        # already run, so the C-cap check sees NHE.
+        # Cap a terminus only when its residue is one the force field can build a
+        # backbone cap onto: a canonical residue or one of its protonation /
+        # modified variants. Everything else stays uncapped - a non-canonical
+        # residue is parameterized in its terminal form, and an existing cap
+        # residue (ACE / NME / NHE / ...) is not a known protein residue, so it
+        # is not re-capped either.
         seg_atoms = np.where(segmask)[0]
         first_rn = str(mol.resname[seg_atoms[0]])
         last_rn = str(mol.resname[seg_atoms[-1]])
-        nterm = "none" if first_rn in N_TERMINAL_CAP_RESIDUE_NAMES else "ACE"
-        cterm = "none" if last_rn in C_TERMINAL_CAP_RESIDUE_NAMES else "NME"
+        nterm = "ACE" if first_rn in known_protein else "none"
+        cterm = "NME" if last_rn in known_protein else "none"
         caps[s] = [nterm, cterm]
     return caps
 

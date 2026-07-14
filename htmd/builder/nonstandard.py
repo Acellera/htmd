@@ -3007,6 +3007,65 @@ def parameterizeFromSpecs(
     return out
 
 
+def parameterizeMolecule(
+    mol: Molecule,
+    outdir: str,
+    forcefield: "str | dict" = "gaff2",
+    charge_method: str = "am1-bcc",
+) -> ClusterOutputs:
+    """Parameterize a single-residue free molecule (a ligand) and write its force-field files.
+
+    Treats ``mol`` as one free ligand and runs :func:`parameterizeFromSpecs` on
+    it, writing the topology (CIF), frcmod and OpenMM ForceField XML into
+    ``outdir``. Use :func:`parameterizeFromSpecs` directly for anything more
+    complex (chain-resident or covalently bound non-canonical residues).
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The single-residue molecule to parameterize. Must already be templated
+        (explicit bonds, bond orders and hydrogens), e.g. loaded from a CIF or
+        built from SMILES.
+    outdir : str
+        Output directory into which the topology, frcmod and XML files are written.
+    forcefield : str or dict, optional
+        Force field passed through to :func:`parameterizeFromSpecs` (``"gaff2"``
+        routes through antechamber; a SMIRNOFF offxml filename routes through
+        OpenFF).
+    charge_method : str, optional
+        Charge model passed through to :func:`parameterizeFromSpecs`.
+
+    Returns
+    -------
+    out : :class:`ClusterOutputs`
+        The topology, frcmod and OpenMM XML paths, exactly as returned by
+        :func:`parameterizeFromSpecs`.
+
+    Raises
+    ------
+    RuntimeError
+        If ``mol`` does not consist of exactly one residue.
+    """
+    from moleculekit.molecule import UniqueResidueID
+    from moleculekit.tools.nonstandard_residues import LigandSpec
+
+    os.makedirs(outdir, exist_ok=True)
+    if mol.numResidues != 1:
+        raise RuntimeError(
+            f"parameterizeMolecule expects a single-residue free molecule (a "
+            f"ligand), but the input has {mol.numResidues} residues. Use "
+            "parameterizeFromSpecs for multi-residue systems."
+        )
+    spec = LigandSpec(str(mol.resname[0]), UniqueResidueID.fromMolecule(mol, "all"))
+    return parameterizeFromSpecs(
+        [spec],
+        mol,
+        outdir,
+        forcefield=forcefield,
+        charge_method=charge_method,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Cluster model compound builder.
 #

@@ -1422,6 +1422,8 @@ def _prepare_molecule(mol, caps, disulfide, custombonds):
     cyclic = _detect_cyclic_segments(mol)
 
     if caps is None:
+        from htmd.builder.amber import _defaultProteinCaps
+
         caps = _defaultProteinCaps(mol)
     for seg, _, _ in cyclic:
         if seg in caps:
@@ -1547,35 +1549,6 @@ def _add_caps(mol, caps):
         res_idx = uqres.selectAtoms(mol, indexes=True)
         insert_pos = res_idx[0] if cap == "ACE" else res_idx[-1] + 1
         mol.insert(capmol, insert_pos)
-
-
-def _defaultProteinCaps(mol):
-    from moleculekit.residues import (
-        N_TERMINAL_CAP_RESIDUE_NAMES,
-        C_TERMINAL_CAP_RESIDUE_NAMES,
-    )
-
-    segs = np.unique(mol.get("segid", sel="protein"))
-    caps = {}
-    for s in segs:
-        segmask = mol.segid == s
-        if len(np.unique(mol.resid[segmask])) < 10:
-            logger.warning(
-                f"Segment {s} has fewer than 10 residues - not capped by "
-                "default.  Use the caps argument to override."
-            )
-            continue
-        # A segment already carrying a terminal cap (e.g. a deposited
-        # C-terminal amide NH2 / NHE) must not be re-capped: aligning an NME
-        # onto an existing cap residue has no backbone to match and would
-        # otherwise build a spurious terminus. Mirrors amber._defaultProteinCaps.
-        seg_atoms = np.where(segmask)[0]
-        first_rn = str(mol.resname[seg_atoms[0]])
-        last_rn = str(mol.resname[seg_atoms[-1]])
-        nterm = "none" if first_rn in N_TERMINAL_CAP_RESIDUE_NAMES else "ACE"
-        cterm = "none" if last_rn in C_TERMINAL_CAP_RESIDUE_NAMES else "NME"
-        caps[s] = [nterm, cterm]
-    return caps
 
 
 def _fix_water_naming(mol):

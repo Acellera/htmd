@@ -3975,3 +3975,62 @@ def test_custom_residue_param_reference(tmp_path):
             stem,
             regenerate,
         )
+
+
+def _methane_mol():
+    """A minimal, fully-templated methane ligand (bonds + bond orders + H)."""
+    from moleculekit.molecule import Molecule
+
+    mol = Molecule().empty(5)
+    mol.name[:] = ["C1", "H1", "H2", "H3", "H4"]
+    mol.element[:] = ["C", "H", "H", "H", "H"]
+    mol.resname[:] = "MOL"
+    mol.resid[:] = 1
+    mol.record[:] = "HETATM"
+    mol.segid[:] = "L0"
+    mol.chain[:] = "A"
+    mol.coords = np.array(
+        [[0, 0, 0], [0.63, 0.63, 0.63], [-0.63, -0.63, 0.63],
+         [-0.63, 0.63, -0.63], [0.63, -0.63, -0.63]],
+        dtype=np.float32,
+    ).reshape(5, 3, 1)
+    mol.bonds = np.array([[0, 1], [0, 2], [0, 3], [0, 4]], dtype=np.uint32)
+    mol.bondtype = np.array(["1"] * 4, dtype=object)
+    return mol
+
+
+def test_parameterizeMolecule_rejects_multi_residue():
+    """parameterizeMolecule handles a single free ligand only, so a multi-residue
+    input is rejected with a clear error."""
+    from htmd.builder.nonstandard import parameterizeMolecule
+
+    a = _methane_mol()
+    b = _methane_mol()
+    b.resid[:] = 2  # a second residue
+    a.append(b)
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="single-residue"):
+        parameterizeMolecule(a, outdir="unused")
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="parameterizeMolecule end-to-end needs antechamber + teLeap",
+)
+def test_parameterizeMolecule_parameterizes_free_ligand(tmp_path):
+    """parameterizeMolecule parameterizes a free ligand and returns a
+    ClusterOutputs with topology, frcmod and OpenMM XML paths."""
+    from htmd.builder.nonstandard import parameterizeMolecule, ClusterOutputs
+
+    out = parameterizeMolecule(
+        _methane_mol(),
+        outdir=str(tmp_path),
+        forcefield="gaff2",
+        charge_method="gasteiger",
+    )
+    assert isinstance(out, ClusterOutputs)
+    assert out.topo_paths and out.frcmod_paths and out.xml_paths
+    for f in out.topo_paths + out.frcmod_paths + out.xml_paths:
+        assert os.path.exists(f), f

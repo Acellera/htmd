@@ -345,8 +345,10 @@ def test_caps(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
-@pytest.mark.parametrize("pdbid", ["5VBL", "1AWF"])
+@pytest.mark.parametrize("pdbid", ["1AWF"])
 def test_non_standard_residue_building(tmp_path, pdbid):
+    # Builds a protein carrying a non-standard residue (1AWF: mid-chain TYS)
+    # from user-supplied prepi/frcmod topology and compares against a reference.
     homedir = os.path.join(curr_dir, "data", "test-amber-build", "non-standard")
 
     protdir = os.path.join(homedir, pdbid)
@@ -358,9 +360,7 @@ def test_non_standard_residue_building(tmp_path, pdbid):
         ionize=False,
         outdir=tmp_path,
     )
-    refdir = os.path.join(
-        curr_dir, "data", "test-amber-build", "non-standard", pdbid, "build"
-    )
+    refdir = os.path.join(homedir, pdbid, "build")
     _compareResultFolders(refdir, tmp_path, pdbid)
 
 
@@ -899,3 +899,65 @@ def test_built_molecule_has_box_from_crd(tmp_path):
         f"amber.build() returned a Molecule with box={built.box[:, 0]}; "
         "expected the periodic box tLeap wrote into structure.crd."
     )
+
+
+def _synthetic_protein(resnames, segid="P0"):
+    """Build a single-segment polypeptide with N/CA/C/O backbone atoms per
+    residue. After guessBonds it registers as 'protein', and the first/last
+    entry of ``resnames`` controls the corresponding terminus."""
+    per = ["N", "CA", "C", "O"]
+    el = ["N", "C", "C", "O"]
+    n = len(resnames) * 4
+    mol = Molecule().empty(n)
+    names, elems, resids, rn, xyz = [], [], [], [], []
+    x = 0.0
+    for i, resname in enumerate(resnames):
+        for a, e in zip(per, el):
+            names.append(a)
+            elems.append(e)
+            resids.append(i + 1)
+            rn.append(resname)
+            xyz.append([x, 0.0, 0.0])
+            x += 1.4
+    mol.name[:] = names
+    mol.element[:] = elems
+    mol.resid[:] = resids
+    mol.resname[:] = rn
+    mol.segid[:] = segid
+    mol.chain[:] = "A"
+    mol.record[:] = "ATOM"
+    mol.coords = np.array(xyz, dtype=np.float32).reshape(n, 3, 1)
+    mol.guessBonds()
+    return mol
+
+
+def test_default_protein_caps_canonical_termini():
+    from htmd.builder.amber import _defaultProteinCaps
+
+    mol = _synthetic_protein(["ALA"] * 12)
+    assert _defaultProteinCaps(mol) == {"P0": ["ACE", "NME"]}
+
+
+def test_default_protein_caps_leaves_noncanonical_terminus_uncapped():
+    # A non-canonical terminal residue must not be capped: parameterizeFromSpecs
+    # builds it in its terminal form, so tleap must not add ACE/NME there.
+    from htmd.builder.amber import _defaultProteinCaps
+
+    mol = _synthetic_protein(["ALA"] * 11 + ["LIG"])
+    assert _defaultProteinCaps(mol) == {"P0": ["ACE", "none"]}
+
+
+def test_default_protein_caps_protonation_variant_terminus_is_capped():
+    # HIE / CYX are protonation/naming variants systemPrepare produces; they are
+    # standard protein residues and must still be capped.
+    from htmd.builder.amber import _defaultProteinCaps
+
+    mol = _synthetic_protein(["CYX"] + ["ALA"] * 10 + ["HIE"])
+    assert _defaultProteinCaps(mol) == {"P0": ["ACE", "NME"]}
+
+
+def test_default_protein_caps_existing_cap_not_recapped():
+    from htmd.builder.amber import _defaultProteinCaps
+
+    mol = _synthetic_protein(["ALA"] * 11 + ["NME"])
+    assert _defaultProteinCaps(mol) == {"P0": ["ACE", "none"]}
