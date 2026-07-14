@@ -50,6 +50,24 @@ from moleculekit.util import calculateAnglesAndDihedrals
 logger = logging.getLogger(__name__)
 
 
+class NonstandardResidueError(RuntimeError):
+    """Base class for errors raised while validating the non-canonical residues
+    in a spec list before parameterizing them.
+
+    Subclasses :class:`RuntimeError` so existing ``except RuntimeError`` callers
+    keep working; catch a specific subclass to react to one failure mode.
+    """
+
+
+class UntemplatedResidueError(NonstandardResidueError):
+    """A non-canonical residue is missing the explicit bonds and/or bond orders
+    required to parameterize it (i.e. it was never templated)."""
+
+
+class UnderProtonatedResidueError(NonstandardResidueError):
+    """A non-canonical residue reached parameterization without its hydrogens."""
+
+
 # ---------------------------------------------------------------------------
 # Cluster machinery: an internal grouping of residues that share at least one
 # non-peptide inter-residue covalent bond. The whole cluster is parameterized
@@ -2424,6 +2442,94 @@ def _estimate_sp3_hydrogens(elem_upper, formalcharge, heavy_degree, atom_idx):
     return total
 
 
+def _check_specs_templated(mol, specs):
+    """Refuse to parameterize a non-canonical residue that is not templated.
+
+    Every non-canonical residue handed to :func:`parameterizeFromSpecs` must
+    carry explicit internal bonds *and* bond orders: the GAFF / OpenFF backends
+    perceive the residue's chemistry from that connectivity, so a residue read
+    straight from a coordinate file (bonds guessed, no bond orders) or with no
+    bonds at all cannot be parameterized correctly. Templating a residue - e.g.
+    with ``mol.templateResidueFromSmiles`` or by loading a CIF that stores our
+    bonds and bond orders - is what sets them.
+
+    Canonical residues renamed at a covalent junction (a disulfide ``CYS``
+    detected as a ``ChainResidueSpec`` with ``new_resname="CYX"``, a glycosylated
+    ``ASN``, ...) are built from an ff14SB template rather than GAFF and so need
+    no bond orders; they are skipped.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule the specs describe.
+    specs : list
+        Per-residue specs from
+        :func:`moleculekit.tools.nonstandard_residues.detectNonStandardResidues`.
+
+    Raises
+    ------
+    UntemplatedResidueError
+        If any non-canonical residue is missing internal bonds or bond orders.
+    """
+    from moleculekit.tools.nonstandard_residues import (
+        ChainResidueSpec,
+        PROTEIN_RESNAMES,
+    )
+
+    bonds = mol.bonds if mol.bonds is not None else np.empty((0, 2), dtype=int)
+    bondtypes = (
+        mol.bondtype
+        if mol.bondtype is not None and len(mol.bondtype) == len(bonds)
+        else None
+    )
+
+    missing_bonds, missing_orders = [], []
+    for spec in specs:
+        # Canonical amino acids renamed at a non-peptide junction (e.g. a
+        # CYS->CYX disulfide, a GLU-LYS isopeptide rename) build from ff14SB
+        # templates, so the force field already knows their bonds.
+        if isinstance(spec, ChainResidueSpec) and spec.resname in PROTEIN_RESNAMES:
+            continue
+        rid = spec.residue
+        res_idx = np.where(
+            (mol.segid == str(rid.segid))
+            & (mol.chain == str(rid.chain))
+            & (mol.resid == int(rid.resid))
+            & (mol.insertion == str(rid.insertion))
+        )[0]
+        # Monatomic residues (single ions) have no internal bonds by nature.
+        if len(res_idx) <= 1:
+            continue
+        res_set = set(int(i) for i in res_idx)
+        internal = [
+            i
+            for i, (a, b) in enumerate(bonds)
+            if int(a) in res_set and int(b) in res_set
+        ]
+        label = f"{rid.resname} {rid.resid}{rid.insertion} chain {rid.chain}"
+        if not internal:
+            missing_bonds.append(label)
+        elif bondtypes is None or any(
+            str(bondtypes[i]) in ("", "un", "0") for i in internal
+        ):
+            missing_orders.append(label)
+
+    issues = []
+    if missing_bonds:
+        issues.append("missing bonds: " + ", ".join(missing_bonds))
+    if missing_orders:
+        issues.append("missing bond orders: " + ", ".join(missing_orders))
+    if issues:
+        raise UntemplatedResidueError(
+            "The following non-canonical residues are not templated ("
+            + "; ".join(issues)
+            + "). Every non-canonical residue must carry explicit bonds and bond "
+            "orders before parameterization - template it with "
+            "mol.templateResidueFromSmiles(<sel>, <smiles>), or load a structure "
+            "(e.g. a CIF) that already stores them."
+        )
+
+
 def _check_specs_protonated(mol, spec_by_res_idx, groups):
     """Refuse to parameterize a carbon-bearing residue that is missing its
     hydrogens (entirely, or e.g. a sidechain stripped of H while the backbone
@@ -2480,7 +2586,7 @@ def _check_specs_protonated(mol, spec_by_res_idx, groups):
         )
         bad.append(res)
     if bad:
-        raise RuntimeError(
+        raise UnderProtonatedResidueError(
             "Residue(s) look under-protonated, refusing to parameterize:\n  "
             + "\n  ".join(bad)
             + "\nAdd hydrogens first - e.g. template the residue with "
@@ -2692,6 +2798,11 @@ def parameterizeFromSpecs(
     # A modified nucleotide spliced into a nucleic chain has no de-novo
     # parameterization path yet and would silently build disconnected; refuse.
     _assert_no_chain_resident_modified_nucleotide(mol, specs)
+
+    # Every non-canonical residue must arrive templated (explicit bonds + bond
+    # orders); the GAFF / OpenFF backends perceive chemistry from them. Fail
+    # fast with a clear message instead of deep inside antechamber / RDKit.
+    _check_specs_templated(mol, specs)
 
     # SMIRNOFF parameters can't be expressed losslessly as AMBER frcmod
     # (e.g. SMIRNOFF supports more torsion periodicities and improper

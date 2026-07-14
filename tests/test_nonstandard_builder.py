@@ -273,6 +273,115 @@ def test_warn_if_nonalpha_backbone_silent_for_alpha(caplog):
     assert not caplog.records, [r.message for r in caplog.records]
 
 
+def _lig_residue_mol(bonds=True, bondtype=True):
+    """A minimal 5-carbon free ligand residue LIG. Optionally drop the internal
+    bonds or the bond orders to simulate a residue that was never templated."""
+    mol = Molecule().empty(5)
+    mol.name[:] = ["C1", "C2", "C3", "C4", "C5"]
+    mol.element[:] = ["C", "C", "C", "C", "C"]
+    mol.resname[:] = "LIG"
+    mol.resid[:] = 1
+    mol.chain[:] = "B"
+    mol.segid[:] = "L0"
+    mol.record[:] = "HETATM"
+    mol.coords = np.arange(15, dtype=np.float32).reshape(5, 3, 1)
+    if bonds:
+        mol.bonds = np.array([[0, 1], [1, 2], [2, 3], [3, 4]], dtype=np.uint32)
+        if bondtype:
+            mol.bondtype = np.array(["1"] * 4, dtype=object)
+    return mol
+
+
+def test_check_specs_templated_raises_when_bonds_missing():
+    """A multi-atom non-canonical residue with no internal bonds cannot be
+    parameterized and is rejected as untemplated."""
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import (
+        _check_specs_templated,
+        UntemplatedResidueError,
+    )
+
+    mol = _lig_residue_mol(bonds=False)
+    spec = LigandSpec("LIG", UniqueResidueID.fromMolecule(mol, "resname LIG"))
+    with pytest.raises(UntemplatedResidueError, match="LIG"):
+        _check_specs_templated(mol, [spec])
+
+
+def test_check_specs_templated_raises_when_bond_orders_missing():
+    """Bonds present but no bond orders (bondtype absent) is still untemplated:
+    the GAFF/OpenFF backends need bond orders to perceive chemistry."""
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import (
+        _check_specs_templated,
+        UntemplatedResidueError,
+    )
+
+    mol = _lig_residue_mol(bonds=True, bondtype=False)
+    spec = LigandSpec("LIG", UniqueResidueID.fromMolecule(mol, "resname LIG"))
+    with pytest.raises(UntemplatedResidueError, match="bond order"):
+        _check_specs_templated(mol, [spec])
+
+
+def test_check_specs_templated_passes_when_templated():
+    """A residue carrying both bonds and bond orders passes silently."""
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import _check_specs_templated
+
+    mol = _lig_residue_mol(bonds=True, bondtype=True)
+    spec = LigandSpec("LIG", UniqueResidueID.fromMolecule(mol, "resname LIG"))
+    _check_specs_templated(mol, [spec])
+
+
+def test_check_specs_templated_skips_canonical_chain_rename():
+    """A canonical residue renamed at a junction (e.g. CYS->CYX) is built from
+    an ff14SB template, not GAFF, so it needs no bond orders and is not flagged
+    even when they are absent."""
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import _check_specs_templated
+
+    mol = _lig_residue_mol(bonds=True, bondtype=False)
+    mol.resname[:] = "CYS"
+    spec = ChainResidueSpec(
+        resname="CYS",
+        residue=UniqueResidueID.fromMolecule(mol, "resname CYS"),
+        new_resname="CYX",
+    )
+    _check_specs_templated(mol, [spec])
+
+
+def test_parameterizeFromSpecs_rejects_untemplated_residue(tmp_path):
+    """The templated guard runs at the top of parameterizeFromSpecs, before any
+    antechamber work, so an untemplated residue is rejected fast."""
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import (
+        parameterizeFromSpecs,
+        UntemplatedResidueError,
+    )
+
+    mol = _lig_residue_mol(bonds=True, bondtype=False)
+    spec = LigandSpec("LIG", UniqueResidueID.fromMolecule(mol, "resname LIG"))
+    with pytest.raises(UntemplatedResidueError):
+        parameterizeFromSpecs([spec], mol, outdir=str(tmp_path))
+
+
+def test_check_specs_protonated_raises_typed_error():
+    """The under-protonation check raises the typed UnderProtonatedResidueError
+    (a RuntimeError subclass) so callers can catch it precisely."""
+    from moleculekit.molecule import UniqueResidueID
+    from htmd.builder.nonstandard import (
+        _check_specs_protonated,
+        UnderProtonatedResidueError,
+        _residue_groups_with_index,
+    )
+
+    mol = _lig_residue_mol(bonds=True, bondtype=True)  # 5 carbons, zero hydrogens
+    spec = LigandSpec("LIG", UniqueResidueID.fromMolecule(mol, "resname LIG"))
+    _, groups = _residue_groups_with_index(mol)
+    assert issubclass(UnderProtonatedResidueError, RuntimeError)
+    with pytest.raises(UnderProtonatedResidueError):
+        _check_specs_protonated(mol, {0: spec}, groups)
+
+
 # N-terminal NH3+ first-hydrogen naming convention differs between
 # builders: amber.build emits ``H1`` / ``H2`` / ``H3``; openff.build
 # emits ``H`` / ``H2`` / ``H3``. Topologically identical. The alias is
