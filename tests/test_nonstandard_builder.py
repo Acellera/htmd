@@ -1153,7 +1153,7 @@ def test_full_pipeline_1m63(tmp_path):
         "SAR": "O=CCNC",                           # sarcosine (N-methyl-Gly)
         "MLE": "CC(C)C[C@@H](C=O)NC",              # N-methyl-L-leucine
         "MVA": "CC(C)[C@@H](C=O)NC",               # N-methyl-L-valine
-        "BMT": "O=C[C@@H](NC)C(O)C(C)C/C=C/C",     # (4R)-MeBmt
+        "BMT": "C/C=C/C[C@@H](C)[C@H]([C@@H](C=O)NC)O",  # (4R)-MeBmt
     }
     built = _run_pipeline(mol, smiles, tmp_path)
     assert built is not None
@@ -3535,17 +3535,18 @@ def test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
             cluster_total += _prepi_total(path)
         elif fname.endswith(".cif"):
             cluster_total += float(Molecule(path).charge.sum())
-    # 5VBL has 7 chain-resident specs which split into 6 separate
-    # antechamber runs (one XX1+XX2 multi-cluster + 5 singletons), so
-    # the natural Gasteiger smear into the (discarded) ACE/NME-style
-    # cap atoms compounds across clusters. With no pin and no
-    # normalize, expect drift up to ~0.1; the reference-file diff
-    # locks each per-atom charge, so this side-check just guards
-    # against gross regressions (e.g. a future change silently
-    # turning normalize back on).
-    assert abs(cluster_total) < 0.15, (
-        f"5VBL_A unpinned + unnormalised cluster total drifted by "
-        f"{cluster_total:+.4f} (expected within rounding + cap smear)"
+    # The C-terminal NCAA (residue 200) is a carboxylate (formal -1) at pH 7.4;
+    # every other chain-resident NCAA here is neutral, so the emitted units sum
+    # to about -1. 5VBL has 7 chain-resident specs which split into 6 separate
+    # antechamber runs (one XX1+XX2 multi-cluster + 5 singletons), so the natural
+    # Gasteiger smear into the (discarded) ACE/NME-style cap atoms compounds
+    # across clusters; with no pin and no normalize, expect drift up to ~0.1
+    # around that -1. The reference-file diff locks each per-atom charge, so this
+    # side-check just guards against gross regressions (e.g. a future change
+    # silently turning normalize back on).
+    assert abs(cluster_total + 1.0) < 0.15, (
+        f"5VBL_A unpinned + unnormalised cluster total {cluster_total:+.4f} "
+        f"(expected ~-1 from the C-terminal carboxylate + cap smear)"
     )
 
 
