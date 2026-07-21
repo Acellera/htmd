@@ -3212,6 +3212,22 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
                 return int(ai)
         return None
 
+    def _bonded_carbon(center_idx, residue_atom_idxs):
+        """Index of a carbon covalently bonded to ``center_idx`` within the
+        residue - the acetyl methyl anchor for a backbone cap. For a standard
+        alpha residue the atom bonded to the carbonyl C is CA; for an elongated
+        backbone (e.g. Adda, N-CA-C18-C) it is the penultimate backbone carbon
+        (C18), which selecting by the name "CA" would miss, placing the methyl
+        two bonds (~2.5 A) away and drawing a nonphysical cap bond."""
+        if center_idx is None:
+            return None
+        allowed = {int(a) for a in residue_atom_idxs}
+        for nb in mol.getNeighbors(int(center_idx)):
+            nb = int(nb)
+            if nb in allowed and str(mol.element[nb]).upper() == "C":
+                return nb
+        return None
+
     for cidx, residue_id in enumerate(spec.residues):
         if not spec.is_chain_resident[cidx]:
             continue
@@ -3224,7 +3240,11 @@ def _build_cluster_model_accurate(mol, spec, cif_path):
             prev_atoms = groups[prev_r]["atom_idx"]
             prev_c = _atom_in_residue(prev_atoms, "C")
             prev_o = _atom_in_residue(prev_atoms, "O")
-            prev_ca = _atom_in_residue(prev_atoms, "CA")
+            # The acetyl methyl is the carbon bonded to the carbonyl C, not the
+            # atom named "CA" (they differ for an elongated backbone like Adda).
+            prev_ca = _bonded_carbon(prev_c, prev_atoms)
+            if prev_ca is None:
+                prev_ca = _atom_in_residue(prev_atoms, "CA")
             cap = cap_atoms.setdefault(prev_r, {})
             if prev_c is not None:
                 cap[prev_c] = "C"
