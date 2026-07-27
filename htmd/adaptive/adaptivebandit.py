@@ -405,7 +405,9 @@ class AdaptiveBandit(AdaptiveBase):
             sims = simfilter(sims, self.filteredpath, filtersel=self.filtersel)
         return sims
 
-    def count_ucb(self, q_value: float, exploration: float, step: int, n_value: int) -> float:
+    def count_ucb(
+        self, q_value: float, exploration: float, step: int, n_value: int
+    ) -> float:
         """Compute the UCB value for a state.
 
         Parameters
@@ -426,7 +428,14 @@ class AdaptiveBandit(AdaptiveBase):
         """
         return q_value + (exploration * np.sqrt((np.log(step) / (n_value + 1))))
 
-    def count_pucb(self, q_value: float, exploration: float, predictor: float, step: int, n_value: int) -> float:
+    def count_pucb(
+        self,
+        q_value: float,
+        exploration: float,
+        predictor: float,
+        step: int,
+        n_value: int,
+    ) -> float:
         """Compute the predictive UCB value for a state.
 
         Parameters
@@ -451,7 +460,14 @@ class AdaptiveBandit(AdaptiveBase):
             exploration * predictor * np.sqrt((np.log(step) / (n_value + 1)))
         )
 
-    def getRewards(self, trajidx: np.ndarray, data_q, confstatdist, numstates: int, rewardmethod: str) -> list:
+    def getRewards(
+        self,
+        trajidx: np.ndarray,
+        data_q,
+        confstatdist,
+        numstates: int,
+        rewardmethod: str,
+    ) -> list:
         from htmd.kinetics import Kinetics
         import pandas as pd
 

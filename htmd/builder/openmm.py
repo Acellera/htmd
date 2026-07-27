@@ -106,7 +106,9 @@ def _phosaa_ffxml_namespaced(outdir):
     phos = re.sub(r"<Residue\b.*?</Residue>", _fix_residue, phos, flags=re.S)
 
     p_type = next(
-        line for line in re.findall(r"<Type\b[^>]*>", mono) if re.search(r'\bname="P"', line)
+        line
+        for line in re.findall(r"<Type\b[^>]*>", mono)
+        if re.search(r'\bname="P"', line)
     )
     p_nonbonded = next(
         line
@@ -226,7 +228,9 @@ def _amber_modres_ffxml(present, outdir):
         prefix = lib["prefix"]
         type_def = {t.get("name"): t for t in root.findall(".//AtomTypes/Type")}
         res_elems = [
-            res for res in root.findall(".//Residues/Residue") if res.get("name") in want
+            res
+            for res in root.findall(".//Residues/Residue")
+            if res.get("name") in want
         ]
         used = {a.get("type") for res in res_elems for a in res.findall("Atom")}
         new_types = {t for t in used if type_def[t].get("class") not in base_cls}
@@ -253,8 +257,10 @@ def _amber_modres_ffxml(present, outdir):
             return bool(vals & new_classes)
 
         for tag in (
-            "HarmonicBondForce", "HarmonicAngleForce",
-            "PeriodicTorsionForce", "NonbondedForce",
+            "HarmonicBondForce",
+            "HarmonicAngleForce",
+            "PeriodicTorsionForce",
+            "NonbondedForce",
         ):
             src = root.find(f".//{tag}")
             if src is None:
@@ -271,7 +277,9 @@ def _amber_modres_ffxml(present, outdir):
                     c.attrib.pop("charge", None)
                 fe.append(c)
 
-        out_path = os.path.join(outdir, f"{lib['lib'].split('.')[0]}_ff14SBnamespaced.xml")
+        out_path = os.path.join(
+            outdir, f"{lib['lib'].split('.')[0]}_ff14SBnamespaced.xml"
+        )
         ET.ElementTree(ff).write(out_path)
         paths.append(out_path)
     return paths
@@ -311,9 +319,7 @@ def _ffptm_prepi_residues():
     if not os.path.isdir(ffptm):
         return frozenset()
     return frozenset(
-        os.path.splitext(f)[0]
-        for f in os.listdir(ffptm)
-        if f.endswith(".prepi")
+        os.path.splitext(f)[0] for f in os.listdir(ffptm) if f.endswith(".prepi")
     )
 
 
@@ -360,8 +366,20 @@ def _parse_prepi(path):
                 bonds.append((f[0], f[1]))
             continue
         # atom row: "I NAME TYPE TOPO NA NB NC R THETA PHI CHARGE"
-        if len(f) >= 11 and f[0].isdigit() and f[3] in (
-            "M", "S", "B", "E", "3", "4", "5", "6",
+        if (
+            len(f) >= 11
+            and f[0].isdigit()
+            and f[3]
+            in (
+                "M",
+                "S",
+                "B",
+                "E",
+                "3",
+                "4",
+                "5",
+                "6",
+            )
         ):
             i = int(f[0])
             name, atype = f[1], f[2]
@@ -406,9 +424,15 @@ def _ffptm_prepi_ffxml(present, outdir):
         resblock = ET.SubElement(ff, "Residues")
         rel = ET.SubElement(resblock, "Residue", {"name": res})
         for name, atype, charge in atoms:
-            ET.SubElement(rel, "Atom", {
-                "name": name, "type": f"protein-{atype}", "charge": f"{charge:.6f}",
-            })
+            ET.SubElement(
+                rel,
+                "Atom",
+                {
+                    "name": name,
+                    "type": f"protein-{atype}",
+                    "charge": f"{charge:.6f}",
+                },
+            )
         for n1, n2 in bonds:
             ET.SubElement(rel, "Bond", {"atomName1": n1, "atomName2": n2})
         for bb in ("N", "C"):
@@ -418,14 +442,23 @@ def _ffptm_prepi_ffxml(present, outdir):
         # Extra bonded terms from the frcmod, converted to OpenMM units.
         frcmod = os.path.join(ffptm, f"{res}.frcmod")
         aps = AmberParameterSet(frcmod)
-        if any((aps.bond_types, aps.angle_types, aps.dihedral_types,
-                getattr(aps, "improper_periodic_types", {}))):
+        if any(
+            (
+                aps.bond_types,
+                aps.angle_types,
+                aps.dihedral_types,
+                getattr(aps, "improper_periodic_types", {}),
+            )
+        ):
             tmp = os.path.join(outdir, f"_frcmod_{res}.xml")
             OpenMMParameterSet.from_parameterset(aps).write(tmp, provenance=None)
             froot = ET.parse(tmp).getroot()
             os.remove(tmp)
-            for tag in ("HarmonicBondForce", "HarmonicAngleForce",
-                        "PeriodicTorsionForce"):
+            for tag in (
+                "HarmonicBondForce",
+                "HarmonicAngleForce",
+                "PeriodicTorsionForce",
+            ):
                 src = froot.find(f".//{tag}")
                 if src is None or len(src) == 0:
                     continue
@@ -477,9 +510,7 @@ def _maybe_add_ffptm_prepi(mol, outdir, extra_xml):
     paths = []
     for res, ffxml_path, hdef_path in results:
         app.Modeller.loadHydrogenDefinitions(hdef_path)
-        mol.remove(
-            (mol.resname == res) & (mol.element == "H"), _logger=False
-        )
+        mol.remove((mol.resname == res) & (mol.element == "H"), _logger=False)
         paths.append(ffxml_path)
     if not extra_xml:
         return paths
@@ -1082,9 +1113,7 @@ def _emit_openmm_xml_from_cluster_interchange(
     # Per-atom class names (used in force-section entries). Default to
     # synthesised unique ``OFF_<prefix>_<i>``; atoms in ``class_overrides``
     # get the ff14SB class (e.g. "CT" for backbone CA).
-    classes = [
-        class_overrides.get(i, f"{class_prefix}_{i}") for i in range(n_atoms)
-    ]
+    classes = [class_overrides.get(i, f"{class_prefix}_{i}") for i in range(n_atoms)]
     # Per-atom type names (used in <Residue><Atom type=...> attributes).
     # Default to the same as the class; backbone atoms get the ff14SB
     # type (e.g. "protein-CT" for CA).
@@ -1097,10 +1126,11 @@ def _emit_openmm_xml_from_cluster_interchange(
         atom_names = [a.name for a in off_mol.atoms]
     else:
         assert len(atom_names) == n_atoms, (
-            f"atom_names length {len(atom_names)} != topology n_atoms "
-            f"{n_atoms}"
+            f"atom_names length {len(atom_names)} != topology n_atoms " f"{n_atoms}"
         )
-    elements = [_element_symbol_from_atomic_number(a.atomic_number) for a in off_mol.atoms]
+    elements = [
+        _element_symbol_from_atomic_number(a.atomic_number) for a in off_mol.atoms
+    ]
     masses = [float(a.mass.m_as(unit.dalton)) for a in off_mol.atoms]
     is_kept = [i not in cap_atoms for i in range(n_atoms)]
 
@@ -1114,10 +1144,12 @@ def _emit_openmm_xml_from_cluster_interchange(
     # Build the root <ForceField> element.
     root = ET.Element("ForceField")
     resnames = ",".join(r for r, _ in residue_assignment)
-    root.append(ET.Comment(
-        f" Auto-generated from OpenFF Interchange. Residues: {resnames}. "
-        f"Cap atoms dropped: {len(cap_atoms)}. Do not edit by hand. "
-    ))
+    root.append(
+        ET.Comment(
+            f" Auto-generated from OpenFF Interchange. Residues: {resnames}. "
+            f"Cap atoms dropped: {len(cap_atoms)}. Do not edit by hand. "
+        )
+    )
 
     # <AtomTypes>: one entry per kept atom. Atoms with a class override
     # are skipped because their class is declared by a different XML
@@ -1177,19 +1209,30 @@ def _emit_openmm_xml_from_cluster_interchange(
     # those parameters, our XML should not redeclare them).
     overridden_atoms = {i for i in range(n_atoms) if is_overridden[i]}
     _write_bond_force(
-        root, ic, classes,
-        drop_atoms=cap_atoms, all_overridden_drop=overridden_atoms,
+        root,
+        ic,
+        classes,
+        drop_atoms=cap_atoms,
+        all_overridden_drop=overridden_atoms,
     )
     _write_angle_force(
-        root, ic, classes,
-        drop_atoms=cap_atoms, all_overridden_drop=overridden_atoms,
+        root,
+        ic,
+        classes,
+        drop_atoms=cap_atoms,
+        all_overridden_drop=overridden_atoms,
     )
     _write_torsion_force(
-        root, ic, classes,
-        drop_atoms=cap_atoms, all_overridden_drop=overridden_atoms,
+        root,
+        ic,
+        classes,
+        drop_atoms=cap_atoms,
+        all_overridden_drop=overridden_atoms,
     )
     _write_nonbonded_force(
-        root, ic, classes,
+        root,
+        ic,
+        classes,
         drop_atoms=cap_atoms | overridden_atoms,
     )
 
@@ -1215,8 +1258,9 @@ def _element_symbol_from_atomic_number(atomic_number):
     return GetPeriodicTable().GetElementSymbol(int(atomic_number))
 
 
-def _write_bond_force(root, ic, classes, drop_atoms=frozenset(),
-                      all_overridden_drop=frozenset()):
+def _write_bond_force(
+    root, ic, classes, drop_atoms=frozenset(), all_overridden_drop=frozenset()
+):
     import xml.etree.ElementTree as ET
     from openff.units import unit
 
@@ -1230,9 +1274,11 @@ def _write_bond_force(root, ic, classes, drop_atoms=frozenset(),
             continue
         pot = ic["Bonds"].potentials[pot_key]
         length_nm = float(pot.parameters["length"].m_as(unit.nanometer))
-        k_kj = float(pot.parameters["k"].m_as(
-            unit.kilojoule_per_mole / unit.nanometer**2,
-        ))
+        k_kj = float(
+            pot.parameters["k"].m_as(
+                unit.kilojoule_per_mole / unit.nanometer**2,
+            )
+        )
         ET.SubElement(
             bonds_el,
             "Bond",
@@ -1245,8 +1291,9 @@ def _write_bond_force(root, ic, classes, drop_atoms=frozenset(),
         )
 
 
-def _write_angle_force(root, ic, classes, drop_atoms=frozenset(),
-                       all_overridden_drop=frozenset()):
+def _write_angle_force(
+    root, ic, classes, drop_atoms=frozenset(), all_overridden_drop=frozenset()
+):
     import xml.etree.ElementTree as ET
     from openff.units import unit
 
@@ -1263,9 +1310,11 @@ def _write_angle_force(root, ic, classes, drop_atoms=frozenset(),
             continue
         pot = ic["Angles"].potentials[pot_key]
         angle_rad = float(pot.parameters["angle"].m_as(unit.radian))
-        k_kj = float(pot.parameters["k"].m_as(
-            unit.kilojoule_per_mole / unit.radian**2,
-        ))
+        k_kj = float(
+            pot.parameters["k"].m_as(
+                unit.kilojoule_per_mole / unit.radian**2,
+            )
+        )
         ET.SubElement(
             angles_el,
             "Angle",
@@ -1279,8 +1328,9 @@ def _write_angle_force(root, ic, classes, drop_atoms=frozenset(),
         )
 
 
-def _write_torsion_force(root, ic, classes, drop_atoms=frozenset(),
-                         all_overridden_drop=frozenset()):
+def _write_torsion_force(
+    root, ic, classes, drop_atoms=frozenset(), all_overridden_drop=frozenset()
+):
     """Write proper + improper torsions. SMIRNOFF spreads multi-term
     dihedrals across `mult`-indexed entries with the same atom tuple; we
     merge them back into one ``<Proper>``/``<Improper>`` element with
@@ -1318,9 +1368,7 @@ def _write_torsion_force(root, ic, classes, drop_atoms=frozenset(),
             idivf = 1.0
             if "idivf" in pot.parameters:
                 idivf = float(pot.parameters["idivf"].m_as(unit.dimensionless))
-            k_kj = float(
-                pot.parameters["k"].m_as(unit.kilojoule_per_mole) / idivf
-            )
+            k_kj = float(pot.parameters["k"].m_as(unit.kilojoule_per_mole) / idivf)
             grouped[atoms].append((periodicity, phase_rad, k_kj))
 
         for atoms, terms in grouped.items():
@@ -1377,9 +1425,7 @@ def _write_nonbonded_force(root, ic, classes, drop_atoms=frozenset()):
         (idx,) = top_key.atom_indices
         pot = ic["vdW"].potentials[pot_key]
         sigmas[idx] = float(pot.parameters["sigma"].m_as(unit.nanometer))
-        epsilons[idx] = float(
-            pot.parameters["epsilon"].m_as(unit.kilojoule_per_mole)
-        )
+        epsilons[idx] = float(pot.parameters["epsilon"].m_as(unit.kilojoule_per_mole))
     for i, (cls, sigma, epsilon) in enumerate(zip(classes, sigmas, epsilons)):
         if i in drop_atoms:
             continue
@@ -1488,7 +1534,10 @@ def _add_caps(mol, caps):
     # so addHydrogens can't re-add the backbone amide H that capping strips -
     # keep it for them (standard residues are unaffected).
     keep_amide_h = set(_PHOSAA_RESNAMES) | {
-        r for lib in _amber_modres_libs() if lib["prefix"] == "protein" for r in lib["residues"]
+        r
+        for lib in _amber_modres_libs()
+        if lib["prefix"] == "protein"
+        for r in lib["residues"]
     }
 
     if caps is None or len(caps) == 0:
@@ -1734,7 +1783,7 @@ def _isopeptide_acceptor_resnames(mol, custombonds):
     :func:`_prepare_molecule`.
     """
     resnames = set()
-    for a1, a2 in (custombonds or []):
+    for a1, a2 in custombonds or []:
         for aid in (a1, a2):
             idx = aid.selectAtom(mol)
             if str(mol.name[idx]) == "N":
@@ -1945,9 +1994,7 @@ def _register_modified_residue_bond_defs(mol):
         ref = Molecule(cif)
         if ref.bonds is None or len(ref.bonds) == 0:
             continue
-        defs = [
-            (str(ref.name[int(a)]), str(ref.name[int(b)])) for a, b in ref.bonds
-        ]
+        defs = [(str(ref.name[int(a)]), str(ref.name[int(b)])) for a, b in ref.bonds]
         if "N" in set(ref.name.tolist()):
             defs.append(("-C", "N"))
         Topology._standardBonds[resn] = defs
@@ -2076,7 +2123,11 @@ def _register_extra_xml_template_matcher(forcefield, extra_xml):
         # where a residue is renamed (e.g. HIS->HID at apply time) but
         # the topology still carries the input name.
         match = compiled.matchResidueToTemplate(
-            residue, template, bonded_to_atom, ignore_external, ignore_extra,
+            residue,
+            template,
+            bonded_to_atom,
+            ignore_external,
+            ignore_extra,
         )
         if match is None:
             return None
@@ -2569,8 +2620,11 @@ def _rigidify_three_point_water(struct):
             continue  # already rigid (e.g. a tleap-built water)
         r_oh = next(b.type.req for b in ox.bonds if h1 in (b.atom1, b.atom2))
         theta = next(
-            (ang.type.theteq for ang in struct.angles
-             if ang.atom2 is ox and {ang.atom1, ang.atom3} == {h1, h2}),
+            (
+                ang.type.theteq
+                for ang in struct.angles
+                if ang.atom2 is ox and {ang.atom1, ang.atom3} == {h1, h2}
+            ),
             104.52,
         )
         d_hh = 2.0 * r_oh * math.sin(math.radians(theta) / 2.0)
@@ -2579,8 +2633,9 @@ def _rigidify_three_point_water(struct):
             struct.bond_types.append(hh_type)
         struct.bonds.append(Bond(h1, h2, type=hh_type))
         n_rigidified += 1
-        for ang in [a for a in struct.angles
-                    if a.atom2 is ox and {a.atom1, a.atom3} == {h1, h2}]:
+        for ang in [
+            a for a in struct.angles if a.atom2 is ox and {a.atom1, a.atom3} == {h1, h2}
+        ]:
             ang.delete()
             struct.angles.remove(ang)
             n_angles_removed += 1
@@ -2659,7 +2714,9 @@ def _read_built_molecule(outdir, prefix, topology=None, positions=None):
                 hh = is_h[molbuilt.bonds[:, 0]] & is_h[molbuilt.bonds[:, 1]]
                 if hh.any():
                     keep = ~hh
-                    if molbuilt.bondtype is not None and len(molbuilt.bondtype) == len(hh):
+                    if molbuilt.bondtype is not None and len(molbuilt.bondtype) == len(
+                        hh
+                    ):
                         molbuilt.bondtype = molbuilt.bondtype[keep]
                     molbuilt.bonds = molbuilt.bonds[keep]
             if positions is not None:

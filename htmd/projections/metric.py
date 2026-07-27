@@ -163,7 +163,7 @@ class Metric:
 
         # Find out if there is a unique molfile. If there is, initialize a single Molecule to speed up calculations
         uqMol = None
-        (single, molfile) = _singleMolfile(self.simulations)
+        single, molfile = _singleMolfile(self.simulations)
         if single:
             uqMol = Molecule(molfile)
             for proj in self.projectionlist:

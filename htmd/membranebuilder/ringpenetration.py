@@ -144,7 +144,9 @@ def _detectRingPenetration(l1, lipids, box):
     return False
 
 
-def resolveRingPenetrations(lipids: list, box: list | np.ndarray, max_iterations: int = 50):
+def resolveRingPenetrations(
+    lipids: list, box: list | np.ndarray, max_iterations: int = 50
+):
     """Iteratively resolve ring penetrations between neighboring lipids.
 
     Detects pairs of lipids where one lipid's chain atoms thread through

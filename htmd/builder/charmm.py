@@ -859,5 +859,3 @@ def _checkFailedAtoms(mol):
             f"Atoms with indexes {idx} are positioned at [0,0,0]. This can cause simulations to crash. "
             "Check log file for more details."
         )
-
-

@@ -406,7 +406,7 @@ def _filtSim(i, sims, outFolder, filterSel):
         path.join(outFolder, "filtered.psf"),
         path.join(outFolder, "filtered.pdb"),
     ]
-    (traj, outtraj) = _renameSims(sims[i].trajectory, name, outFolder)
+    traj, outtraj = _renameSims(sims[i].trajectory, name, outFolder)
     if not traj:
         ftrajectory = _autoDetectTrajectories(path.join(outFolder, name))
         numframes = _getNumFrames(sims[i], ftrajectory)
@@ -485,8 +485,8 @@ def _renameSims(trajectory, simname, outfolder):
     outtraj = list()
 
     for t in range(0, len(trajectory)):
-        (_, fname) = path.split(trajectory[t])
-        (fname, ext) = path.splitext(fname)
+        _, fname = path.split(trajectory[t])
+        fname, ext = path.splitext(fname)
         outname = path.join(outfolder, simname, f"{fname}.filtered{ext}")
 
         if not path.isfile(outname) or (

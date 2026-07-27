@@ -191,15 +191,13 @@ def htmd_register(product: str = "htmd") -> None:
         The product name to register.
     """
 
-    print(
-        """
+    print("""
   Welcome to the HTMD registration!
 
   We would like to know about you to keep in touch.
   Please provide your full name, institutional email,
   institution name, city, and country.
-"""
-    )
+""")
 
     # Ask a user for data
     data = {}

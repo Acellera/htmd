@@ -120,9 +120,7 @@ a.starting_model= 1
 a.ending_model  = 1
 
 a.make()
-    """.format(
-        movstart + 1 - segresidstart, movend - segresidstart, alifile
-    )
+    """.format(movstart + 1 - segresidstart, movend - segresidstart, alifile)
     pyfile = tempname(suffix=".py")
     f = open(pyfile, "w")
     f.write(script)

@@ -90,9 +90,7 @@ class Model(object):
             )
 
         if estimator != "mle":
-            raise ValueError(
-                f"Unknown estimator '{estimator}'. Choose 'mle' or 'oom'."
-            )
+            raise ValueError(f"Unknown estimator '{estimator}'. Choose 'mle' or 'oom'.")
 
         count_mode = "sliding" if bayesian_samples is None else "effective"
 
@@ -696,7 +694,7 @@ class Model(object):
 
             st = states[i]
             if statetype == "macro":
-                (selFr, selMicro) = _sampleMacro(
+                selFr, selMicro = _sampleMacro(
                     self, st, stConcat, samplemode, frames[i], replacement
                 )
                 absFrames.append(selFr)
@@ -836,7 +834,7 @@ class Model(object):
                     "Provided simlist has different number of trajectories than the one used by the model."
                 )
 
-        (single, molfile) = _singleMolfile(simlist)
+        single, molfile = _singleMolfile(simlist)
         if not single:
             raise NameError(
                 "Visualizer does not support yet visualization of systems with different structure files. "
@@ -856,7 +854,7 @@ class Model(object):
         if len(states) == 0:
             raise NameError("No " + statetype + " states exist in the model")
 
-        (tmp, relframes) = self.sampleStates(
+        tmp, relframes = self.sampleStates(
             states, numsamples, statetype=statetype, samplemode=samplemode
         )
 
@@ -1224,9 +1222,7 @@ class Model(object):
 
         self._integrityCheck(postmsm=True)
 
-        lags = self._cktest_lags(
-            lags=lags, maxlag=maxlag, numlags=numlags, units=units
-        )
+        lags = self._cktest_lags(lags=lags, maxlag=maxlag, numlags=numlags, units=units)
 
         statelist = [traj.cluster for traj in self.data.trajectories]
         models = []
@@ -1772,5 +1768,3 @@ def _macroTrajSt(St, macro_ofcluster):
 
     from deeptime.estimation import transition_matrix
     return transition_matrix(macroC, reversible=True)"""
-
-

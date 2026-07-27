@@ -53,7 +53,17 @@ _FORCEFIELD_MAP = {
 # sets, never by GAFF) are deliberately excluded so antechamber is not asked to
 # type something it cannot.
 _GAFF_SUPPORTED_ELEMENTS = {
-    "H", "C", "N", "O", "S", "P", "F", "CL", "BR", "I", "B",
+    "H",
+    "C",
+    "N",
+    "O",
+    "S",
+    "P",
+    "F",
+    "CL",
+    "BR",
+    "I",
+    "B",
 }
 
 # Charge methods that work under Pyodide. AM1-BCC needs the SQM backend,
@@ -184,11 +194,7 @@ def _fftype_antechamber(
     # Gasteiger returns non-finite values). Fail early with an actionable
     # message instead.
     unsupported = sorted(
-        {
-            str(e)
-            for e in mol.element
-            if str(e).upper() not in _GAFF_SUPPORTED_ELEMENTS
-        }
+        {str(e) for e in mol.element if str(e).upper() not in _GAFF_SUPPORTED_ELEMENTS}
     )
     if unsupported:
         resnames = sorted({str(r) for r in mol.resname})
@@ -239,14 +245,22 @@ def _fftype_antechamber(
 
     cmd = [
         "antechamber",
-        "-i", input_mol2,
-        "-fi", "mol2",
-        "-o", output_mol2,
-        "-fo", "mol2",
-        "-at", at_flag,
-        "-nc", str(netcharge),
-        "-dr", "n",
-        "-j", "1",
+        "-i",
+        input_mol2,
+        "-fi",
+        "mol2",
+        "-o",
+        output_mol2,
+        "-fo",
+        "mol2",
+        "-at",
+        at_flag,
+        "-nc",
+        str(netcharge),
+        "-dr",
+        "n",
+        "-j",
+        "1",
     ]
     if ac_charge is not None:
         cmd += ["-c", ac_charge]
@@ -281,11 +295,16 @@ def _fftype_antechamber(
 
     cmd = [
         "parmchk2",
-        "-i", output_mol2,
-        "-f", "mol2",
-        "-o", output_frcmod,
-        "-s", parmchk_s,
-        "-a", "Y",
+        "-i",
+        output_mol2,
+        "-f",
+        "mol2",
+        "-o",
+        output_frcmod,
+        "-s",
+        parmchk_s,
+        "-a",
+        "Y",
     ]
 
     result = _run_ambertools(
@@ -385,6 +404,7 @@ def _duplicate_parameters(prm, original):
     written under the corresponding ff14SB-typed permutation so torsions
     spanning the backbone-sidechain boundary still resolve at build time.
     """
+
     def _gen_permutations(typ, original):
         possibles = []
         for tt in typ:

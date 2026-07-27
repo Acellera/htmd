@@ -372,4 +372,3 @@ if __name__ == "__main__":
             "protein and name CA", "resname BEN and noh", periodic="selections"
         ),
     ]
-

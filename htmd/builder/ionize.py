@@ -197,9 +197,7 @@ def _resolve_ion(name):
     """Resolve any ion alias (canonical key, full name, AMBER name, CHARMM name) to the canonical key."""
     key = _ion_aliases.get(name.upper())
     if key is None:
-        valid = ", ".join(
-            f"{k} ({v[1]}, {v[2]}, {v[3]})" for k, v in _ions.items()
-        )
+        valid = ", ".join(f"{k} ({v[1]}, {v[2]}, {v[3]})" for k, v in _ions.items())
         raise NameError(
             f"Ion '{name}' not recognized. Valid ions and their aliases: {valid}"
         )

@@ -300,9 +300,7 @@ def _cofactors_ncaa_ptm_params():
 # Modified amino acids that AMBER parameterizes only in mod_amino.lib (the
 # ff*SB_modAA forcefield), NOT the base ff14SB/ff19SB libraries. Mirrors the
 # unit list + PDB aliases in leaprc.protein.ff14SB_modAA.
-_MODAA_RESNAMES = frozenset(
-    {"ALY", "AZF", "CYF", "CNX", "MSE", "4II", "4CF", "MTN"}
-)
+_MODAA_RESNAMES = frozenset({"ALY", "AZF", "CYF", "CNX", "MSE", "4II", "4CF", "MTN"})
 
 
 def _detect_modaa_residues(mol, ff):
@@ -315,9 +313,7 @@ def _detect_modaa_residues(mol, ff):
     ff (ff19SB vs ff14SB). Appends the leaprc to ``ff`` in place and returns the
     detected resnames.
     """
-    present = sorted(
-        {str(r) for r in np.unique(mol.resname)} & _MODAA_RESNAMES
-    )
+    present = sorted({str(r) for r in np.unique(mol.resname)} & _MODAA_RESNAMES)
     if not present:
         return []
     variant = "ff19SB" if any("ff19SB" in str(f) for f in ff) else "ff14SB"
@@ -618,9 +614,7 @@ def _getResiduesInFF(ff, teleap=None):
 
     backend, value = _resolve_backend(teleap)
     if backend == "native":
-        amberhome = os.path.normpath(
-            os.path.join(os.path.dirname(value), "../")
-        )
+        amberhome = os.path.normpath(os.path.join(os.path.dirname(value), "../"))
     else:
         amberhome = value
 
@@ -1654,9 +1648,7 @@ def _run_tleap(
         teleap = backend_value
         if teleap is None:
             teleap = _findTeLeap()
-        amberhome = os.path.normpath(
-            os.path.join(os.path.dirname(teleap), "../")
-        )
+        amberhome = os.path.normpath(os.path.join(os.path.dirname(teleap), "../"))
         return _run_tleap_native(
             outdir,
             prefix,
@@ -1732,9 +1724,7 @@ def _detect_cyclic_segments(mol: Molecule):
         has_closure_bond = False
         if len(mol.bonds):
             pair = {int(np.where(first_mask)[0][0]), int(np.where(last_mask)[0][0])}
-            has_closure_bond = any(
-                {int(b[0]), int(b[1])} == pair for b in mol.bonds
-            )
+            has_closure_bond = any({int(b[0]), int(b[1])} == pair for b in mol.bonds)
         if has_closure_bond and dist > MAX_CYCLIC_CLOSURE_DIST:
             logger.warning(
                 f"Segment {seg} carries an explicit first-N to last-C bond, but "

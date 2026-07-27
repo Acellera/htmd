@@ -412,4 +412,3 @@ class AdaptiveGoal(AdaptiveMD):
             stds[i] = np.std(goalconcat[indexes[i]])
 
         return means, stds
-

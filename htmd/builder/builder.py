@@ -503,5 +503,3 @@ def minimalRotation(prot):
 
     angle, _ = cart2pol(xa, ya)
     return angle + np.radians(45)
-
-

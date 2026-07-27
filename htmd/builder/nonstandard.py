@@ -406,7 +406,7 @@ def _load_ff14sb_amino_lib_openmm():
         for atom in residue.findall("Atom"):
             atomtype = atom.attrib["type"]
             if atomtype.startswith(prefix):
-                atomtype = atomtype[len(prefix):]
+                atomtype = atomtype[len(prefix) :]
             atoms[atom.attrib["name"]] = (
                 atomtype,
                 float(atom.attrib["charge"]),
@@ -865,6 +865,7 @@ class _ClusterDispatch:
     ``in_cluster_set`` recording which residue indices are already covered
     by ``cluster_membership``.
     """
+
     # All residue groups in mol, indexed 0..N-1 (output of
     # :func:`_residue_groups_with_index`).
     groups: list = field(default_factory=list)
@@ -1090,13 +1091,13 @@ def _resolve_forcefield(forcefield):
         # when the offending resname is dispatched.
         for k, v in forcefield.items():
             _engine_for_forcefield(v)  # raises TypeError if not a string
+
         def _lookup(resname):
             ff = forcefield.get(resname, default)
             return (_engine_for_forcefield(ff), ff)
+
         return _lookup
-    raise TypeError(
-        f"forcefield must be str or dict, got {type(forcefield).__name__}"
-    )
+    raise TypeError(f"forcefield must be str or dict, got {type(forcefield).__name__}")
 
 
 def _detect_clusters(mol, specs):
@@ -1319,9 +1320,7 @@ def _parameterize_free_residue_antechamber(
         _normalize_residue_charges(typed_mol, netcharge)
     typed_mol.write(out_cif)
     pset = AmberParameterSet(frcmod_path)
-    _clean_frcmod_params(
-        pset, typed_mol, [], np.zeros(typed_mol.numAtoms, dtype=bool)
-    )
+    _clean_frcmod_params(pset, typed_mol, [], np.zeros(typed_mol.numAtoms, dtype=bool))
     pset.write(out_frcmod, title=f"parameters for {group['resname']}", style="frcmod")
     residue_templates.append(
         _ResidueTemplateData(
@@ -1366,10 +1365,7 @@ def _apply_cluster_charge_policy(
             "first and assign via off_mol.partial_charges = ..."
         )
     charges = np.array(
-        [
-            float(q.m_as(unit.elementary_charge))
-            for q in off_mol.partial_charges
-        ],
+        [float(q.m_as(unit.elementary_charge)) for q in off_mol.partial_charges],
         dtype=np.float64,
     )
 
@@ -1408,7 +1404,9 @@ def _apply_cluster_charge_policy(
         # the carboxylate C / OXT.
         if ri < len(cluster_model.spec.is_n_term) and cluster_model.spec.is_n_term[ri]:
             terminus = "n"
-        elif ri < len(cluster_model.spec.is_c_term) and cluster_model.spec.is_c_term[ri]:
+        elif (
+            ri < len(cluster_model.spec.is_c_term) and cluster_model.spec.is_c_term[ri]
+        ):
             terminus = "c"
         else:
             terminus = ""
@@ -1416,11 +1414,7 @@ def _apply_cluster_charge_policy(
         # whether the cluster Interchange has an N-H bond among the
         # residue's atoms.
         n_idx = next(
-            (
-                ai
-                for ai in atom_indices
-                if original_names[ai] == "N"
-            ),
+            (ai for ai in atom_indices if original_names[ai] == "N"),
             None,
         )
         n_has_bonded_h = False
@@ -1434,12 +1428,14 @@ def _apply_cluster_charge_policy(
                         n_has_bonded_h = True
                         break
 
-        net_charge = int(round(sum(
-            float(off_mol.atoms[ai].formal_charge.m_as(
-                unit.elementary_charge
-            ))
-            for ai in atom_indices
-        )))
+        net_charge = int(
+            round(
+                sum(
+                    float(off_mol.atoms[ai].formal_charge.m_as(unit.elementary_charge))
+                    for ai in atom_indices
+                )
+            )
+        )
 
         charge_map = _backbone_charge_map(
             canonical_resname=canonical_resname,
@@ -1463,12 +1459,16 @@ def _apply_cluster_charge_policy(
         for ri, atom_indices in enumerate(residue_atom_indices):
             if not atom_indices:
                 continue
-            net_q = int(round(sum(
-                float(off_mol.atoms[ai].formal_charge.m_as(
-                    unit.elementary_charge
-                ))
-                for ai in atom_indices
-            )))
+            net_q = int(
+                round(
+                    sum(
+                        float(
+                            off_mol.atoms[ai].formal_charge.m_as(unit.elementary_charge)
+                        )
+                        for ai in atom_indices
+                    )
+                )
+            )
             non_pinned = [ai for ai in atom_indices if not pinned_mask[ai]]
             if not non_pinned:
                 continue
@@ -1487,12 +1487,16 @@ def _apply_cluster_charge_policy(
             ai for atom_indices in residue_atom_indices for ai in atom_indices
         ]
         if cluster_atoms:
-            net_q = int(round(sum(
-                float(off_mol.atoms[ai].formal_charge.m_as(
-                    unit.elementary_charge
-                ))
-                for ai in cluster_atoms
-            )))
+            net_q = int(
+                round(
+                    sum(
+                        float(
+                            off_mol.atoms[ai].formal_charge.m_as(unit.elementary_charge)
+                        )
+                        for ai in cluster_atoms
+                    )
+                )
+            )
             non_pinned = [ai for ai in cluster_atoms if not pinned_mask[ai]]
             if non_pinned:
                 current = sum(charges[ai] for ai in cluster_atoms)
@@ -1600,9 +1604,7 @@ def _parameterize_cluster_openff(
     atom_to_residue_idx = [
         cluster_model.atom_to_residue.get(nm) for nm in atom_names_off
     ]
-    cap_atoms = {
-        i for i, ri in enumerate(atom_to_residue_idx) if ri is None
-    }
+    cap_atoms = {i for i, ri in enumerate(atom_to_residue_idx) if ri is None}
     original_names = [
         cluster_model.atom_to_orig_name.get(nm, nm) for nm in atom_names_off
     ]
@@ -1692,13 +1694,13 @@ def _parameterize_cluster_openff(
     # class1="protein-CT" in HarmonicBondForce would never match. Force
     # entries must use the ff14SB class.
     _BACKBONE_TO_FF14SB = {
-        "N":   ("protein-N",   "N"),
-        "H":   ("protein-H",   "H"),
-        "CA":  ("protein-CT",  "CT"),
-        "HA":  ("protein-H1",  "H1"),
-        "C":   ("protein-C",   "C"),
-        "O":   ("protein-O",   "O"),
-        "OXT": ("protein-O2",  "O2"),
+        "N": ("protein-N", "N"),
+        "H": ("protein-H", "H"),
+        "CA": ("protein-CT", "CT"),
+        "HA": ("protein-H1", "H1"),
+        "C": ("protein-C", "C"),
+        "O": ("protein-O", "O"),
+        "OXT": ("protein-O2", "O2"),
     }
     type_overrides = {}
     class_overrides = {}
@@ -1744,9 +1746,7 @@ def _parameterize_cluster_openff(
                 # the cluster), but we skip defensively.
                 continue
             cluster_residue = cluster_model.spec.residues[ri]
-            resname = cluster_model.canonical_renames.get(
-                ri, cluster_residue.resname
-            )
+            resname = cluster_model.canonical_renames.get(ri, cluster_residue.resname)
             external_bonds.setdefault(resname, []).append(end_atom.name)
 
     xml_path = os.path.join(cluster_outdir, f"cluster_{cluster_index:03d}.xml")
@@ -2810,8 +2810,7 @@ def parameterizeFromSpecs(
     # info reminding the user, since the symptom otherwise ("tleap
     # can't find topology for resname X") is non-obvious.
     if any(
-        _engine_for_forcefield(ff) == "openff"
-        for ff in _forcefields_in(forcefield)
+        _engine_for_forcefield(ff) == "openff" for ff in _forcefields_in(forcefield)
     ):
         logger.info(
             "SMIRNOFF (openff) forcefield in use; the per-cluster XML "
@@ -2883,9 +2882,7 @@ def parameterizeFromSpecs(
                     continue
                 seen_singleton_keys.add(key)
 
-        cluster_resnames = frozenset(
-            dispatch.groups[m]["resname"] for m in members
-        )
+        cluster_resnames = frozenset(dispatch.groups[m]["resname"] for m in members)
         if any(cluster_resnames <= seen for seen in seen_cluster_resname_sets):
             continue
         seen_cluster_resname_sets.append(cluster_resnames)

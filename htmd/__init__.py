@@ -11,7 +11,6 @@ import htmd.home
 import logging.config
 from importlib.metadata import version, PackageNotFoundError
 
-
 try:
     __version__ = version("htmd")
 except PackageNotFoundError:

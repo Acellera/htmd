@@ -87,9 +87,7 @@ def _subrandom_particle_positions(
     e.g. WebGPU). The Halton sequence is regenerated at growing length until
     ``nparticles`` non-forbidden positions are available, with a 10x cap.
     """
-    box_lengths = [
-        box_vectors[d][d].value_in_unit(unit.angstrom) for d in range(3)
-    ]
+    box_lengths = [box_vectors[d][d].value_in_unit(unit.angstrom) for d in range(3)]
 
     if forbidden_xy is None or len(forbidden_xy) == 0:
         positions = _generate_halton_positions(nparticles, box_lengths, ndim)
@@ -274,9 +272,7 @@ def distributeLipids(
         # Obstacle sigmas (radii treated as sigma, in nm)
         for r in forbidden_radii_arr:
             wca.addParticle([float(r) * 0.1])
-        wca.addInteractionGroup(
-            list(range(nparticles)), obstacle_indices
-        )
+        wca.addInteractionGroup(list(range(nparticles)), obstacle_indices)
         system.addForce(wca)
 
     # Add the nonbonded force.
@@ -344,7 +340,9 @@ def distributeLipids(
         # their XY centroid relative to the input is purely OpenMM's
         # internal wrapping; subtract it to recover the caller's frame.
         initial_obs_com = obstacle_positions[:, :2].mean(axis=0)
-        final_obs_com = allfinalpos[nparticles:nparticles + n_obstacles, :2].mean(axis=0)
+        final_obs_com = allfinalpos[nparticles : nparticles + n_obstacles, :2].mean(
+            axis=0
+        )
         allfinalpos[:, :2] -= final_obs_com - initial_obs_com
         anchor_xy = initial_obs_com
     else:

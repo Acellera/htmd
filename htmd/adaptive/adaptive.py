@@ -593,5 +593,3 @@ def _findprevioustraj(simlist, simname):
     if sim is None:
         raise NameError(f"Could not find parent of simulation {simname}.")
     return sim, prevpiece, prevframe, epo
-
-

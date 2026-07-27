@@ -187,7 +187,7 @@ class TICA(object):
                 from htmd.projections.metric import _singleMolfile
                 from moleculekit.molecule import Molecule
 
-                (single, molfile) = _singleMolfile(metr.simulations)
+                single, molfile = _singleMolfile(metr.simulations)
                 if single:
                     keepdimdesc = metr.getMapping(Molecule(molfile))
                     keepdimdesc = keepdimdesc.iloc[keepdim]
@@ -210,8 +210,7 @@ class TICA(object):
                 ]
             else:
                 proj = [
-                    self.model.transform(tr.projection)
-                    for tr in self.data.trajectories
+                    self.model.transform(tr.projection) for tr in self.data.trajectories
                 ]
             simlist = self.data.simlist
             ref = self.data.ref

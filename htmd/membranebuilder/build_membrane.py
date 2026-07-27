@@ -152,13 +152,16 @@ def _solute_area_fraction(footprint, xysize, n_samples=10000):
 
 
 def _createLipids(
-    lipidratio, area, lipiddb, files, leaflet=None,
-    area_fraction_used=0.0, head_z=15.0,
+    lipidratio,
+    area,
+    lipiddb,
+    files,
+    leaflet=None,
+    area_fraction_used=0.0,
+    head_z=15.0,
 ):
     if leaflet not in ("upper", "lower"):
-        raise ValueError(
-            f"leaflet must be 'upper' or 'lower', got {leaflet!r}"
-        )
+        raise ValueError(f"leaflet must be 'upper' or 'lower', got {leaflet!r}")
     if area_fraction_used >= 1.0:
         raise RuntimeError(
             f"Solute occupies the entire {leaflet} leaflet area "
@@ -297,7 +300,9 @@ def _detectRings(mol):
     return fivesix
 
 
-def wrapping_dist_python(coor1: np.ndarray, coor2: np.ndarray, box: np.ndarray) -> np.ndarray:
+def wrapping_dist_python(
+    coor1: np.ndarray, coor2: np.ndarray, box: np.ndarray
+) -> np.ndarray:
     """Compute minimum-image wrapped distances between a point and an array of points.
 
     Parameters
@@ -415,7 +420,13 @@ def _locateLipidFiles(folder, lipidnames):
 
 
 def _writeLJDebugPDB(
-    path, lipids, upper_fp, lower_fp, com_xy, upper_z, lower_z,
+    path,
+    lipids,
+    upper_fp,
+    lower_fp,
+    com_xy,
+    upper_z,
+    lower_z,
     use_initial=False,
 ):
     """Write the lipid head positions and per-leaflet obstacle positions to a
@@ -470,8 +481,18 @@ def _writeLJDebugPDB(
 # (e.g. CHARMM-GUI output uses TIP3/OH2, AMBER/PDB uses HOH/O, GROMACS uses
 # SOL/OW).
 _WATER_RESNAMES = (
-    "TIP3", "TIP3P", "TIP4", "TIP4P", "TIP5", "TIP5P",
-    "HOH", "WAT", "SOL", "H2O", "T3P", "T4P",
+    "TIP3",
+    "TIP3P",
+    "TIP4",
+    "TIP4P",
+    "TIP5",
+    "TIP5P",
+    "HOH",
+    "WAT",
+    "SOL",
+    "H2O",
+    "T3P",
+    "T4P",
 )
 _WATER_OXYGEN_NAMES = ("OH2", "O", "OW")
 
@@ -504,9 +525,7 @@ def _defaultHeadAtoms():
     import os
     import pandas as pd
 
-    csv = os.path.join(
-        home(shareDir=True), "membranebuilder", "lipids", "lipiddb.csv"
-    )
+    csv = os.path.join(home(shareDir=True), "membranebuilder", "lipids", "lipiddb.csv")
     db = pd.read_csv(csv, index_col="Name")
     return {name.upper(): str(db.loc[name, "Head"]) for name in db.index}
 
@@ -638,11 +657,7 @@ def equilibrateMembrane(
     # buildMembrane leaves mol.box as all zeros (solvate does not set it),
     # so we fall back to coord extents in that case. For user-supplied
     # membranes that already have a valid box, respect it.
-    if (
-        work.box is not None
-        and work.box.size == 3
-        and np.all(work.box > 0)
-    ):
+    if work.box is not None and work.box.size == 3 and np.all(work.box > 0):
         box = work.box[:, 0].astype(np.float32)
     else:
         coord_min = work.coords[:, :, 0].min(axis=0)
@@ -712,14 +727,13 @@ def equilibrateMembrane(
         )
         # Find the standard NonbondedForce so we can add ghost particles.
         nb = next(
-            f for f in (system.getForce(i) for i in range(system.getNumForces()))
+            f
+            for f in (system.getForce(i) for i in range(system.getNumForces()))
             if isinstance(f, openmm.NonbondedForce)
         )
         for el in ghost_elements:
             # vdW radius is r_min/2; AMBER sigma = r_min / 2^(1/6).
-            r_vdw = (
-                periodictable[el].vdw_radius if el in periodictable else 1.7
-            )
+            r_vdw = periodictable[el].vdw_radius if el in periodictable else 1.7
             sigma = 2.0 * r_vdw / (2 ** (1 / 6))
             system.addParticle(0.0)  # frozen
             nb.addParticle(
@@ -762,9 +776,12 @@ def equilibrateMembrane(
         for _ in range(len(ghost_xyz)):
             res = pdb.topology.addResidue("GHOST", ghost_chain)
             pdb.topology.addAtom("X", carbon, res)
-        all_positions = np.vstack(
-            [np.asarray(pdb.positions.value_in_unit(unit.angstrom)), ghost_xyz]
-        ) * unit.angstrom
+        all_positions = (
+            np.vstack(
+                [np.asarray(pdb.positions.value_in_unit(unit.angstrom)), ghost_xyz]
+            )
+            * unit.angstrom
+        )
     else:
         all_positions = pdb.positions
 
@@ -777,7 +794,11 @@ def equilibrateMembrane(
         kcal = unit.kilocalorie_per_mole
 
         def _e():
-            return simulation.context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(kcal)
+            return (
+                simulation.context.getState(getEnergy=True)
+                .getPotentialEnergy()
+                .value_in_unit(kcal)
+            )
 
         e_initial = _e()
         # CG copes with catastrophic starting energies; L-BFGS then drives
@@ -799,9 +820,7 @@ def equilibrateMembrane(
 
     # enforcePeriodicBox=False keeps molecules intact across the PBC;
     # mol.wrap() afterwards uses the bonds on mol to wrap whole lipids.
-    state = simulation.context.getState(
-        getPositions=True, enforcePeriodicBox=False
-    )
+    state = simulation.context.getState(getPositions=True, enforcePeriodicBox=False)
     positions = state.getPositions(asNumpy=True).value_in_unit(unit.angstrom)
     mol.coords[:, :, 0] = positions[:n_lipid_atoms].astype(np.float32)
 
@@ -966,12 +985,22 @@ def buildMembrane(
         lower_fraction = _solute_area_fraction(lower_fp, xysize)
 
     lipids = _createLipids(
-        ratioupper, area, lipiddb, files, leaflet="upper",
-        area_fraction_used=upper_fraction, head_z=head_z,
+        ratioupper,
+        area,
+        lipiddb,
+        files,
+        leaflet="upper",
+        area_fraction_used=upper_fraction,
+        head_z=head_z,
     )
     lipids += _createLipids(
-        ratiolower, area, lipiddb, files, leaflet="lower",
-        area_fraction_used=lower_fraction, head_z=head_z,
+        ratiolower,
+        area,
+        lipiddb,
+        files,
+        leaflet="lower",
+        area_fraction_used=lower_fraction,
+        head_z=head_z,
     )
 
     _setPositionsLJSim(
