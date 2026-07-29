@@ -772,18 +772,13 @@ def build(
     return molbuilt, system
 
 
-PDB_SERIAL_LIMIT = 99999  # PDB 5-digit atom-serial / CONECT cap
-
-
 def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
     """Write the self-contained ForceField-XML handoff for ACEMD.
 
     Emits an *ordered* parameter set (stock FF names first, then copied
     ``extra_xml`` fragments, then the frozen small-molecule ffxml), an mmCIF
-    topology (always; preserves all connectivity), a PDB (only when the system
-    fits PDB's serial limit - above that CONECT records overflow so we ship
-    only the mmCIF), and a partial ``system.yaml`` config. Returns the ordered
-    ``parameters`` list.
+    topology (preserves all connectivity), a bond-free PDB, and a partial
+    ``system.yaml`` config. Returns the ordered ``parameters`` list.
     """
     import shutil
     import yaml
@@ -809,16 +804,12 @@ def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
     cif = f"{prefix}.cif"
     molbuilt.write(os.path.join(outdir, cif))
 
-    # The PDB is a convenience carrier for other tools; moleculekit writes it
-    # (its CONECT writer caps at the PDB serial limit). Above the limit the
-    # bond records overflow, so we ship only the mmCIF (no such cap).
-    if molbuilt.numAtoms <= PDB_SERIAL_LIMIT:
-        molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"))
-    else:
-        logger.info(
-            f"System has {molbuilt.numAtoms} atoms (> {PDB_SERIAL_LIMIT}); "
-            "PDB CONECT serials overflow - shipping only the mmCIF."
-        )
+    # The PDB is a convenience carrier for other tools, written without bonds
+    # (as amber.build does). CONECT records cap at PDB's 5-digit serial: past
+    # 99999 atoms the writer silently drops the bonds above the cap and the
+    # reader renumbers the "*****" serials on the way back in, so connectivity
+    # carried here would be quietly wrong. It lives in the prmtop and the cif.
+    molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
 
     system_yaml = {
         "structure": cif,

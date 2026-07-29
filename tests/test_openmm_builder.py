@@ -2323,6 +2323,9 @@ def test_write_ff_handoff(tmpdir):
     assert sy["boxsize"] == [30.0, 30.0, 30.0]
     rt = Molecule(os.path.join(tmpdir, "structure.cif"))
     assert len(rt.bonds) == 1  # bond preserved through the cif
+    # The cif is the connectivity carrier; the PDB never carries CONECT, so
+    # that it stays identical in kind at any system size (cf. amber.build).
+    assert len(Molecule(os.path.join(tmpdir, "structure.pdb")).bonds) == 0
 
 
 @pytest.mark.skipif(not _openmm_installed, reason="needs openmm")
@@ -2341,6 +2344,54 @@ def test_write_ff_handoff_vacuum(tmpdir):
         sy = yaml.safe_load(fh)
     assert "boxsize" not in sy  # omitted for vacuum
     assert os.path.exists(os.path.join(tmpdir, "structure.cif"))
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="needs openmm")
+def test_write_ff_handoff_above_pdb_serial_limit(tmpdir):
+    # A system past PDB's 5-digit serial limit still gets a PDB. Writing it
+    # bond-free is what makes that safe: the writer would silently drop the
+    # CONECT records above the cap, and the reader renumbers the "*****"
+    # serials on the way back in, so connectivity carried here would be
+    # quietly wrong. Bonds come from the prmtop / cif instead.
+    import numpy as np
+    from htmd.builder.openmm import _write_ff_handoff, defaultFf
+    from moleculekit.molecule import Molecule
+
+    n = 100002  # just past PDB's 99999 serial cap; even, so it pairs into bonds
+    m = Molecule().empty(n)
+    m.record[:] = "ATOM"
+    m.resname[:] = "HYD"
+    m.chain[:] = "W"
+    m.segid[:] = "W"
+    m.resid[:] = np.arange(n) // 2  # diatomic residues
+    # Names must be unique within a residue - the cif bond block addresses
+    # atoms by name, so duplicates round-trip into nonsense.
+    m.name[0::2] = "O1"
+    m.name[1::2] = "H1"
+    m.element[0::2] = "O"
+    m.element[1::2] = "H"
+    # A second resname keeps the cif writer off its single-component path.
+    m.resname[-2:] = "HYE"
+    m.coords = np.zeros((n, 3, 1), dtype=np.float32)
+    m.coords[:, 0, 0] = np.arange(n, dtype=np.float32) % 100
+    # Bonds spanning the limit - exactly what overflows the CONECT records.
+    m.bonds = np.column_stack(
+        [np.arange(0, n, 2), np.arange(1, n, 2)]
+    ).astype(np.uint32)
+    m.bondtype = np.array(["1"] * (n // 2), dtype=object)
+    m.box = np.array([[100.0], [100.0], [100.0]], dtype=np.float32)
+
+    _write_ff_handoff(m, str(tmpdir), "structure", defaultFf(), None, [])
+
+    pdb = os.path.join(tmpdir, "structure.pdb")
+    assert os.path.exists(pdb)  # shipped, not skipped
+
+    rt = Molecule(pdb)
+    assert rt.numAtoms == n  # every atom survives the round-trip
+    assert len(rt.bonds) == 0  # no CONECT records to be mismapped
+
+    # The cif remains the connectivity carrier.
+    assert len(Molecule(os.path.join(tmpdir, "structure.cif")).bonds) == n // 2
 
 
 @pytest.mark.skipif(not _openmm_installed, reason="needs openmm")
