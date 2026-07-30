@@ -11,6 +11,14 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-2022"]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        exclude:
+          # deeptime ships no cp314 wheel, so 3.14 builds it from sdist. That
+          # build succeeds on Linux and Windows but not with AppleClang 21,
+          # which rejects its C++ ("a template argument list is expected after
+          # a name prefixed by the template keyword"). Not a missing toolchain
+          # - drop this once deeptime publishes cp314 wheels.
+          - os: "macos-latest"
+            python-version: "3.14"
 
     steps:
       - uses: actions/checkout@v4
