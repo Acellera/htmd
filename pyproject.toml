@@ -5,7 +5,7 @@ authors = [{ name = "Acellera", email = "info@acellera.com" }]
 readme = "README.md"
 license = "LicenseRef-Acellera-Not-for-Profit"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version"]
 classifiers = [
   "Programming Language :: Python :: 3",
@@ -39,7 +39,10 @@ interactive = [
   "ipywidgets>=8.1.8",
   "nglview>=4.0.1",
 ]
-pymol = ["pymol-open-source"]
+# pymol-open-source publishes wheels only (no sdist) and tags them cp39-cp313,
+# so it cannot be installed or built on 3.14+. Marked rather than dropped: the
+# extra stays installable everywhere and simply contributes nothing on 3.14+.
+pymol = ["pymol-open-source; python_version < '3.14'"]
 openff = [
   "openmm",
   "acellera-openmmforcefields",
@@ -51,7 +54,12 @@ openff = [
   "cachetools>=7.1.2",
   "pydantic>=2.13.4",
   "xmltodict>=1.0.4",
-  "python-constraint>=1.4.0",
+  # openff-toolkit's rdkit_wrapper imports `constraint` (E/Z stereo CSP) but
+  # declares no Python deps of its own (conda-first upstream), so we supply it.
+  # python-constraint 1.4.0's only artifact is a non-PEP 625 .tar.bz2, which
+  # uv >= 0.12 refuses; python-constraint2 is the maintained fork of the same
+  # module.
+  "python-constraint2>=2.6",
   "lxml>=5.0.0",
   "acellera-openff-amber-ff-ports>=2025.9.0",
 ]
