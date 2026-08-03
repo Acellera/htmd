@@ -114,23 +114,32 @@ napoleon_type_aliases = {
 
 
 def _emit_llms_full_txt(app, exception):
-    """build-finished hook: concatenate every rendered page source into llms-full.txt."""
+    """build-finished hook: concatenate every doc page source into llms-full.txt.
+
+    Written to two places, both of which matter:
+
+    - ``outdir`` so it is published. docs.yml deploys by rsyncing only
+      ``doc/build/html`` to the docs bucket, so a file written solely into srcdir
+      can never reach https://software.acellera.com/htmd/llms-full.txt. Writing
+      here is safe from build-finished: Sphinx's copy phase is already done, so
+      nothing will overwrite it.
+    - ``srcdir`` for local retrieval pipelines that read it straight out of the
+      checkout (playmoleculeAI's vectordb/config/collections.yaml points at
+      ``doc/source/llms-full.txt``).
+    """
     if exception is not None:
         return
     srcdir = Path(app.srcdir)
-    output = srcdir / "llms-full.txt"
     parts = []
-    for path in sorted(srcdir.rglob("*.md")):
-        if "build" in path.parts:
-            continue
-        rel = path.relative_to(srcdir)
-        parts.append(f"# === {rel} ===\n\n{path.read_text(encoding='utf-8')}\n")
-    for path in sorted(srcdir.rglob("*.rst")):
-        if "build" in path.parts:
-            continue
-        rel = path.relative_to(srcdir)
-        parts.append(f"# === {rel} ===\n\n{path.read_text(encoding='utf-8')}\n")
-    output.write_text("\n".join(parts), encoding="utf-8")
+    for pattern in ("*.md", "*.rst"):
+        for path in sorted(srcdir.rglob(pattern)):
+            if "build" in path.parts:
+                continue
+            rel = path.relative_to(srcdir)
+            parts.append(f"# === {rel} ===\n\n{path.read_text(encoding='utf-8')}\n")
+    corpus = "\n".join(parts)
+    for output in (srcdir / "llms-full.txt", Path(app.outdir) / "llms-full.txt"):
+        output.write_text(corpus, encoding="utf-8")
 
 
 def setup(app):
