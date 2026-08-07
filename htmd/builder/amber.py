@@ -1068,7 +1068,7 @@ def build(
             nanion,
             ncation,
         )
-        solvent_mol.write(os.path.join(outdir, "solvent.pdb"))
+        solvent_mol.write(os.path.join(outdir, "solvent.pdb"), writebonds=False)
 
     if execute:
         molbuilt = _run_tleap(
@@ -1488,7 +1488,7 @@ def _prepare_build(
 
     if has_water:
         water_mol = nonc_mol.copy(sel=water_sel)
-        water_mol.write(os.path.join(outdir, "solvent.pdb"))
+        water_mol.write(os.path.join(outdir, "solvent.pdb"), writebonds=False)
 
     cyc_info = []
     if len(cyclic):

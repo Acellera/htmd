@@ -101,7 +101,9 @@ def solvate(
     rotate : bool, optional
         If True, rotate the molecule to minimize box volume (not yet implemented).
     spdb : str, optional
-        Path to a custom water PDB file. If None, uses the built-in water box.
+        Path to a custom solvent box file, in any format Molecule can read.
+        If None, uses the built-in water box. Bonds are read from the file if
+        present and guessed from the coordinates otherwise.
 
     Returns
     -------
@@ -148,13 +150,19 @@ def solvate(
         )
 
     if spdb is None:
-        spdb = os.path.join(home(shareDir=True), "solvate", "wat.pdb")
+        spdb = os.path.join(home(shareDir=True), "solvate", "wat.bcif.gz")
 
     if os.path.isfile(spdb):
-        logger.info("Using water pdb file at: " + spdb)
+        logger.info("Using water file at: " + spdb)
         water = Molecule(spdb)
     else:
-        raise NameError("No solvent pdb file found in " + spdb)
+        raise NameError("No solvent file found in " + spdb)
+
+    # Without bonds, Molecule.wrap treats each water atom as its own molecule
+    # and splits waters across periodic boundaries.
+    if water.bonds.shape[0] == 0:
+        logger.info(f"No bonds found in {spdb}. Guessing them from the coordinates.")
+        water.guessBonds()
 
     if pad is not None:
         negx = pad
