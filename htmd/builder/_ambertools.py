@@ -286,12 +286,12 @@ def _fftype_antechamber(
     frcmod_path = os.path.join(tmpdir, output_frcmod)
 
     if use_pyodide:
-        typed_mol2_data = result[output_mol2]
-        _write_pyodide_output(typed_path, typed_mol2_data)
-        input_files = {output_mol2: typed_mol2_data}
-    else:
-        with open(typed_path, "rb") as f:
-            input_files = {output_mol2: f.read()}
+        _write_pyodide_output(typed_path, result[output_mol2])
+
+    # Before anything reads it back: the names in here are antechamber's.
+    _fix_mol2_atomname_capitalization(mol, typed_path)
+    with open(typed_path, "rb") as f:
+        input_files = {output_mol2: f.read()}
 
     cmd = [
         "parmchk2",
@@ -392,6 +392,47 @@ def _fix_prepi_atomname_capitalization(mol, prepi):
             section = "improper"
 
     with open(prepi, "w") as f:
+        f.writelines(lines)
+
+
+def _fix_mol2_atomname_capitalization(mol, mol2):
+    """Fix antechamber's case-flips on atom names in a typed mol2.
+
+    The mol2 counterpart of :func:`_fix_prepi_atomname_capitalization`, and the
+    same underlying flip: antechamber writes a deposited ``CL1`` back out as
+    ``Cl1``. tLeap matches atom names case-sensitively, so a residue template
+    keeping antechamber's spelling leaves the structure's own atom untyped and
+    re-adds the template's as a missing heavy atom -- a duplicate halogen, or a
+    ``MissingAtomTypeError`` if nothing types it.
+
+    Rewrites the file in place, using ``mol.name`` as the reference set.
+    """
+    uqnames = {x.upper(): x for x in np.unique(mol.name)}
+
+    # newline="" both ways so only the names change, not the line endings.
+    with open(mol2, "r", newline="") as f:
+        lines = f.readlines()
+
+    in_atoms = False
+    for i in range(len(lines)):
+        if lines[i].startswith("@<TRIPOS>"):
+            in_atoms = lines[i].strip() == "@<TRIPOS>ATOM"
+            continue
+        pieces = lines[i].split()
+        if not in_atoms or len(pieces) < 2:
+            continue
+        old_name = pieces[1]
+        new_name = uqnames.get(old_name.upper())
+        if new_name is None or new_name == old_name:
+            continue
+        logger.info(
+            f"Fixed residue {mol.resname[0]} atom name {old_name} -> "
+            f"{new_name} to match the input structure."
+        )
+        start = lines[i].index(old_name, len(pieces[0]))
+        lines[i] = f"{lines[i][:start]}{new_name}{lines[i][start + len(old_name) :]}"
+
+    with open(mol2, "w", newline="") as f:
         f.writelines(lines)
 
 

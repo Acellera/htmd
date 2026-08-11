@@ -292,6 +292,36 @@ def _lig_residue_mol(bonds=True, bondtype=True):
     return mol
 
 
+def test_typed_mol2_keeps_the_input_atom_name_capitalization(tmp_path):
+    """Antechamber writes a deposited CL1 back out as Cl1, and tLeap is
+    case-sensitive: it leaves CL1 untyped and re-adds Cl1 as a missing heavy
+    atom. 3UZC (T4E) and 6ORV (N2V) both died on MissingAtomTypeError this way.
+    """
+    from htmd.builder._ambertools import _fix_mol2_atomname_capitalization
+
+    mol = Molecule().empty(3)
+    mol.name[:] = ["CL1", "C9", "BR2"]
+    mol.resname[:] = "T4E"
+
+    mol2 = tmp_path / "typed.mol2"
+    mol2.write_text(
+        "@<TRIPOS>MOLECULE\nT4E\n    3     2     1     0     0\n"
+        "@<TRIPOS>ATOM\n"
+        "      1 C9           0.761   -5.257    6.818 ca         1 T4E  -0.0944\n"
+        "     20 Cl1          0.761   -5.257    6.818 cl         1 T4E  -0.0944\n"
+        "     21 Br2          1.000    2.000    3.000 br         1 T4E   0.0100\n"
+        "@<TRIPOS>BOND\n     1    1   20 1\n"
+    )
+    _fix_mol2_atomname_capitalization(mol, mol2)
+
+    written = mol2.read_text()
+    assert " CL1 " in written and " BR2 " in written
+    assert "Cl1" not in written and "Br2" not in written
+    # The GAFF types are lowercase by convention and share the elements' spelling.
+    assert " cl " in written and " br " in written
+    assert Molecule(str(mol2)).numAtoms == 3
+
+
 def test_check_specs_templated_raises_when_bonds_missing():
     """A multi-atom non-canonical residue with no internal bonds cannot be
     parameterized and is rejected as untemplated."""
