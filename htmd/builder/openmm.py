@@ -287,8 +287,18 @@ def _amber_modres_ffxml(present, outdir):
 
 def _maybe_add_amber_modres(mol, outdir, extra_xml):
     """Auto-convert + load any AMBER-library modified residue present in ``mol``
-    (MSE / ALY / ... from ff14SB_modAA). Returns the augmented ``extra_xml``."""
-    paths = _amber_modres_ffxml({str(r) for r in np.unique(mol.resname)}, outdir)
+    (MSE / ALY / ... from ff14SB_modAA). Returns the augmented ``extra_xml``.
+
+    GLYCAM sugar units are excluded first: the modrna08 codes ``1MA``/``2MA``
+    (1- and 2-methyladenosine) are also the GLYCAM codes for 1- and 2-linked
+    alpha-D-mannose, so a glycan would otherwise pull in the modified-RNA
+    library it has nothing to do with. ``glycamUnitMask`` tells the two apart
+    by ring composition rather than by the 3-letter code alone."""
+    from moleculekit.tools.glycans import glycamUnitMask
+
+    resnames = {str(r) for r in np.unique(mol.resname)}
+    resnames -= {str(r) for r in mol.resname[glycamUnitMask(mol)]}
+    paths = _amber_modres_ffxml(resnames, outdir)
     if not paths:
         return extra_xml
     logger.info(
@@ -519,6 +529,85 @@ def _maybe_add_ffptm_prepi(mol, outdir, extra_xml):
     return list(extra_xml) + paths
 
 
+def _maybe_add_glycam(mol, extra_xml):
+    """Auto-detect a GLYCAM glycan in ``mol`` (sugars renamed by
+    ``systemPrepare`` to their GLYCAM unit codes such as ``0YB``/``4YB``/
+    ``UYB``, a free reducing end renamed to ``ROH``, and a glycosylated
+    ASN/SER/THR renamed to its anchor ``NLN``/``OLS``/``OLT``) and wire up
+    OpenMM's own bundled GLYCAM force field for it: append
+    ``amber14/GLYCAM_06j-1.xml`` to ``extra_xml`` (so it reaches both the
+    topology bond definitions via :func:`_temporary_residue_bond_defs` and the
+    ``ForceField`` via :func:`_setup_forcefield`), register OpenMM's bundled
+    ``glycam-hydrogens.xml``, and strip the input hydrogens from the sugar and
+    ``ROH`` residues **in place** so ``Modeller.addHydrogens`` rebuilds them in
+    GLYCAM naming (mirroring how ``amber.build`` lets tleap rebuild them from
+    its own libraries). Anchor hydrogens are left untouched: they are ordinary
+    protein hydrogens and :func:`_register_amber_variant_bond_defs`'s
+    ``NLN``/``OLS``/``OLT`` bond definitions expect them present.
+
+    Raises ``NotImplementedError`` for the two glycan pieces the OpenMM
+    builder cannot support: the ``ZfA``/``ZfB`` 2,3-linked-fucose units (no
+    OpenMM GLYCAM template exists for them) and the ``OLP`` (glycosylated
+    hydroxyproline) anchor (its base ``HYP`` residue is not a standard
+    PDBFile residue, so no bond definition can be derived for it - see
+    :func:`_register_amber_variant_bond_defs`). Both are supported by
+    ``htmd.builder.amber.build``. Returns the augmented ``extra_xml``,
+    unchanged if no GLYCAM residue is present."""
+    import openmm.app as app
+    from moleculekit.tools.glycans import GLYCAM_ANCHOR_UNITS, glycamUnitMask
+
+    # glycamUnitMask gates on sugar-like ring composition, not just the
+    # 3-letter code, so the modified ribonucleotides 1MA/2MA (handled above
+    # via _maybe_add_amber_modres) and colliding ligand codes such as TLA
+    # are not misread as unsupported glycans.
+    sugar_mask = glycamUnitMask(mol)
+    roh_mask = mol.resname == "ROH"
+    anchor_mask = np.isin(mol.resname, list(GLYCAM_ANCHOR_UNITS))
+    glycam_mask = sugar_mask | roh_mask | anchor_mask
+    if not np.any(glycam_mask):
+        return extra_xml
+
+    present = sorted({str(r) for r in mol.resname[glycam_mask]})
+
+    unsupported_units = sorted(set(present) & {"ZfA", "ZfB"})
+    if unsupported_units:
+        raise NotImplementedError(
+            f"GLYCAM unit(s) {', '.join(unsupported_units)} (2,3-linked "
+            "L-fucose) have no OpenMM GLYCAM_06j-1 template. Use "
+            "htmd.builder.amber.build, which does support them."
+        )
+    if "OLP" in present:
+        raise NotImplementedError(
+            "The OLP glycan anchor (glycosylated hydroxyproline) has no "
+            "usable OpenMM bond definition (its base HYP residue is not a "
+            "standard PDBFile residue). Use htmd.builder.amber.build, which "
+            "does support it."
+        )
+
+    logger.info(
+        f"GLYCAM glycan residue(s) {', '.join(present)} detected; auto-loading "
+        "OpenMM's bundled GLYCAM_06j-1 force field and rebuilding sugar "
+        "hydrogens in GLYCAM naming."
+    )
+
+    data_dir = os.path.join(os.path.dirname(app.__file__), "data")
+    glycam_ffxml = os.path.join(data_dir, "amber14", "GLYCAM_06j-1.xml")
+    app.Modeller.loadHydrogenDefinitions(
+        os.path.join(data_dir, "glycam-hydrogens.xml")
+    )
+
+    # Strip sugar / ROH hydrogens so addHydrogens rebuilds them in GLYCAM
+    # naming. Anchor hydrogens are standard protein ones and are kept.
+    strip_mask = (sugar_mask | roh_mask) & (mol.element == "H")
+    mol.remove(strip_mask, _logger=False)
+
+    if not extra_xml:
+        return [glycam_ffxml]
+    if isinstance(extra_xml, str):
+        return [extra_xml, glycam_ffxml]
+    return list(extra_xml) + [glycam_ffxml]
+
+
 def build(
     mol: Molecule,
     ff: list | None = None,
@@ -636,22 +725,11 @@ def build(
     # to an OpenMM template, register a hydrogen definition, and strip their
     # input Hs so addHydrogens rebuilds them in the template's naming.
     extra_xml = _maybe_add_ffptm_prepi(mol, outdir, extra_xml)
-
-    from moleculekit.tools.glycans import GLYCAM_ANCHOR_UNITS, glycamUnitMask
-
-    # glycamUnitMask checks composition, not just the 3-letter code, so the
-    # modified ribonucleotides 1MA/2MA (supported above via
-    # _maybe_add_amber_modres) are not misread as unsupported glycans.
-    glycam_present = sorted(
-        set(mol.resname[glycamUnitMask(mol)])
-        | (set(np.unique(mol.resname)) & ({"ROH"} | set(GLYCAM_ANCHOR_UNITS)))
-    )
-    if glycam_present:
-        raise NotImplementedError(
-            f"GLYCAM glycan residue(s) {', '.join(glycam_present)} are "
-            f"supported only by the AMBER builder (htmd.builder.amber.build). "
-            f"The OpenMM builder does not support glycans yet."
-        )
+    # GLYCAM glycan residues (sugars, the ROH free reducing end, and the
+    # NLN/OLS/OLT anchors): auto-load OpenMM's own bundled GLYCAM_06j-1 force
+    # field and hydrogen definitions, and strip sugar hydrogens so
+    # addHydrogens rebuilds them in GLYCAM naming.
+    extra_xml = _maybe_add_glycam(mol, extra_xml)
 
     topology, positions = _mol_to_openmm(
         mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
@@ -1879,22 +1957,30 @@ _AMBER_VARIANT_BONDS_REGISTERED = False
 
 def _register_amber_variant_bond_defs():
     """Teach :class:`openmm.app.Topology` about the AMBER ff14SB
-    protonation-state variants of canonical residues so PDBFile can
-    auto-infer their intra-residue and peptide N-C bonds.
+    protonation-state variants of canonical residues, and the GLYCAM
+    glycan anchor residues, so PDBFile can auto-infer their intra-residue
+    and peptide N-C bonds.
 
     OpenMM's built-in ``residues.xml`` (consumed by
     ``Topology.createStandardBonds``) only knows the standard PDB
-    amino-acid names (CYS, HIS, LYS, ASP, GLU, TYR, ARG). The AMBER
-    variant resnames moleculekit emits (CYM, CYX, HID, HIE, HIP, LYN,
-    ASH, GLH, TYM, AR0) are absent. Without these definitions PDBFile
-    can't insert the peptide bonds at the boundary of a variant
+    amino-acid names (CYS, HIS, LYS, ASP, GLU, TYR, ARG, ASN, SER, THR).
+    The AMBER variant resnames moleculekit emits (CYM, CYX, HID, HIE,
+    HIP, LYN, ASH, GLH, TYM, AR0) and the GLYCAM glycosylation-anchor
+    resnames (NLN, OLS, OLT) are absent. Without these definitions
+    PDBFile can't insert the peptide bonds at the boundary of a variant
     residue, so OpenMM's ``ForceField`` template matcher rejects the
     NEIGHBOURING canonical residue with ``missing 1 C atom``.
 
     Each variant is the base residue's bond set minus the H atoms that
     don't exist for that protonation state (e.g. ``HG`` removed for
-    CYM/CYX, ``HZ3`` for LYN, ``HE2`` for HID, ``HD1`` for HIE). The
-    backbone and side-chain heavy-atom bonds carry over unchanged.
+    CYM/CYX, ``HZ3`` for LYN, ``HE2`` for HID, ``HD1`` for HIE) or that
+    the glycosidic bond displaced (``HD22`` for NLN, ``HG`` for OLS,
+    ``HG1`` for OLT - see
+    :data:`moleculekit.tools.glycans.GLYCAN_ANCHORS`). The backbone and
+    side-chain heavy-atom bonds carry over unchanged. ``OLP`` (the
+    hydroxyproline anchor) is deliberately not included here: its base
+    ``HYP`` residue is not itself a standard PDBFile residue, so no bond
+    list can be derived this way.
 
     Idempotent - the first call registers; subsequent calls are no-ops.
     """
@@ -1941,6 +2027,15 @@ def _register_amber_variant_bond_defs():
         },
         "ARG": {
             "AR0": {"HE"},  # neutral arginine (one variant)
+        },
+        "ASN": {
+            "NLN": {"HD22"},  # N-glycosylated Asn: GLYCAM anchor for N-glycans
+        },
+        "SER": {
+            "OLS": {"HG"},  # O-glycosylated Ser: GLYCAM anchor for O-glycans
+        },
+        "THR": {
+            "OLT": {"HG1"},  # O-glycosylated Thr: GLYCAM anchor for O-glycans
         },
     }
 
@@ -2016,7 +2111,8 @@ def _add_missing_bonds(mol, topology):
     - Intra-residue bonds for any residue whose name is in
       ``Topology._standardBonds`` (standard amino acids and nucleotides
       out of the box; AMBER protonation variants CYM / CYX / HID / HIE
-      / HIP / LYN / ASH / GLH / TYM / AR0 are registered here via
+      / HIP / LYN / ASH / GLH / TYM / AR0 and the GLYCAM glycan anchors
+      NLN / OLS / OLT are registered here via
       :func:`_register_amber_variant_bond_defs` so PDBFile knows them
       too).
     - Peptide N-C bonds between adjacent residues whose names are in

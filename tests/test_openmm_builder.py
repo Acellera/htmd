@@ -1535,9 +1535,23 @@ _THREE_WAY_SYSTEMS = [
     pytest.param("4TOT_E.cif", id="4TOT_E_cyclosporin"),
     pytest.param("8QFZ_B.cif", id="8QFZ_B_scaffolded"),
     pytest.param("8QU4_A.cif", id="8QU4_A_staple"),
-    # 1R1J (glycoprotein) intentionally excluded: glycans are amber-only for
-    # now (see test_openmm_build_rejects_glycans), so the amber vs openmm
-    # parity comparison this parametrization runs does not apply to it.
+    # 1R1J (glycoprotein) intentionally excluded from this parametrization.
+    # Its ZN2+ has also been stripped from the fixture (neither AMBER's GAFF2
+    # nor SMIRNOFF parameterize metal-coordination bonds), but the real reason
+    # is a residue-numbering artifact, not a chemistry disagreement: 1R1J is
+    # the only fixture where a free ligand (OIR) sits, in the original file's
+    # residue order, between the protein and its own covalently-attached
+    # glycan. tleap writes the trailing non-polymer residues as
+    # [protein, OIR, glycan]; ParmEd's rediscover_molecules (used only by
+    # openmm.build's prmtop writer) reorders them to keep the covalently-
+    # bonded protein+glycan molecule contiguous, giving [protein, glycan,
+    # OIR] instead. This test keys atom identity on resid, so the two builds
+    # look like they disagree on 4 residues when they actually agree on all
+    # 11184 atoms - same resnames, same atom names, same charges, just one
+    # residue of numbering displacement on the glycan. See
+    # test_glycan_amber_vs_openmm_chemistry_agreement below for the
+    # resid-independent comparison that covers this system's actual glycan
+    # chemistry instead.
     pytest.param("2KDC_A.cif", id="2KDC_membrane"),
     pytest.param("1BL8_A.cif", id="1BL8_channel"),
     pytest.param("2B5I_A.cif", id="2B5I_canonical"),
@@ -1751,22 +1765,235 @@ def test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
         ), f"{label} total charge {total:.4f} not integer"
 
 
-@pytest.mark.skipif(
-    not (_openmm_installed and _openff_installed and _tleap_installed),
-    reason="OpenMM + OpenFF Interchange + tleap required",
-)
-def test_openmm_build_rejects_glycans(tmp_path):
-    """1R1J's N-glycosylated ASN is renamed by systemPrepare's glycan
-    detection to NLN/0YB (GLYCAM unit names). GLYCAM ships only tleap-
-    loadable prep/lib units, so the OpenMM builder has no support for it and
-    must refuse with a clear NotImplementedError instead of silently
-    mis-building (or crashing deep inside) the sugar."""
+def _minimal_glycam_sugar_mol(resname, resid=1, chain="C", segid="G1", x0=0.0):
+    """A minimal 2-atom GLYCAM sugar residue (anomeric carbon + ring oxygen,
+    at real ring-bond distance) - just enough for glycamUnitMask's
+    composition-and-geometry gate to recognize it as a genuine GLYCAM unit.
+    Mirrors the amber builder's own ``_minimal_sugar_mol`` test helper."""
+    from moleculekit.molecule import Molecule
+
+    mol = Molecule().empty(2)
+    mol.resname[:] = resname
+    mol.resid[:] = resid
+    mol.chain[:] = chain
+    mol.segid[:] = segid
+    mol.record[:] = "ATOM"
+    mol.name[:] = ["C1", "O5"]
+    mol.element[:] = ["C", "O"]
+    mol.coords = np.array(
+        [[x0, 0.0, 0.0], [x0 + 1.4, 0.0, 0.0]], dtype=np.float32
+    ).reshape(2, 3, 1)
+    return mol
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="OpenMM required")
+def test_maybe_add_glycam_rejects_fucose_zfa_zfb():
+    """ZfA/ZfB (2,3-linked L-fucose) are 2 of the 184 GLYCAM unit names with
+    no matching template in OpenMM's bundled GLYCAM_06j-1.xml (it covers the
+    other 182, plus ROH and all four anchors). The OpenMM builder must
+    refuse with a clear, specific error naming the residue rather than
+    silently building an unparameterized sugar or failing deep inside
+    ForceField's template matcher. amber.build does support it via tleap's
+    own GLYCAM libraries."""
+    from htmd.builder.openmm import _maybe_add_glycam
+
+    mol = _minimal_glycam_sugar_mol("ZfA")
+    with pytest.raises(NotImplementedError, match="ZfA"):
+        _maybe_add_glycam(mol, None)
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="OpenMM required")
+def test_maybe_add_glycam_rejects_olp_anchor():
+    """OLP (glycosylated hydroxyproline) cannot get a bond definition the way
+    NLN/OLS/OLT do: its base HYP residue is absent from OpenMM's
+    Topology._standardBonds (see _register_amber_variant_bond_defs), so no
+    bond list can be derived for it there. The OpenMM builder must refuse it
+    explicitly rather than build a bond-less, mis-templated residue.
+    amber.build does support it via tleap's own GLYCAM libraries."""
+    from moleculekit.molecule import Molecule
+    from htmd.builder.openmm import _maybe_add_glycam
+
+    mol = Molecule().empty(1)
+    mol.resname[:] = "OLP"
+    mol.name[:] = "OD1"
+    mol.element[:] = "O"
+    mol.resid[:] = 1
+    mol.chain[:] = "A"
+    mol.segid[:] = "P1"
+    mol.record[:] = "ATOM"
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+    with pytest.raises(NotImplementedError, match="OLP"):
+        _maybe_add_glycam(mol, None)
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="OpenMM required")
+def test_maybe_add_glycam_does_not_misdetect_modified_ribonucleotide():
+    """1MA/2MA are two of GLYCAM's 184 unit codes AND real AMBER modrna08
+    modified-ribonucleotide names (see glycamUnitMask's docstring and
+    test_glycam_modrna_collision_set_is_1ma_2ma on the amber side). A real
+    1MA ribonucleotide carries its purine base nitrogen (unlike a genuine
+    GLYCAM mannose-linkage unit, which glycamUnitMask's nitrogen gate keys
+    on), so it must not be misdetected as a glycan by _maybe_add_glycam and
+    sent down the GLYCAM force-field / hydrogen-stripping path."""
+    from moleculekit.molecule import Molecule
+    from htmd.builder.openmm import _maybe_add_glycam
+
+    mol = Molecule(
+        os.path.join(
+            curr_dir, "test_nonstandard_builder", "modrna_pdb", "1MA.cif"
+        )
+    )
+    mol.resname[:] = "1MA"
+    mol.chain[:] = "A"
+    mol.segid[:] = "A"
+    mol.resid[:] = 1
+    mol.remove("element H", _logger=False)
+
+    assert _maybe_add_glycam(mol, None) is None
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="OpenMM required")
+def test_openmm_build_3ave_branched_nglycan(tmp_path):
+    """End-to-end OpenMM build of 3AVE's branched N-glycan fragment (the same
+    fixture amber's test_glycam_build_3ave_branched_nglycan builds).
+    systemPrepare renames the sugar tree to GLYCAM unit codes and the
+    glycosylated ASN to NLN; openmm.build must produce a system carrying
+    those GLYCAM resnames, the glycosidic bonds between them, and rebuilt
+    sugar hydrogens (the input PDB has none on the sugar tree -
+    _maybe_add_glycam strips whatever systemPrepare/pdb2pqr added and
+    Modeller.addHydrogens rebuilds them in GLYCAM naming)."""
+    from moleculekit.molecule import Molecule
+    from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.openmm import build as openmm_build
 
-    pmol, _specs = _load_three_way_system("1R1J_A.cif")
-    assert "NLN" in pmol.resname and "0YB" in pmol.resname
-    with pytest.raises(NotImplementedError, match="GLYCAM"):
-        openmm_build(pmol, outdir=str(tmp_path), solvate=False, ionize=False)
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    pmol, _ = systemPrepare(mol)
+    molbuilt, _system = openmm_build(
+        pmol, outdir=str(tmp_path), solvate=False, ionize=False
+    )
+
+    for code in ("NLN", "UYB", "4YB", "VMB", "2MA", "0YB", "0fA"):
+        assert code in molbuilt.resname, code
+
+    def _has_bond(resname_a, name_a, resname_b, name_b):
+        idx_a = np.where((molbuilt.resname == resname_a) & (molbuilt.name == name_a))[
+            0
+        ]
+        idx_b = np.where((molbuilt.resname == resname_b) & (molbuilt.name == name_b))[
+            0
+        ]
+        bset = {tuple(sorted((int(a), int(b)))) for a, b in molbuilt.bonds}
+        return any(
+            tuple(sorted((int(a), int(b)))) in bset for a in idx_a for b in idx_b
+        )
+
+    # Glycosidic bonds (mol.bonds -> CONECT -> _add_missing_bonds) survive.
+    assert _has_bond("NLN", "ND2", "UYB", "C1")
+    assert _has_bond("UYB", "O6", "0fA", "C1")
+    assert _has_bond("VMB", "O3", "2MA", "C1")
+    assert _has_bond("VMB", "O6", "2MA", "C1")
+
+    # Sugar hydrogens were rebuilt by Modeller.addHydrogens in GLYCAM naming.
+    sugar_h = (molbuilt.resname == "UYB") & (molbuilt.element == "H")
+    assert np.any(sugar_h), "sugar hydrogens were not rebuilt by addHydrogens"
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _tleap_installed),
+    reason="OpenMM + tleap required",
+)
+def test_glycan_amber_vs_openmm_chemistry_agreement(tmp_path):
+    """amber.build vs openmm.build on 3AVE's branched N-glycan, compared
+    resid-independently.
+
+    This is the coverage that replaces 1R1J in _THREE_WAY_SYSTEMS above: 3AVE
+    has no free ligand sitting between the protein and its glycan tail, so
+    there is no trailing-residue-order ambiguity between tleap and ParmEd
+    here (unlike 1R1J) - amber.build and openmm.build number every residue
+    identically for this fixture. We still compare resid-independently
+    (composition as a multiset, bonds by name, charges keyed by
+    resname+atom name) rather than by index, since that is the correct way
+    to compare two builders that are, in general, allowed to number
+    residues differently.
+
+    Prepares once with systemPrepare and builds the SAME prepared molecule
+    both ways, then asserts the two builds agree on:
+      1. composition - the multiset of (normalised resname, atom name) pairs
+         is identical (catches atoms migrating to a different residue or
+         atom count drifting, independent of order/resid).
+      2. every glycosidic and anchor bond is present in BOTH built
+         topologies (glycam.build's tleap and openmm.build's GLYCAM_06j-1
+         path must both wire up the same sugar tree).
+      3. per-atom charges agree within 1e-3, matched by (resname, atom
+         name) - not index - since atom order legitimately differs between
+         the two builders (see the 1R1J comment above) and AMBER-style
+         force fields assign charges per residue TEMPLATE, so every atom
+         sharing a (resname, atom name) key is expected to carry the same
+         charge regardless of which specific residue instance it is.
+    """
+    from collections import Counter
+
+    from moleculekit.molecule import Molecule
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build as amber_build
+    from htmd.builder.openmm import build as openmm_build
+    from test_amber_builder import _assert_glycan_bond
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    pmol, _ = systemPrepare(mol)
+
+    molbuilt_amber = amber_build(pmol.copy(), outdir=str(tmp_path / "amber"), ionize=False)
+    molbuilt_omm, _system = openmm_build(
+        pmol.copy(), outdir=str(tmp_path / "omm"), solvate=False, ionize=False
+    )
+
+    def _norm_resname(resname):
+        return _RESNAME_NORMALISE.get(str(resname), str(resname))
+
+    # 1. Composition: multiset of (normalised resname, atom name).
+    def _composition(m):
+        return Counter(
+            (_norm_resname(m.resname[i]), str(m.name[i])) for i in range(m.numAtoms)
+        )
+
+    comp_amber = _composition(molbuilt_amber)
+    comp_omm = _composition(molbuilt_omm)
+    assert comp_amber == comp_omm, (
+        f"composition differs: amber-only {comp_amber - comp_omm}, "
+        f"openmm-only {comp_omm - comp_amber}"
+    )
+
+    # 2. Glycosidic + anchor bonds present in BOTH built topologies.
+    for m in (molbuilt_amber, molbuilt_omm):
+        _assert_glycan_bond(m, "NLN", "ND2", "UYB", "C1")
+        _assert_glycan_bond(m, "UYB", "O6", "0fA", "C1")
+        _assert_glycan_bond(m, "VMB", "O3", "2MA", "C1")
+        _assert_glycan_bond(m, "VMB", "O6", "2MA", "C1")
+
+    # 3. Per-atom charges agree, keyed by (resname, atom name) rather than
+    # index/resid, since atom order legitimately differs between builders.
+    def _charge_by_key(m):
+        out = {}
+        for i in range(m.numAtoms):
+            key = (_norm_resname(m.resname[i]), str(m.name[i]))
+            out.setdefault(key, []).append(float(m.charge[i]))
+        return {k: sum(v) / len(v) for k, v in out.items()}
+
+    charges_amber = _charge_by_key(molbuilt_amber)
+    charges_omm = _charge_by_key(molbuilt_omm)
+    assert set(charges_amber) == set(charges_omm)
+    mismatches = [
+        (k, charges_amber[k], charges_omm[k])
+        for k in charges_amber
+        if abs(charges_amber[k] - charges_omm[k]) > 1e-3
+    ]
+    assert not mismatches, (
+        f"{len(mismatches)} charge mismatches > 1e-3 (first 10): {mismatches[:10]}"
+    )
 
 
 @pytest.mark.skipif(
