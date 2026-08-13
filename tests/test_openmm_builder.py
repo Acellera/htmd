@@ -1535,10 +1535,9 @@ _THREE_WAY_SYSTEMS = [
     pytest.param("4TOT_E.cif", id="4TOT_E_cyclosporin"),
     pytest.param("8QFZ_B.cif", id="8QFZ_B_scaffolded"),
     pytest.param("8QU4_A.cif", id="8QU4_A_staple"),
-    # 1R1J's ZN2+ has been stripped from the fixture: neither AMBER's
-    # GAFF2 nor SMIRNOFF parameterise metal-coordination bonds, so the
-    # two builds would only agree if both see no Zn at all.
-    pytest.param("1R1J_A.cif", id="1R1J_glyco"),
+    # 1R1J (glycoprotein) intentionally excluded: glycans are amber-only for
+    # now (see test_openmm_build_rejects_glycans), so the amber vs openmm
+    # parity comparison this parametrization runs does not apply to it.
     pytest.param("2KDC_A.cif", id="2KDC_membrane"),
     pytest.param("1BL8_A.cif", id="1BL8_channel"),
     pytest.param("2B5I_A.cif", id="2B5I_canonical"),
@@ -1750,6 +1749,24 @@ def test_three_way_amber_vs_antechamber_vs_openff(tmp_path, input_filename):
         assert (
             abs(total - round(total)) < 0.01
         ), f"{label} total charge {total:.4f} not integer"
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _openff_installed and _tleap_installed),
+    reason="OpenMM + OpenFF Interchange + tleap required",
+)
+def test_openmm_build_rejects_glycans(tmp_path):
+    """1R1J's N-glycosylated ASN is renamed by systemPrepare's glycan
+    detection to NLN/0YB (GLYCAM unit names). GLYCAM ships only tleap-
+    loadable prep/lib units, so the OpenMM builder has no support for it and
+    must refuse with a clear NotImplementedError instead of silently
+    mis-building (or crashing deep inside) the sugar."""
+    from htmd.builder.openmm import build as openmm_build
+
+    pmol, _specs = _load_three_way_system("1R1J_A.cif")
+    assert "NLN" in pmol.resname and "0YB" in pmol.resname
+    with pytest.raises(NotImplementedError, match="GLYCAM"):
+        openmm_build(pmol, outdir=str(tmp_path), solvate=False, ionize=False)
 
 
 @pytest.mark.skipif(

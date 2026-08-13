@@ -46,6 +46,10 @@ Stapled peptides (hydrocarbon, lactam, thioether staples), isopeptide bonds (N-t
 
 The same {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` call handles staples, isopeptides, and cycles; you don't have to hand-edit a tLeap script or a CHARMM PSF.
 
+### Glycoproteins and free glycans
+
+N-linked and O-linked glycans, and free oligosaccharides, build through {py:func}`htmd.builder.amber.build` against the GLYCAM-06j force field, over a curated set of PDB sugar resnames (NAG, NDG, BMA, MAN, GAL, GLA, GLC, BGC, FUC, FUL, XYP, XYS, SIA, NGA, A2G). {py:func}`~moleculekit.tools.preparation.systemPrepare` renames sugar residues to their GLYCAM unit names, renames the glycosylated ASN/SER/THR/HYP anchor to `NLN`/`OLS`/`OLT`/`OLP` while removing the hydrogen displaced by the glycosidic bond, and splits free reducing ends into their own `ROH` residue. `amber.build` then auto-loads `leaprc.GLYCAM_06j-1`, strips sugar hydrogens so tLeap rebuilds them in GLYCAM naming, and derives every glycosidic bond from the GLYCAM resnames plus geometry, passing them to tLeap as explicit `bond` commands - so branched glycans build correctly regardless of residue order. Unsupported sugars, anchors, or linkages raise a clear error rather than a silent bad topology. Only {py:func}`htmd.builder.amber.build` supports glycans; {py:func}`htmd.builder.openmm.build` and {py:func}`htmd.builder.charmm.build` both raise `NotImplementedError` for glycosylated input.
+
 ### Disulfide bonds
 
 Disulfide handling is automatic by default: {py:func}`~htmd.builder.builder.detectDisulfideBonds` scans the prepared structure for `CY*`-resname residues' `SG` atoms within `thresh` Å (default 3 Å) — segids must be set first — and returns the inferred bridges. Both {py:func}`htmd.builder.amber.build` and {py:func}`htmd.builder.charmm.build` accept a `disulfide=` argument; pass `None` to auto-detect, or a list of `(sel1, sel2)` atom-selection pairs to override.

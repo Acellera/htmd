@@ -2451,13 +2451,14 @@ def test_full_pipeline_4tot_e(tmp_path):
 )
 def test_full_pipeline_1r1j(tmp_path):
     """1R1J: glycoprotein with three NAG-Asn N-glycosylation sites. Each
-    Asn ND2 - NAG C1 bond produces a CovalentLigandSpec(NAG) plus a
-    CanonicalRenamedSpec(ASN). All three sites share one (ASN, ND2, NAG,
-    mid-chain) bucket so they collapse to a single per-bucket prepi."""
+    Asn ND2 - NAG C1 bond is recognized natively by systemPrepare's glycan
+    detection: NAG is emitted as a GlycanSpec (no SMILES templating needed)
+    and is renamed to GLYCAM's 0YB unit, with the anchor ASN renamed to NLN.
+    parameterizeFromSpecs skips GlycanSpec entirely; GLYCAM's own forcefield
+    parameters build the sugar, not antechamber."""
     mol = Molecule(R1J_PDB)
 
     smiles = {
-        "NAG": "CC(=O)N[C@@H]1[C@@H](O)O[C@H](CO)[C@@H](O)[C@@H]1O",
         # OIR: N-(3-phenyl-2-sulfanylpropanoyl)phenylalanylalanine, the
         # zinc-bound peptidic inhibitor (RCSB chem-comp OIR).
         "OIR": "CC(C(=O)O)NC(=O)C(Cc1ccccc1)NC(=O)C(Cc2ccccc2)S",
@@ -2465,6 +2466,9 @@ def test_full_pipeline_1r1j(tmp_path):
     built = _run_pipeline(mol, smiles, tmp_path)
     assert built is not None
     _check_no_overvalent_atoms(built)
+    assert "NLN" in built.resname
+    assert "0YB" in built.resname
+    assert "NAG" not in built.resname
 
 
 @pytest.mark.skipif(

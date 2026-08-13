@@ -730,6 +730,328 @@ def test_detect_modaa_residues_noop_without_modaa():
     assert not any("modAA" in f for f in ff)
 
 
+def test_glycam_modrna_collision_set_is_1ma_2ma():
+    """Pins the exact set of 3-letter codes shared between GLYCAM's
+    systematically generated sugar unit names and AMBER's modrna08
+    modified-ribonucleotide names. ``_is_glycam_sugar_not_modrna`` tells
+    the two apart by checking for a nitrogen atom, which is only valid
+    because the current collision set happens to be entirely mannose
+    (N-free) codes. If this test fails, a new collision has landed on a
+    different code: re-examine ``_is_glycam_sugar_not_modrna`` before
+    trusting it, since a GlcNAc/GalNAc/sialic-acid GLYCAM unit (all of
+    which DO carry nitrogen) would be misclassified as the modrna
+    residue, silently, in all three of its call sites at once."""
+    from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+    from moleculekit.tools.glycans import GLYCAM_UNIT_NAMES
+
+    collision = set(MODIFIED_NUCLEIC_RESIDUE_NAMES) & (
+        set(GLYCAM_UNIT_NAMES) | {"ROH"}
+    )
+    assert collision == {"1MA", "2MA"}
+
+
+def test_detect_glycam_residues_ff_and_hydrogens():
+    from htmd.builder.amber import _detect_glycam_residues, defaultFf
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    # simulate prepared naming (subset is enough for this unit test)
+    ren = {1: "UYB", 2: "4YB", 3: "VMB", 4: "2MA", 5: "0YB", 6: "2MA", 7: "0YB", 8: "0fA"}
+    for resid, code in ren.items():
+        mol.resname[(mol.chain == "C") & (mol.resid == resid)] = code
+    mol.resname[(mol.chain == "A") & (mol.resid == 297)] = "NLN"
+    # 3AVE_frag.pdb is a bare crystallographic fragment with no hydrogens at
+    # all; add one synthetic amide hydrogen on the anchor residue, as a real
+    # systemPrepare/pdb2pqr protonation would, so the "anchor hydrogens are
+    # untouched" assertion below is actually exercised rather than trivially
+    # true.
+    nd2_idx = np.where(
+        (mol.chain == "A") & (mol.resid == 297) & (mol.name == "ND2")
+    )[0][0]
+    h_atom = Molecule().empty(1)
+    h_atom.name[:] = "HD22"
+    h_atom.element[:] = "H"
+    h_atom.resname[:] = "NLN"
+    h_atom.resid[:] = 297
+    h_atom.chain[:] = "A"
+    h_atom.record[:] = "ATOM"
+    h_atom.coords = (
+        mol.coords[nd2_idx, :, 0] + np.array([0.5, 0.5, 0.5], dtype=np.float32)
+    ).reshape(1, 3, 1)
+    mol.append(h_atom)
+    mol.segid[:] = np.where(mol.chain == "C", "G1", "P1")
+    mol.deleteBonds("all")
+
+    ff = defaultFf()
+    bonds = _detect_glycam_residues(mol, ff)
+    # leaprc inserted before the water leaprc, not appended
+    gidx = ff.index("leaprc.GLYCAM_06j-1")
+    widx = [i for i, f in enumerate(ff) if "water" in f][0]
+    assert gidx < widx
+    # 7 glycosidic + 1 anchor bond
+    assert len(bonds) == 8
+    # sugar hydrogens stripped, NLN hydrogens kept
+    assert not np.any((mol.segid == "G1") & (mol.element == "H"))
+    assert np.any((mol.resname == "NLN") & (mol.element == "H"))
+
+
+def test_detect_glycam_residues_noop_without_sugars():
+    from htmd.builder.amber import _detect_glycam_residues, defaultFf
+
+    mol = Molecule("3ptb")
+    ff = defaultFf()
+    before = list(ff)
+    assert _detect_glycam_residues(mol, ff) == []
+    assert ff == before
+
+
+def test_detect_glycam_residues_ignores_tla_ligand_collision():
+    """TLA (L-(+)-tartaric acid) is a real PDB Chemical Component Dictionary
+    ligand code that also happens to be a valid GLYCAM-06j unit name (a
+    fully-branched galactose linkage). Matching purely on resname would
+    misdetect a crystallization-buffer tartrate as a glycan and send it
+    through glycanBondsFromNames, which fails hard looking for a glycosidic
+    partner that does not exist ("Expected exactly one anomeric partner...
+    found 0"). glycamUnitMask's sugar-composition gate must keep a real TLA
+    ligand out of glycan detection entirely, so it builds like any other
+    ordinary HETATM residue."""
+    from htmd.builder.amber import _detect_glycam_residues, defaultFf
+
+    mol = Molecule().empty(10)
+    mol.resname[:] = "TLA"
+    mol.resid[:] = 1
+    mol.chain[:] = "L"
+    mol.segid[:] = "L1"
+    mol.record[:] = "HETATM"
+    # Real RCSB Chemical Component Dictionary atom names for TLA - note
+    # there is no "O5" atom at all, unlike a genuine GLYCAM sugar unit,
+    # which is what tells the two apart.
+    mol.name[:] = ["O1", "O11", "C1", "C2", "O2", "C3", "O3", "C4", "O4", "O41"]
+    mol.element[:] = ["O", "O", "C", "C", "O", "C", "O", "C", "O", "O"]
+    mol.coords = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.5, 1.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [2.0, 0.5, 0.0],
+            [2.5, 1.5, 0.0],
+            [3.0, 0.0, 0.0],
+            [3.5, 1.0, 0.0],
+            [4.0, 0.0, 0.0],
+            [4.5, 1.0, 0.0],
+            [5.0, 0.0, 0.0],
+        ],
+        dtype=np.float32,
+    ).reshape(10, 3, 1)
+
+    ff = defaultFf()
+    before = list(ff)
+    assert _detect_glycam_residues(mol, ff) == []
+    assert ff == before, "TLA must not trigger the GLYCAM leaprc auto-load"
+
+
+def test_detect_glycam_residues_raises_on_anchor_without_sugar():
+    """A GLYCAM anchor residue (NLN/OLS/OLT/OLP) present without any GLYCAM
+    sugar indicates a partially-prepared or hand-edited structure. This must
+    raise a clear, actionable error rather than silently building a bare
+    protein with a stray GLYCAM-named residue and no glycan at all."""
+    from htmd.builder.amber import _detect_glycam_residues, defaultFf
+
+    mol = Molecule().empty(1)
+    mol.resname[:] = "NLN"
+    mol.name[:] = "ND2"
+    mol.element[:] = "N"
+    mol.resid[:] = 1
+    mol.chain[:] = "A"
+    mol.segid[:] = "P1"
+    mol.record[:] = "ATOM"
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+    ff = defaultFf()
+    with pytest.raises(RuntimeError, match="GLYCAM anchor residue"):
+        _detect_glycam_residues(mol, ff)
+
+
+def test_detect_glycam_residues_raises_on_unrenamed_pdb_sugar():
+    """A glycan that reaches amber.build still carrying its original PDB
+    sugar resnames (NAG/BMA/MAN/FUC/...) instead of GLYCAM unit names -
+    because the caller skipped systemPrepare, or bypassed GlycanSpec
+    parameterization entirely - must raise a clear, actionable error
+    pointing at systemPrepare, instead of dying deep inside tleap with
+    "Unknown residue: NAG"."""
+    from htmd.builder.amber import _detect_glycam_residues, defaultFf
+
+    # Loaded as-is, with no GLYCAM renaming applied: 3AVE_frag.pdb's chain C
+    # still carries the original PDB sugar resnames (NAG, BMA, MAN, FUC).
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    ff = defaultFf()
+    with pytest.raises(RuntimeError, match="un-renamed PDB sugar"):
+        _detect_glycam_residues(mol, ff)
+
+
+def test_glycan_break_points():
+    from htmd.builder.amber import _glycan_break_points
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    ren = {1: "UYB", 2: "4YB", 3: "VMB", 4: "2MA", 5: "0YB", 6: "2MA", 7: "0YB", 8: "0fA"}
+    for resid, code in ren.items():
+        mol.resname[(mol.chain == "C") & (mol.resid == resid)] = code
+    mol.segid[:] = np.where(mol.chain == "C", "G1", "P1")
+    points = _glycan_break_points(mol)
+    assert points == {("G1", r) for r in range(1, 9)}
+
+
+def _glycam_atom(resname, resid, segid, chain, name, element, xyz):
+    m = Molecule().empty(1)
+    m.resname[:] = resname
+    m.resid[:] = resid
+    m.segid[:] = segid
+    m.chain[:] = chain
+    m.record[:] = "ATOM"
+    m.name[:] = name
+    m.element[:] = element
+    m.coords = np.array(xyz, dtype=np.float32).reshape(1, 3, 1)
+    return m
+
+
+def _minimal_sugar_mol(resname, resid, segid, chain, x0=0.0):
+    """A minimal 2-atom GLYCAM sugar residue (anomeric carbon + ring oxygen,
+    at real bonding distance) - just enough for glycamUnitMask's
+    composition-and-geometry gate to recognize it."""
+    mol = Molecule()
+    mol.append(
+        _glycam_atom(resname, resid, segid, chain, "C1", "C", [x0, 0.0, 0.0])
+    )
+    mol.append(
+        _glycam_atom(resname, resid, segid, chain, "O5", "O", [x0 + 1.4, 0.0, 0.0])
+    )
+    return mol
+
+
+def test_glycan_break_points_isolates_first_glycan_from_preceding_protein():
+    """A segid mixing protein and glycan residues is only a warning (see
+    _checkMixedSegment), not an error, so amber.build must not rely on the
+    caller always splitting them into separate segids. _glycan_break_points
+    previously only emitted a break-AFTER point on each glycan residue's own
+    resid, which isolates it from the NEXT residue but not from the
+    PREVIOUS one - so the first glycan residue of a run landed in the same
+    tLeap chain (no TER) as the last protein residue preceding it, and
+    tLeap would auto-bond the two together across a bond that must instead
+    come exclusively from the explicit `bond` commands."""
+    from htmd.builder.amber import _glycan_break_points, _apply_chain_breaks
+
+    mol = Molecule()
+    for r in (1, 2, 3):
+        mol.append(_ala_mol(r, "P", "A", x0=r * 5.0))
+    mol.append(_minimal_sugar_mol("4YB", 4, "P", "A", x0=20.0))
+    mol.append(_minimal_sugar_mol("0YB", 5, "P", "A", x0=25.0))
+
+    points = _glycan_break_points(mol)
+    assert points == {("P", 3), ("P", 4), ("P", 5)}
+
+    out = _apply_chain_breaks(mol, points, alternate_segids={"P"})
+    chain_of = {r: str(out.chain[out.resid == r][0]) for r in (1, 2, 3, 4, 5)}
+    assert chain_of[1] == chain_of[2] == chain_of[3]
+    assert chain_of[3] != chain_of[4], (
+        "the first glycan residue must not share a chain with the "
+        "preceding protein residue"
+    )
+    assert chain_of[4] != chain_of[5]
+
+
+def test_glycan_break_points_two_adjacent_segid_glycan_trees():
+    """Two independent glycan trees under different segids, adjacent in file
+    order with no intervening residue, must each keep their own internal
+    isolation working (this coverage gap was previously deferred). A segid
+    boundary already forces a TER via the PDB writer regardless of chain
+    ID, so reusing the same two alternating chain letters across segids
+    (see _apply_chain_breaks) must not interfere with either tree's own
+    break points."""
+    from htmd.builder.amber import _glycan_break_points, _apply_chain_breaks
+
+    mol = Molecule()
+    mol.append(_minimal_sugar_mol("4YB", 1, "G1", "C", x0=0.0))
+    mol.append(_minimal_sugar_mol("0YB", 2, "G1", "C", x0=5.0))
+    mol.append(_minimal_sugar_mol("4YB", 1, "G2", "D", x0=10.0))
+    mol.append(_minimal_sugar_mol("0YB", 2, "G2", "D", x0=15.0))
+
+    points = _glycan_break_points(mol)
+    assert points == {("G1", 1), ("G1", 2), ("G2", 1), ("G2", 2)}
+
+    out = _apply_chain_breaks(mol, points, alternate_segids={"G1", "G2"})
+    c1 = str(out.chain[(out.segid == "G1") & (out.resid == 1)][0])
+    c2 = str(out.chain[(out.segid == "G1") & (out.resid == 2)][0])
+    d1 = str(out.chain[(out.segid == "G2") & (out.resid == 1)][0])
+    d2 = str(out.chain[(out.segid == "G2") & (out.resid == 2)][0])
+    assert c1 != c2, "G1's own two glycan residues must still alternate chains"
+    assert d1 != d2, "G2's own two glycan residues must still alternate chains"
+
+
+def test_apply_chain_breaks_alternating():
+    from htmd.builder.amber import _apply_chain_breaks
+
+    # 70 single-residue breaks: with alternate_segids only TWO chain IDs are
+    # consumed, no matter how many glycan residues exist
+    mol = Molecule().empty(70)
+    mol.segid[:] = "G1"
+    mol.chain[:] = "X"
+    mol.resid[:] = np.arange(1, 71)
+    mol.resname[:] = "0YB"
+    mol.name[:] = "C1"
+    mol.element[:] = "C"
+    mol.coords = np.zeros((70, 3, 1), dtype=np.float32)
+    points = {("G1", int(r)) for r in range(1, 71)}
+    out = _apply_chain_breaks(mol, points, alternate_segids={"G1"})
+    chains = out.chain
+    # every consecutive residue pair differs in chain, using exactly 2 IDs
+    assert all(chains[i] != chains[i + 1] for i in range(69))
+    assert len(set(chains)) == 2
+    assert "X" not in set(chains)  # picked from the free pool
+
+
+def test_glycam_tleap_script(tmp_path):
+    # end-to-end script generation without running tleap
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    pmol, _specs = systemPrepare(mol)
+    build(pmol, outdir=str(tmp_path), ionize=False, execute=False)
+    tleap_in = (tmp_path / "tleap.in").read_text()
+    source_lines = [ln for ln in tleap_in.splitlines() if ln.startswith("source")]
+    assert any("GLYCAM_06j-1" in ln for ln in source_lines)
+    # inserted before the water leaprc
+    gpos = next(i for i, ln in enumerate(source_lines) if "GLYCAM_06j-1" in ln)
+    wpos = next(i for i, ln in enumerate(source_lines) if "water" in ln)
+    assert gpos < wpos
+    # the anchor bond and at least the branch bonds are explicit
+    bond_lines = [ln for ln in tleap_in.splitlines() if ln.startswith("bond ")]
+    assert any(".ND2" in ln and ".C1" in ln for ln in bond_lines)
+    assert sum(1 for ln in bond_lines if ".O6" in ln or ".O4" in ln or ".O3" in ln or ".O2" in ln) >= 7
+    # consecutive glycan residues alternate chain IDs in input.pdb
+    input_pdb = (tmp_path / "input.pdb").read_text()
+    per_residue = []  # (chain, resid) in file order, one entry per residue
+    for ln in input_pdb.splitlines():
+        if ln.startswith(("ATOM", "HETATM")) and ln[17:20].strip() in (
+            "UYB", "4YB", "VMB", "2MA", "0YB", "0fA",
+        ):
+            entry = (ln[21], ln[22:26].strip())
+            if not per_residue or per_residue[-1] != entry:
+                per_residue.append(entry)
+    assert len(per_residue) == 8
+    assert all(
+        per_residue[i][0] != per_residue[i + 1][0]
+        for i in range(len(per_residue) - 1)
+    ), "consecutive glycan residues must differ in chain ID"
+    assert len({c for c, _ in per_residue}) == 2, "two alternating chain IDs"
+
+
 def _mixed_cyclic_mol(closure_dist=1.32):
     """3-residue cyclic segment whose middle residue is non-canonical and
     fails the 'protein' selection (as microcystin's beta-amino-acid Adda does),
@@ -961,3 +1283,68 @@ def test_default_protein_caps_existing_cap_not_recapped():
 
     mol = _synthetic_protein(["ALA"] * 11 + ["NME"])
     assert _defaultProteinCaps(mol) == {"P0": ["ACE", "none"]}
+
+
+def _assert_glycan_bond(molbuilt, resname_a, name_a, resname_b, name_b):
+    idx_a = np.where((molbuilt.resname == resname_a) & (molbuilt.name == name_a))[0]
+    idx_b = np.where((molbuilt.resname == resname_b) & (molbuilt.name == name_b))[0]
+    bset = {tuple(sorted(b)) for b in molbuilt.bonds.tolist()}
+    found = any(
+        tuple(sorted((int(a), int(b)))) in bset for a in idx_a for b in idx_b
+    )
+    assert found, f"missing bond {resname_a}.{name_a} - {resname_b}.{name_b}"
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_glycam_build_3ave_branched_nglycan(tmp_path):
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
+    )
+    pmol, _ = systemPrepare(mol)
+    molbuilt = build(pmol, outdir=str(tmp_path), ionize=False)
+    assert molbuilt is not None
+    for code in ("NLN", "UYB", "4YB", "VMB", "2MA", "0YB", "0fA"):
+        assert code in molbuilt.resname, code
+    _assert_glycan_bond(molbuilt, "NLN", "ND2", "UYB", "C1")
+    _assert_glycan_bond(molbuilt, "UYB", "O6", "0fA", "C1")
+    _assert_glycan_bond(molbuilt, "VMB", "O3", "2MA", "C1")
+    _assert_glycan_bond(molbuilt, "VMB", "O6", "2MA", "C1")
+    total_charge = float(np.sum(molbuilt.charge))
+    assert abs(total_charge - round(total_charge)) < 1e-3
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_glycam_build_1cvn_free_oligosaccharide(tmp_path):
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "1CVN_frag.pdb")
+    )
+    pmol, _ = systemPrepare(mol)
+    molbuilt = build(pmol, outdir=str(tmp_path), ionize=False)
+    assert "ROH" in molbuilt.resname and "VMA" in molbuilt.resname
+    _assert_glycan_bond(molbuilt, "ROH", "O1", "VMA", "C1")
+    _assert_glycan_bond(molbuilt, "VMA", "O3", "0MA", "C1")
+    _assert_glycan_bond(molbuilt, "VMA", "O6", "0MA", "C1")
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_glycam_build_1g1s_olinked(tmp_path):
+    from moleculekit.tools.preparation import systemPrepare
+    from htmd.builder.amber import build
+
+    mol = Molecule(
+        os.path.join(curr_dir, "data", "test-amber-build", "glycans", "1G1S_frag.pdb")
+    )
+    pmol, _ = systemPrepare(mol)
+    molbuilt = build(pmol, outdir=str(tmp_path), ionize=False)
+    for code in ("OLT", "VVB", "WYB", "3LB", "0SA", "0fA", "0LB"):
+        assert code in molbuilt.resname, code
+    _assert_glycan_bond(molbuilt, "OLT", "OG1", "VVB", "C1")
+    _assert_glycan_bond(molbuilt, "3LB", "O3", "0SA", "C2")
+    total_charge = float(np.sum(molbuilt.charge))
+    assert abs(total_charge - round(total_charge)) < 1e-3  # SIA contributes -1

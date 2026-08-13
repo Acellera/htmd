@@ -637,6 +637,22 @@ def build(
     # input Hs so addHydrogens rebuilds them in the template's naming.
     extra_xml = _maybe_add_ffptm_prepi(mol, outdir, extra_xml)
 
+    from moleculekit.tools.glycans import GLYCAM_ANCHOR_UNITS, glycamUnitMask
+
+    # glycamUnitMask checks composition, not just the 3-letter code, so the
+    # modified ribonucleotides 1MA/2MA (supported above via
+    # _maybe_add_amber_modres) are not misread as unsupported glycans.
+    glycam_present = sorted(
+        set(mol.resname[glycamUnitMask(mol)])
+        | (set(np.unique(mol.resname)) & ({"ROH"} | set(GLYCAM_ANCHOR_UNITS)))
+    )
+    if glycam_present:
+        raise NotImplementedError(
+            f"GLYCAM glycan residue(s) {', '.join(glycam_present)} are "
+            f"supported only by the AMBER builder (htmd.builder.amber.build). "
+            f"The OpenMM builder does not support glycans yet."
+        )
+
     topology, positions = _mol_to_openmm(
         mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
     )

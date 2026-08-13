@@ -204,6 +204,23 @@ def build(
     _checkMixedSegment(mol)
     _checkLongResnames(mol, aliasresidues)
 
+    # systemPrepare gives sugars GLYCAM unit names, which the carbohydrate
+    # aliases below (pdbalias residue NAG BGLCNA, ...) never match, so bail
+    # out here instead of failing deep inside psfgen. glycamUnitMask also
+    # checks composition, since some GLYCAM codes are real PDB ligand codes.
+    from moleculekit.tools.glycans import GLYCAM_ANCHOR_UNITS, glycamUnitMask
+
+    glycam_present = sorted(
+        set(mol.resname[glycamUnitMask(mol)])
+        | (set(np.unique(mol.resname)) & ({"ROH"} | set(GLYCAM_ANCHOR_UNITS)))
+    )
+    if glycam_present:
+        raise NotImplementedError(
+            f"GLYCAM glycan residue(s) {', '.join(glycam_present)} are "
+            f"supported only by the AMBER builder (htmd.builder.amber.build). "
+            f"The CHARMM builder does not support glycans."
+        )
+
     if psfgen is None:
         psfgen = shutil.which("psfgen", mode=os.X_OK)
         if not psfgen:

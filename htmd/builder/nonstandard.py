@@ -2750,11 +2750,25 @@ def parameterizeFromSpecs(
     """
     from moleculekit.tools.nonstandard_residues import (
         ChainResidueSpec,
+        GlycanSpec,
         ScaffoldSpec,
         CovalentLigandSpec,
         LigandSpec,
         PROTEIN_RESNAMES,
     )
+
+    # GLYCAM ships native parameters for every sugar unit and amber.build
+    # handles the glycan tree itself, so these need no parameterization here.
+    # Filtered up front so no downstream step ever sees them.
+    glycan_specs = [s for s in specs if isinstance(s, GlycanSpec)]
+    if glycan_specs:
+        logger.info(
+            f"Glycan residue(s) "
+            f"{', '.join(sorted({s.resname for s in glycan_specs}))} are "
+            f"handled natively by the GLYCAM forcefield during amber.build; "
+            f"skipping parameterization."
+        )
+        specs = [s for s in specs if not isinstance(s, GlycanSpec)]
 
     if normalize not in NORMALIZE_MODES:
         raise ValueError(f"normalize={normalize!r}: expected one of {NORMALIZE_MODES}")

@@ -327,6 +327,45 @@ def _detect_modaa_residues(mol, ff):
     return present
 
 
+def _is_glycam_sugar_not_modrna(mol, code: str) -> bool:
+    """Disambiguate a 3-letter code shared by AMBER's modrna08 library and
+    GLYCAM's systematically generated sugar unit names.
+
+    The only codes currently shared between the two libraries are ``1MA``
+    and ``2MA`` (see the intersection of ``MODIFIED_NUCLEIC_RESIDUE_NAMES``
+    and ``GLYCAM_UNIT_NAMES`` pinned by
+    ``test_glycam_modrna_collision_set_is_1ma_2ma`` in
+    ``tests/test_amber_builder.py``), and both happen to be mannose (``M``)
+    linkage codes, which carry no nitrogen. Presence of an N atom therefore
+    tells the two apart for exactly these two codes today. This is NOT a
+    general property of GLYCAM units: GlcNAc (``Y*``, e.g. ``0YB``/``4YB``),
+    GalNAc (``V*``, e.g. ``VVB``) and sialic acid (``S*``, e.g. ``0SA``) all
+    carry nitrogen from their N-acetyl group. If a future GLYCAM sugar or
+    modrna08 residue collides on one of those letters, this helper would
+    misclassify it; the pinning test above is what should fail first and
+    prompt revisiting this function.
+
+    Also note this resolves per 3-letter *code*, not per residue instance
+    (``mol.element[mol.resname == code]`` pools every atom sharing that
+    resname across the whole molecule). A structure containing both a real
+    ``2MA`` nucleotide and an unrelated ``2MA`` sugar would see both
+    classified the same way. This is treated as a known limitation rather
+    than fixed: tleap itself can only hold one unit definition per name per
+    session, so such a structure could not build correctly either way.
+
+    Used only by :func:`_detect_modrna_residues` today. The equivalent
+    disambiguation for the GLYCAM side of the collision (telling a genuine
+    ``1MA``/``2MA`` GLYCAM mannose unit apart from the modrna08 residue of
+    the same name) now lives in
+    :func:`moleculekit.tools.glycans.glycamUnitMask`, which
+    :func:`_detect_glycam_residues` and :func:`_glycan_break_points` use
+    instead of calling this function directly; both copies apply the exact
+    same nitrogen-presence check for the reason explained above, so they
+    cannot disagree on which library claims a given ambiguous residue.
+    """
+    return not np.any(mol.element[mol.resname == code] == "N")
+
+
 def _detect_modrna_residues(mol, ff):
     """Auto-load AMBER's modified-RNA forcefield when such a residue is present.
 
@@ -343,12 +382,22 @@ def _detect_modrna_residues(mol, ff):
     5MC3 / 5MC5 terminal variant), so those atoms have no atom type and tLeap
     would reject them. An in-chain residue never carries them, so this only
     affects genuine 5'/3' termini, which are left as the linking form.
+
+    ``1MA`` and ``2MA`` are ambiguous three-letter codes, shared with GLYCAM
+    sugar unit names; see :func:`_is_glycam_sugar_not_modrna` for how the two
+    are told apart.
     """
     from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
+    from moleculekit.tools.glycans import GLYCAM_UNIT_NAMES
 
-    present = sorted(
+    candidates = sorted(
         {str(r) for r in np.unique(mol.resname)} & set(MODIFIED_NUCLEIC_RESIDUE_NAMES)
     )
+    present = [
+        code
+        for code in candidates
+        if not (code in GLYCAM_UNIT_NAMES and _is_glycam_sugar_not_modrna(mol, code))
+    ]
     if not present:
         return []
     term = np.isin(mol.resname, present) & np.isin(mol.name, ("H3T", "H5T", "O3P"))
@@ -395,6 +444,134 @@ def _detect_phosaa_residues(mol, ff):
             f"system. Automatically loading {leaprc} for AMBER."
         )
     return present
+
+
+_GLYCAM_LEAPRC = "leaprc.GLYCAM_06j-1"
+
+
+def _detect_glycam_residues(mol, ff):
+    """Auto-configure a GLYCAM glycan build when GLYCAM-named residues are
+    present.
+
+    Unlike the other ``_detect_*`` helpers, which append their leaprc,
+    ``leaprc.GLYCAM_06j-1`` is inserted right before the first water leaprc
+    in ``ff``. GLYCAM_06j-1 itself loads ``frcmod.ionsjc_tip3p``, so appending
+    it after the water leaprc would let it silently override whatever ion
+    parameters the user's chosen water model supplies; loading it earlier
+    keeps the water leaprc's ion parameters authoritative. Strips hydrogens
+    off the detected sugar/free-reducing-end (``ROH``) residues so tleap
+    rebuilds them under GLYCAM's own naming and protonation state; the
+    NLN/OLS/OLT/OLP protein-anchor residues keep their hydrogens since those
+    are ordinary amino-acid atoms. Also derives the explicit glycosidic and
+    anchor bonds from residue names and geometry via
+    ``moleculekit.tools.glycans.glycanBondsFromNames``, because
+    ``_prepareMolecule`` has already deleted all bonds by the time this runs;
+    the caller must append the returned bonds to ``custombonds`` so tleap
+    forms them. Sugar residues are recognized via
+    ``moleculekit.tools.glycans.glycamUnitMask``, which gates the resname
+    match on the residue's actual sugar-like composition: several GLYCAM
+    3-character unit codes (e.g. ``TLA``, ``PMA``) collide with unrelated
+    real PDB Chemical Component Dictionary ligand codes, and a resname
+    shared with a modrna08 modified ribonucleotide (``1MA``, ``2MA``) must
+    not be claimed as a sugar either.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The prepared molecule (bonds already deleted, resids renumbered).
+        Sugar and ``ROH`` hydrogens are removed from it in place.
+    ff : list of str
+        The leaprc forcefield file list passed to ``build()``. Mutated in
+        place: ``leaprc.GLYCAM_06j-1`` is inserted before the first water
+        leaprc when a GLYCAM residue is found and it is not already present.
+
+    Returns
+    -------
+    bonds : list
+        A list of ``[UniqueAtomID, UniqueAtomID]`` pairs for the glycosidic
+        and anchor bonds, in the same shape ``_prepareMolecule`` produces for
+        ``custombonds``. Empty when no GLYCAM residue is present.
+
+    Raises
+    ------
+    RuntimeError
+        If GLYCAM anchor residues (NLN/OLS/OLT/OLP) are present without any
+        GLYCAM sugar, or if a glycan reaches this point still carrying its
+        original, un-renamed PDB sugar resname (e.g. ``NAG``) instead of a
+        GLYCAM unit name - both indicate the input was not run through
+        ``systemPrepare``.
+    """
+    from moleculekit.molecule import UniqueAtomID
+    from moleculekit.tools.glycans import (
+        GLYCAM_ANCHOR_UNITS,
+        glycamUnitMask,
+        glycanBondsFromNames,
+        pdbSugarMask,
+    )
+
+    sugar_mask = glycamUnitMask(mol) | (mol.resname == "ROH")
+    anchor_mask = np.isin(mol.resname, sorted(GLYCAM_ANCHOR_UNITS))
+    if not sugar_mask.any():
+        if anchor_mask.any():
+            raise RuntimeError(
+                f"Found GLYCAM anchor residue(s) "
+                f"{sorted(set(mol.resname[anchor_mask]))} but no GLYCAM sugar "
+                f"residues. Prepare the system with systemPrepare to rename "
+                f"glycans, or fix the residue names."
+            )
+        leftover_mask = pdbSugarMask(mol)
+        if leftover_mask.any():
+            raise RuntimeError(
+                f"Found un-renamed PDB sugar residue(s) "
+                f"{sorted(set(mol.resname[leftover_mask]))} but no GLYCAM "
+                f"unit names. Prepare the system with systemPrepare to "
+                f"rename glycans to their GLYCAM unit names before "
+                f"building, or fix the residue names."
+            )
+        return []
+
+    if _GLYCAM_LEAPRC not in ff:
+        amberhome = defaultAmberHome(teleap=None)
+        if _locateFile(_GLYCAM_LEAPRC, "ff", amberhome) is None:
+            raise RuntimeError(
+                f"Glycan residues detected in system but {_GLYCAM_LEAPRC} "
+                f"could not be located under {amberhome}. GLYCAM glycan "
+                f"building requires AmberTools 20 or newer; reinstall or "
+                f"upgrade AmberTools (e.g. `conda install ambertools -c "
+                f"conda-forge`)."
+            )
+        widx = len(ff)
+        for i, force in enumerate(ff):
+            if "water" in os.path.basename(str(force)):
+                widx = i
+                break
+        ff.insert(widx, _GLYCAM_LEAPRC)
+        present = sorted(set(mol.resname[sugar_mask]))
+        logger.info(
+            f"Glycan residue(s) {', '.join(present)} detected in system. "
+            f"Automatically loading {_GLYCAM_LEAPRC} for AMBER."
+        )
+    if any("ff19SB" in str(force) for force in ff):
+        logger.warning(
+            "GLYCAM protein-linking residues (NLN/OLS/OLT/OLP) carry "
+            "ff12SB-derived charges. Combining glycans with ff19SB is "
+            "untested; ff14SB is the recommended protein forcefield for "
+            "glycoproteins."
+        )
+
+    # Bonds must be derived before the hydrogens are stripped, but
+    # glycanBondsFromNames only looks at resnames and geometry, so the order
+    # relative to the removal below does not otherwise matter.
+    pairs = glycanBondsFromNames(mol)
+    bonds = [
+        [UniqueAtomID.fromMolecule(mol, idx=i), UniqueAtomID.fromMolecule(mol, idx=j)]
+        for i, j in pairs
+    ]
+
+    h_sel = sugar_mask & (mol.element == "H")
+    if h_sel.any():
+        mol.remove(h_sel, _logger=False)
+    return bonds
 
 
 def _detect_cofactors_ncaa_ptm(mol, param, topo):
@@ -1009,6 +1186,9 @@ def build(
     _detect_modaa_residues(mol, ff)
     _detect_modrna_residues(mol, ff)
     _detect_phosaa_residues(mol, ff)
+    glycan_bonds = _detect_glycam_residues(mol, ff)
+    if glycan_bonds:
+        custombonds = (custombonds or []) + glycan_bonds
 
     backend, backend_value = _prepare_build(
         mol,
@@ -1466,12 +1646,16 @@ def _prepare_build(
 
     # --- Cyclic segments (decided earlier, while bonds were present) and write
     #     PDB files. Break auto-sequencing at custom-bond (e.g. isopeptide)
-    #     junctions on the per-PDB copies only - the chain reassignment must not
-    #     touch the molecule used below for residue-position / custombond
-    #     resolution (those UniqueAtomIDs match on chain). ---
+    #     junctions and at glycan residues on the per-PDB copies only - the
+    #     chain reassignment must not touch the molecule used below for
+    #     residue-position / custombond resolution (those UniqueAtomIDs match
+    #     on chain). Glycan segids alternate between two pool chains rather
+    #     than one per residue (see _apply_chain_breaks). ---
     cyclic = _cyclic_segment_endpoints(mol, cyclic_segids or [])
     cyclic_segs = [c[0] for c in cyclic]
-    break_points = _custombond_break_points(mol, custombonds)
+    glycan_break_points = _glycan_break_points(mol)
+    glycan_segids = {seg for seg, _ in glycan_break_points}
+    break_points = _custombond_break_points(mol, custombonds) | glycan_break_points
 
     nonc_mol = mol.copy()
     if len(cyclic):
@@ -1483,7 +1667,9 @@ def _prepare_build(
 
     if has_solute:
         solute_mol = nonc_mol.copy(sel=~water_sel)
-        solute_mol = _apply_chain_breaks(solute_mol, break_points)
+        solute_mol = _apply_chain_breaks(
+            solute_mol, break_points, alternate_segids=glycan_segids
+        )
         solute_mol.write(os.path.join(outdir, "input.pdb"))
 
     if has_water:
@@ -1494,7 +1680,9 @@ def _prepare_build(
     if len(cyclic):
         for seg, res_start, res_end in cyclic:
             seg_mol = mol.copy(sel=mol.segid == seg)
-            seg_mol = _apply_chain_breaks(seg_mol, break_points)
+            seg_mol = _apply_chain_breaks(
+                seg_mol, break_points, alternate_segids=glycan_segids
+            )
             fname = f"cyclic_{seg}.pdb"
             seg_mol.write(os.path.join(outdir, fname))
             cyc_var = f"cyc_{seg}"
@@ -1776,7 +1964,71 @@ def _custombond_break_points(mol: Molecule, custombonds):
     return points
 
 
-def _apply_chain_breaks(mol: Molecule, break_points):
+def _glycan_break_points(mol: Molecule):
+    """Break-after points isolating every GLYCAM sugar / free-reducing-end
+    (``ROH``) residue into its own single-residue run, so tLeap never
+    auto-sequences adjacent glycan residues head-to-tail. All glycan
+    connectivity then comes exclusively from the explicit bond commands
+    derived in :func:`_detect_glycam_residues`, which is what makes branched
+    glycans order-independent.
+
+    Unlike :func:`_custombond_break_points`, which only breaks at junctions
+    an explicit bond actually crosses, every glycan residue is broken out
+    regardless of whether it is bonded to its resid neighbor, since GLYCAM
+    branch points routinely place non-consecutive-resid sugars next to each
+    other in the PDB and tLeap would otherwise auto-bond them together.
+
+    A break-after point only isolates a residue from the NEXT one in resid
+    order, so two adjacent glycan resids isolate each other via their own
+    entries, but the first glycan resid of a run has nothing isolating it
+    from whatever non-glycan residue immediately precedes it in that segid
+    (e.g. a segid mixing protein and glycan residues, which
+    :func:`htmd.builder.builder._checkMixedSegment` only warns about). This
+    is fixed by also emitting a break-after point at the nearest preceding
+    non-glycan resid of that segid, for every run's leading residue.
+
+    Sugar residues are recognized via
+    ``moleculekit.tools.glycans.glycamUnitMask``, which gates the resname
+    match on sugar-like composition so that a real PDB ligand whose code
+    happens to collide with a GLYCAM unit name (e.g. ``TLA``, ``PMA``) is
+    not misdetected, and excludes a resname shared with a modrna08 modified
+    ribonucleotide (``1MA``, ``2MA``) the same way
+    :func:`_detect_glycam_residues` does.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule to scan for GLYCAM residues. Resolved by segid/resid, not
+        by ``UniqueAtomID``, so this may be called on any copy that has not
+        had its resids renumbered relative to the one used for custombond
+        resolution.
+
+    Returns
+    -------
+    points : set of tuple
+        A set of ``(segid, resid)`` "break-after" points, in the same shape
+        :func:`_custombond_break_points` produces.
+    """
+    from moleculekit.tools.glycans import glycamUnitMask
+
+    mask = glycamUnitMask(mol) | (mol.resname == "ROH")
+    points = set()
+    for seg in np.unique(mol.segid[mask]):
+        segall = mol.segid == seg
+        seg_resids = sorted({int(r) for r in np.unique(mol.resid[segall])})
+        resid_index = {r: i for i, r in enumerate(seg_resids)}
+        glycan_resids = {int(r) for r in np.unique(mol.resid[mask & segall])}
+        for r in glycan_resids:
+            points.add((str(seg), r))
+            idx = resid_index[r]
+            if idx > 0:
+                prev_r = seg_resids[idx - 1]
+                if prev_r not in glycan_resids:
+                    points.add((str(seg), prev_r))
+    return points
+
+
+def _apply_chain_breaks(mol: Molecule, break_points, alternate_segids=None):
     """Reassign chains so tLeap writes a TER (and does not head-to-tail
     auto-sequence) at each break-after point. A custom-bonded junction's real
     bond is emitted explicitly; the spurious backbone auto-bond must not be
@@ -1785,8 +2037,36 @@ def _apply_chain_breaks(mol: Molecule, break_points):
     are preserved, so residue numbering and bond references are unaffected. Apply
     only to the per-PDB copies written for tLeap, never to the molecule used for
     residue-position / custombond resolution (those ``UniqueAtomID``s match on
-    chain)."""
+    chain).
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule whose ``chain`` field is reassigned. Returned unchanged
+        (same object) when ``break_points`` is empty; otherwise a copy.
+    break_points : set of tuple
+        ``(segid, resid)`` "break-after" points, as produced by
+        :func:`_custombond_break_points` and/or :func:`_glycan_break_points`.
+    alternate_segids : set, optional
+        Segids whose runs should alternate between just two pool chains
+        instead of each getting a unique one. tLeap only needs a chain
+        CHANGE between consecutive residues to suppress auto-sequencing, so
+        two chains suffice regardless of how many break points a segid has;
+        this keeps heavily-glycosylated systems from exhausting the
+        62-character chain pool. The two chains are reserved once and shared
+        across every segid in ``alternate_segids``: a segid boundary already
+        gets its own TER from the PDB writer, so reusing the pair across
+        segments is safe. Segids not listed here keep the original
+        unique-chain-per-run behavior unchanged.
+
+    Returns
+    -------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule with reassigned chains.
+    """
     from collections import defaultdict
+
+    alternate_segids = alternate_segids or set()
 
     byseg = defaultdict(list)
     for seg, resid in break_points:
@@ -1798,11 +2078,31 @@ def _apply_chain_breaks(mol: Molecule, break_points):
     used = set(np.unique(mol.chain).tolist())
     pool = [c for c in _CHAIN_POOL if c not in used]
     pi = 0
+    alt_chains = None
     for seg, brks in byseg.items():
         segmask = mol.segid == seg
+        is_alt = seg in alternate_segids
+        if is_alt and alt_chains is None:
+            if len(pool) - pi < 2:
+                raise RuntimeError(
+                    "Ran out of free chain IDs while isolating glycan "
+                    "residues from auto-sequencing."
+                )
+            alt_chains = (pool[pi], pool[pi + 1])
+            pi += 2
+
+        alt_i = 0
         prev = None
         for b in sorted(brks):
-            if prev is not None:
+            if is_alt:
+                lo = (
+                    segmask & (mol.resid <= b)
+                    if prev is None
+                    else (segmask & (mol.resid > prev) & (mol.resid <= b))
+                )
+                mol.chain[lo] = alt_chains[alt_i % 2]
+                alt_i += 1
+            elif prev is not None:
                 if pi >= len(pool):
                     raise RuntimeError(
                         "Ran out of free chain IDs while breaking auto-sequencing "
@@ -1811,13 +2111,16 @@ def _apply_chain_breaks(mol: Molecule, break_points):
                 mol.chain[segmask & (mol.resid > prev) & (mol.resid <= b)] = pool[pi]
                 pi += 1
             prev = b
-        if pi >= len(pool):
-            raise RuntimeError(
-                "Ran out of free chain IDs while breaking auto-sequencing at "
-                "custom-bond junctions."
-            )
-        mol.chain[segmask & (mol.resid > prev)] = pool[pi]
-        pi += 1
+        if is_alt:
+            mol.chain[segmask & (mol.resid > prev)] = alt_chains[alt_i % 2]
+        else:
+            if pi >= len(pool):
+                raise RuntimeError(
+                    "Ran out of free chain IDs while breaking auto-sequencing at "
+                    "custom-bond junctions."
+                )
+            mol.chain[segmask & (mol.resid > prev)] = pool[pi]
+            pi += 1
     return mol
 
 
@@ -1952,14 +2255,14 @@ def _add_caps(mol: Molecule, caps: dict):
 def _defaultProteinCaps(mol):
     # Defines ACE and NME (neutral terminals) as default for protein segments
     # Of course, this might not be ideal for proteins that require charged terminals
-    from moleculekit.residues import PROTEIN_RESIDUES, MODIFIED_PROTEIN_RESIDUES
+    from moleculekit.residues import (
+        PROTEIN_RESIDUE_NAMES_WITH_VARIANTS,
+        MODIFIED_PROTEIN_RESIDUE_NAMES,
+    )
 
     # Residue names the force field can build a backbone cap onto: canonical
     # residues, their protonation / naming variants and modified residues.
-    known_protein = set()
-    for rr in (*PROTEIN_RESIDUES, *MODIFIED_PROTEIN_RESIDUES):
-        known_protein.add(rr.resname)
-        known_protein.update(rr.resname_variants)
+    known_protein = PROTEIN_RESIDUE_NAMES_WITH_VARIANTS | MODIFIED_PROTEIN_RESIDUE_NAMES
 
     segsProt = np.unique(mol.get("segid", sel="protein"))
     caps = dict()
