@@ -750,7 +750,9 @@ def test_glycam_modrna_collision_set_is_1ma_2ma():
     assert collision == {"1MA", "2MA"}
 
 
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_detect_glycam_residues_ff_and_hydrogens():
+    # needs AMBERHOME to locate the GLYCAM prep files
     from htmd.builder.amber import _detect_glycam_residues, defaultFf
 
     mol = Molecule(
@@ -1013,8 +1015,10 @@ def test_apply_chain_breaks_alternating():
     assert "X" not in set(chains)  # picked from the free pool
 
 
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_glycam_tleap_script(tmp_path):
-    # end-to-end script generation without running tleap
+    # end-to-end script generation without running tleap, but glycan detection
+    # still needs AMBERHOME to locate the GLYCAM prep files
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.amber import build
 
