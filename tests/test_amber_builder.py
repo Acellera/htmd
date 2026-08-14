@@ -1285,6 +1285,20 @@ def test_default_protein_caps_existing_cap_not_recapped():
     assert _defaultProteinCaps(mol) == {"P0": ["ACE", "none"]}
 
 
+def test_default_protein_caps_is_public():
+    from moleculekit.molecule import Molecule
+    from moleculekit.tools.autosegment import autoSegment
+    from htmd.builder.amber import _defaultProteinCaps, defaultProteinCaps
+
+    mol = Molecule("3ptb")
+    mol.filter("protein", _logger=False)
+    mol = autoSegment(mol, fields=("segid",), _logger=False)
+
+    caps = defaultProteinCaps(mol)
+    assert caps == _defaultProteinCaps(mol)
+    assert list(caps.values())[0] == ["ACE", "NME"]
+
+
 def _assert_glycan_bond(molbuilt, resname_a, name_a, resname_b, name_b):
     idx_a = np.where((molbuilt.resname == resname_a) & (molbuilt.name == name_a))[0]
     idx_b = np.where((molbuilt.resname == resname_b) & (molbuilt.name == name_b))[0]

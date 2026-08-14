@@ -2134,7 +2134,7 @@ def _suppress_caps_at_custombonds(mol: Molecule, caps, custombonds):
     an ACE / NME whose backbone atom tLeap then bonds to the already
     custom-bonded terminal atom, over-coordinating it and emitting junction
     angles / torsions (``N-C-ns`` ...) that have no force-field parameters. Only
-    the segment-cap (list) format produced by :func:`_defaultProteinCaps` is
+    the segment-cap (list) format produced by :func:`defaultProteinCaps` is
     adjusted; explicit per-residue cap selections are left untouched. Resids are
     still the input values here (renumbering happens later), so the custombond
     selection strings resolve directly."""
@@ -2252,9 +2252,21 @@ def _add_caps(mol: Molecule, caps: dict):
         mol.remove(mask, _logger=False)
 
 
-def _defaultProteinCaps(mol):
-    # Defines ACE and NME (neutral terminals) as default for protein segments
-    # Of course, this might not be ideal for proteins that require charged terminals
+def defaultProteinCaps(mol):
+    """Neutral ACE/NME caps for every protein segment, as a builder default.
+
+    Returns ``{segid: [nterm, cterm]}``. A terminus is capped only when its
+    residue is one the force field can build a cap onto (canonical, protonation
+    variant or modified); anything else - a non-canonical residue parameterized
+    in its terminal form, or an existing ACE/NME/NHE - gets ``"none"`` and stays
+    as it is. Segments shorter than 10 residues are omitted entirely.
+
+    Callers that want to override individual termini should merge their own
+    choices over this dict rather than replacing it, so that break ends and
+    uncappable termini keep being handled here. The available caps are ACE
+    (N-terminal), NME and NHE (C-terminal), and ``"none"`` leaves the terminus
+    charged.
+    """
     from moleculekit.residues import (
         PROTEIN_RESIDUE_NAMES_WITH_VARIANTS,
         MODIFIED_PROTEIN_RESIDUE_NAMES,
@@ -2288,6 +2300,10 @@ def _defaultProteinCaps(mol):
         cterm = "NME" if last_rn in known_protein else "none"
         caps[s] = [nterm, cterm]
     return caps
+
+
+#: Backwards-compatible alias for internal callers.
+_defaultProteinCaps = defaultProteinCaps
 
 
 def _cleanOutDir(outdir):
