@@ -6,6 +6,7 @@
 from htmd.home import home
 import numpy as np
 import os
+import re
 from os.path import join
 from glob import glob
 from moleculekit.util import _missingSegID, sequenceID
@@ -1159,12 +1160,28 @@ def build(
     mol_orig = mol
     mol = mol.copy()
 
+    # Rename any glycan to its GLYCAM-06 naming (sugars to their unit names,
+    # the anchor to NLN/OLS/OLT/OLP, the free reducing end split into ROH)
+    # before _prepareMolecule deletes all bonds below: the rename is derived
+    # from mol.bonds via moleculekit.tools.glycans.analyzeGlycanResidues, and
+    # systemPrepare intentionally leaves glycans under their original PDB
+    # names (most GLYCAM unit codes collide with unrelated real PDB ligand
+    # codes, e.g. TLA is tartrate) so this is where GLYCAM naming is applied.
+    # A no-op molecule with no glycan.
+    from moleculekit.tools.glycans import applyGlycamNaming
+
+    applyGlycamNaming(mol)
+
+    user_topo = list(topo) if topo is not None else []
+
     if ff is None:
         ff = defaultFf()
     if topo is None:
         topo = defaultTopo()
     if param is None:
         param = defaultParam()
+
+    _warn_unmatched_topo_units(mol, user_topo)
 
     # Warning for bad FF combination
     ff19tip3p = [False, False]
@@ -2531,6 +2548,55 @@ def _logParser(fname):
         )
 
     return errors
+
+
+_PREPI_UNIT_RE = re.compile(r"^(\S{1,4})\s+INT\s+\d", re.MULTILINE)
+
+
+def _warn_unmatched_topo_units(mol: Molecule, topos: list) -> None:
+    """Warn when a caller-supplied single-unit prepi/prep file defines a residue
+    name that ``mol`` does not contain.
+
+    The usual cause is an ordering mistake:
+    :func:`htmd.builder.nonstandard.parameterizeFromSpecs` applies the
+    force-field residue naming to the molecule it is given (a crosslinked
+    ``GLU`` becomes ``XX1``) and names its topology files to match, so building
+    a molecule taken before that call leaves tLeap with an ``XX1`` unit it never
+    uses while it rebuilds the residue from its canonical template instead.
+
+    Multi-unit files are skipped: a prep library legitimately carries units the
+    system does not use.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule being built.
+    topos : list
+        Caller-supplied topology files (an empty list when the caller passed
+        none, so only the AMBER defaults are in play and nothing is checked).
+
+    Returns
+    -------
+    None
+    """
+    resnames = set(str(x) for x in mol.resname)
+    for fname in topos:
+        if os.path.splitext(fname)[1].lower() not in (".prepi", ".prep", ".in"):
+            continue
+        try:
+            with open(fname, "r") as f:
+                units = _PREPI_UNIT_RE.findall(f.read())
+        except OSError:
+            continue
+        if len(units) != 1 or units[0] in resnames:
+            continue
+        logger.warning(
+            f"Topology file {fname} defines residue {units[0]} which is not "
+            f"present in the molecule, so tLeap will never use it. If this "
+            f"file came from parameterizeFromSpecs, build the same Molecule "
+            f"object you passed to it (it applies the force-field residue "
+            f"naming in place) rather than a copy taken beforehand."
+        )
 
 
 def _resname_from_fname(ff):

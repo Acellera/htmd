@@ -70,6 +70,7 @@ def _amber_lib_or_none():
     except (RuntimeError, FileNotFoundError):
         return None
 
+
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(curr_dir, "test_nonstandard_builder")
 QFZ_B_CIF = os.path.join(DATA_DIR, "8QFZ_B.cif")
@@ -144,8 +145,16 @@ _tleap = _findTeLeap() is not None
 # charges are not preserved through the prmtop, so this is the cheap
 # sanity check we have on the built mol.
 _MAX_BONDS_BY_ELEMENT = {
-    "H": 1, "C": 4, "N": 4, "O": 2, "S": 4, "P": 5,
-    "F": 1, "CL": 1, "BR": 1, "I": 1,
+    "H": 1,
+    "C": 4,
+    "N": 4,
+    "O": 2,
+    "S": 4,
+    "P": 5,
+    "F": 1,
+    "CL": 1,
+    "BR": 1,
+    "I": 1,
 }
 
 
@@ -429,7 +438,11 @@ def _normalised_atom_name(name, resname):
 
 
 def _assert_builds_equivalent(
-    amber_built, openmm_built, amber_prmtop, openmm_prmtop, energy_tol=0.05,
+    amber_built,
+    openmm_built,
+    amber_prmtop,
+    openmm_prmtop,
+    energy_tol=0.05,
     rel_tol=None,
 ):
     """Assert that the two prmtops produce the same potential energy on
@@ -505,8 +518,10 @@ def _assert_builds_equivalent(
                 force.setUseDispersionCorrection(False)
         ctx = openmm.Context(system, openmm.VerletIntegrator(0.001))
         ctx.setPositions(coords * 0.1 * omm_unit.nanometers)
-        return ctx.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
-            omm_unit.kilocalorie_per_mole
+        return (
+            ctx.getState(getEnergy=True)
+            .getPotentialEnergy()
+            .value_in_unit(omm_unit.kilocalorie_per_mole)
         )
 
     e_amber = _energy(amber_prmtop, shared)
@@ -526,9 +541,7 @@ def _assert_builds_equivalent(
     )
 
 
-def _run_pipeline(
-    mol, smiles, tmp_path, build_kwargs=None
-):
+def _run_pipeline(mol, smiles, tmp_path, build_kwargs=None):
     """Drive the full autoSegment -> detect -> template -> systemPrepare ->
     parameterize -> amber.build pipeline and return the built Molecule.
     ``autoSegment2`` runs first so each protein chain and each
@@ -610,7 +623,9 @@ def _run_openmm_pipeline(mol, smiles, tmp_path):
     return built, system
 
 
-def _assert_openmm_amber_equivalent(mol, smiles, caps, tmp_path, energy_tol=0.05, rel_tol=None):
+def _assert_openmm_amber_equivalent(
+    mol, smiles, caps, tmp_path, energy_tol=0.05, rel_tol=None
+):
     """Build ``mol`` through BOTH amber.build and openmm.build with identical
     caps and GAFF2/Gasteiger parameters, then assert their single-point energies
     agree (within ``energy_tol`` kcal/mol on shared coordinates). This is the
@@ -638,8 +653,11 @@ def _assert_openmm_amber_equivalent(mol, smiles, caps, tmp_path, energy_tol=0.05
 
     out = (
         parameterizeFromSpecs(
-            specs, pmol, outdir=str(tmp_path / "params"),
-            forcefield="gaff2", charge_method="gasteiger",
+            specs,
+            pmol,
+            outdir=str(tmp_path / "params"),
+            forcefield="gaff2",
+            charge_method="gasteiger",
         )
         if specs
         else None
@@ -658,10 +676,15 @@ def _assert_openmm_amber_equivalent(mol, smiles, caps, tmp_path, energy_tol=0.05
         ionize=False,
         solvate=False,
         caps=caps,
-        **(dict(extra_xml=list(out.xml_paths), custombonds=out.custombonds) if out else {}),
+        **(
+            dict(extra_xml=list(out.xml_paths), custombonds=out.custombonds)
+            if out
+            else {}
+        ),
     )
     _assert_builds_equivalent(
-        amb, omm,
+        amb,
+        omm,
         str(tmp_path / "amber" / "structure.prmtop"),
         str(tmp_path / "openmm" / "structure.prmtop"),
         energy_tol=energy_tol,
@@ -778,8 +801,10 @@ def _assert_openmm_build_matches_reference(system, openmm_outdir, ref_name):
         f"(|d|={abs(energies[k] - ref[k]):.2e} kcal/mol)"
         for k in ref
         if not math.isclose(
-            energies[k], ref[k],
-            rel_tol=_OPENMM_ENERGY_RTOL, abs_tol=_OPENMM_ENERGY_ATOL,
+            energies[k],
+            ref[k],
+            rel_tol=_OPENMM_ENERGY_RTOL,
+            abs_tol=_OPENMM_ENERGY_ATOL,
         )
     ]
     assert not mismatches, (
@@ -850,7 +875,9 @@ def test_amber_anchor_rename_via_custombonds(tmp_path):
     new.resid[:] = 11
     new.chain[:] = mol.chain[sg_idx]
     new.segid[:] = mol.segid[sg_idx]
-    new.coords = (sg_pos + np.array([0.0, 0.0, 1.34])).reshape(1, 3, 1).astype(np.float32)
+    new.coords = (
+        (sg_pos + np.array([0.0, 0.0, 1.34])).reshape(1, 3, 1).astype(np.float32)
+    )
     new.record[:] = "ATOM"
     mol.insert(new, index=sg_idx + 1, collisions=False)
 
@@ -927,8 +954,22 @@ def test_8qu4_stapled_peptide_end_to_end(tmp_path):
 
     # 1. Detect (no canonical anchors here, so no mutation).
     specs = detectNonStandardResidues(mol)
-    assert sum(isinstance(s, ChainResidueSpec) and s.resname not in PROTEIN_RESNAMES and s.anchor_atom is not None for s in specs) == 2
-    assert sum(isinstance(s, ChainResidueSpec) and s.resname in PROTEIN_RESNAMES for s in specs) == 0
+    assert (
+        sum(
+            isinstance(s, ChainResidueSpec)
+            and s.resname not in PROTEIN_RESNAMES
+            and s.anchor_atom is not None
+            for s in specs
+        )
+        == 2
+    )
+    assert (
+        sum(
+            isinstance(s, ChainResidueSpec) and s.resname in PROTEIN_RESNAMES
+            for s in specs
+        )
+        == 0
+    )
 
     # 2. Template the two NCAAs from SMILES.
     mol.templateResidueFromSmiles("resname NLE", NLE_SMILES, addHs=True)
@@ -966,25 +1007,20 @@ def test_8qu4_stapled_peptide_end_to_end(tmp_path):
         assert len(ce_idxs) == 1
         ce = int(ce_idxs[0])
         n_h = sum(
-            1 for nb in built.getNeighbors(ce)
-            if str(built.element[int(nb)]) == "H"
+            1 for nb in built.getNeighbors(ce) if str(built.element[int(nb)]) == "H"
         )
         n_heavy = sum(
-            1 for nb in built.getNeighbors(ce)
-            if str(built.element[int(nb)]) != "H"
+            1 for nb in built.getNeighbors(ce) if str(built.element[int(nb)]) != "H"
         )
         assert n_h == 2, f"{resname}.CE expected 2 H neighbours, got {n_h}"
         assert n_heavy == 2
 
     # The staple bond must be in the built mol.
-    nle_ce = set(
-        np.where((built.resname == "NLE") & (built.name == "CE"))[0].tolist()
-    )
-    mk8_ce = set(
-        np.where((built.resname == "MK8") & (built.name == "CE"))[0].tolist()
-    )
+    nle_ce = set(np.where((built.resname == "NLE") & (built.name == "CE"))[0].tolist())
+    mk8_ce = set(np.where((built.resname == "MK8") & (built.name == "CE"))[0].tolist())
     n_staple = sum(
-        1 for a, b in built.bonds
+        1
+        for a, b in built.bonds
         if (int(a) in nle_ce and int(b) in mk8_ce)
         or (int(b) in nle_ce and int(a) in mk8_ce)
     )
@@ -1021,13 +1057,17 @@ def test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     # three CYS get distinct rename targets. HG drops where present.
     specs = detectNonStandardResidues(mol)
     scaffolds = [s for s in specs if isinstance(s, ScaffoldSpec)]
-    renames = [s for s in specs if isinstance(s, ChainResidueSpec) and s.resname in PROTEIN_RESNAMES]
+    renames = [
+        s
+        for s in specs
+        if isinstance(s, ChainResidueSpec) and s.resname in PROTEIN_RESNAMES
+    ]
     assert len(scaffolds) == 1 and scaffolds[0].resname == "LFI"
     assert len(renames) == 3
     cys_rename_set = {r.new_resname for r in renames}
-    assert len(cys_rename_set) == 3, (
-        f"expected three distinct CYS rename targets, got {cys_rename_set}"
-    )
+    assert (
+        len(cys_rename_set) == 3
+    ), f"expected three distinct CYS rename targets, got {cys_rename_set}"
     for cys_new in cys_rename_set:
         assert len(cys_new) == 3 and cys_new.startswith("XX")
 
@@ -1065,7 +1105,8 @@ def test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     pset = AmberParameterSet(out.frcmod_paths[0])
     ff14sb_backbone_types = {"N", "H", "CT", "H1", "C", "O"}
     cross_ff_bonds = [
-        k for k in pset.bond_types
+        k
+        for k in pset.bond_types
         if any(t in ff14sb_backbone_types for t in k)
         and any(str(t).islower() for t in k)
     ]
@@ -1099,13 +1140,13 @@ def test_8qfz_scaffolded_peptide_end_to_end(tmp_path):
     # Three SG-Cn thioether bonds in the built mol.
     sg_idxs = set(np.where(built.name == "SG")[0].tolist())
     lfi_c_idxs = set(
-        np.where(
-            (built.resname == "LFI")
-            & np.isin(built.name, ["C10", "C11", "C12"])
-        )[0].tolist()
+        np.where((built.resname == "LFI") & np.isin(built.name, ["C10", "C11", "C12"]))[
+            0
+        ].tolist()
     )
     n_thioether = sum(
-        1 for a, b in built.bonds
+        1
+        for a, b in built.bonds
         if (int(a) in sg_idxs and int(b) in lfi_c_idxs)
         or (int(b) in sg_idxs and int(a) in lfi_c_idxs)
     )
@@ -1178,11 +1219,11 @@ def test_full_pipeline_1m63(tmp_path):
     # Mid-chain SMILES (carbonyl as C=O, backbone N as bare N; N-methylated
     # residues carry the extra methyl as "NC").
     smiles = {
-        "DAL": "C[C@H](C=O)N",                     # D-alanine
-        "ABA": "CC[C@@H](C=O)N",                   # L-2-aminobutyrate
-        "SAR": "O=CCNC",                           # sarcosine (N-methyl-Gly)
-        "MLE": "CC(C)C[C@@H](C=O)NC",              # N-methyl-L-leucine
-        "MVA": "CC(C)[C@@H](C=O)NC",               # N-methyl-L-valine
+        "DAL": "C[C@H](C=O)N",  # D-alanine
+        "ABA": "CC[C@@H](C=O)N",  # L-2-aminobutyrate
+        "SAR": "O=CCNC",  # sarcosine (N-methyl-Gly)
+        "MLE": "CC(C)C[C@@H](C=O)NC",  # N-methyl-L-leucine
+        "MVA": "CC(C)[C@@H](C=O)NC",  # N-methyl-L-valine
         "BMT": "C/C=C/C[C@@H](C)[C@H]([C@@H](C=O)NC)O",  # (4R)-MeBmt
     }
     built = _run_pipeline(mol, smiles, tmp_path)
@@ -1192,12 +1233,12 @@ def test_full_pipeline_1m63(tmp_path):
     # Metals survive as correctly-typed free ions (FE is the key one).
     for resname, count, charge in (("FE", 2, 3.0), ("ZN", 2, 2.0), ("CA", 8, 2.0)):
         sel = built.resname == resname
-        assert int(sel.sum()) == count, (
-            f"{resname}: {int(sel.sum())} atoms, expected {count}"
-        )
-        assert np.allclose(built.charge[sel], charge), (
-            f"{resname} charge {np.unique(built.charge[sel])}, expected {charge}"
-        )
+        assert (
+            int(sel.sum()) == count
+        ), f"{resname}: {int(sel.sum())} atoms, expected {count}"
+        assert np.allclose(
+            built.charge[sel], charge
+        ), f"{resname} charge {np.unique(built.charge[sel])}, expected {charge}"
 
     # The two cyclosporin copies are each closed head-to-tail (and nothing
     # else in the system is): exactly two backbone ring closures, each
@@ -1205,9 +1246,9 @@ def test_full_pipeline_1m63(tmp_path):
     closures = _backbone_ring_closures(built)
     assert len(closures) == 2, f"expected 2 cyclic closures, got {closures}"
     for ra, rb in closures:
-        assert abs(ra - rb) == 10, (
-            f"cyclosporin ring should span 11 residues, closure {ra}-{rb}"
-        )
+        assert (
+            abs(ra - rb) == 10
+        ), f"cyclosporin ring should span 11 residues, closure {ra}-{rb}"
 
 
 try:
@@ -1289,7 +1330,9 @@ def test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
         solvate=False,
         caps=caps,
     )
-    _assert_openmm_build_matches_reference(openmm_system, str(tmp_path / "openmm"), "5vbl")
+    _assert_openmm_build_matches_reference(
+        openmm_system, str(tmp_path / "openmm"), "5vbl"
+    )
 
     # NCAA + Zn + 4 disulfides; observed gap ~0.024 kcal/mol on
     # 6000 atoms. 0.05 leaves ~2x headroom.
@@ -1335,7 +1378,9 @@ def test_full_pipeline_6a5j_openmm_vs_amber(tmp_path):
         ionize=False,
         solvate=False,
     )
-    _assert_openmm_build_matches_reference(openmm_system, str(tmp_path / "openmm"), "6a5j")
+    _assert_openmm_build_matches_reference(
+        openmm_system, str(tmp_path / "openmm"), "6a5j"
+    )
 
     # Canonical-only ~270-atom peptide; observed gap is ~5e-5 kcal/mol.
     # 0.001 still gives ~20x headroom and catches any real regression.
@@ -1391,7 +1436,9 @@ def test_full_pipeline_6mdx_openmm_vs_amber(tmp_path):
 def test_full_pipeline_6lxu_openmm_vs_amber(tmp_path):
     """6LXU: the PLP-lysine (LLP) GAFF cluster gives the same energy through
     amber.build and openmm.build."""
-    _assert_openmm_amber_equivalent(Molecule(LXU_CIF), {"LLP": LLP_SMILES}, None, tmp_path)
+    _assert_openmm_amber_equivalent(
+        Molecule(LXU_CIF), {"LLP": LLP_SMILES}, None, tmp_path
+    )
 
 
 @pytest.mark.skipif(
@@ -1482,7 +1529,9 @@ def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
         custombonds=out.custombonds,
         caps=caps,
     )
-    _assert_openmm_build_matches_reference(openmm_system, str(tmp_path / "openmm"), "7bti")
+    _assert_openmm_build_matches_reference(
+        openmm_system, str(tmp_path / "openmm"), "7bti"
+    )
 
     # Both builders must produce the same topology.
     assert openmm_built.numAtoms == amber_built.numAtoms, (
@@ -1586,8 +1635,11 @@ def test_full_pipeline_1fjm_microcystin_openmm(tmp_path):
             )
     pmol, _ = systemPrepare(mol, detect_specs=specs)
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params"),
-        forcefield="gaff2", charge_method="gasteiger",
+        specs,
+        pmol,
+        outdir=str(tmp_path / "params"),
+        forcefield="gaff2",
+        charge_method="gasteiger",
     )
     caps = {str(s): ("none", "none") for s in set(pmol.segid.tolist())}
 
@@ -1614,11 +1666,13 @@ def test_full_pipeline_1fjm_microcystin_openmm(tmp_path):
     acb_cg = set(np.where((built.resname == "ACB") & (built.name == "CG"))[0].tolist())
     xx3_n = set(np.where((built.resname == "XX3") & (built.name == "N"))[0].tolist())
     n_iso = sum(
-        1 for a, b in built.bonds
+        1
+        for a, b in built.bonds
         if ({int(a), int(b)} & acb_cg) and ({int(a), int(b)} & xx3_n)
     )
     n_spurious = sum(
-        1 for a, b in built.bonds
+        1
+        for a, b in built.bonds
         if ({int(a), int(b)} & acb_c) and ({int(a), int(b)} & xx3_n)
     )
     assert n_iso >= 1, "isopeptide ACB.CG - XX3.N missing"
@@ -1764,9 +1818,7 @@ def test_full_pipeline_6mdx_mlz(tmp_path):
     sg = set(np.where(built.name == "SG")[0].tolist())
     cm = set(np.where(built.name == "CM")[0].tolist())
     n_xlink = sum(
-        1
-        for a, b in built.bonds
-        if ({int(a), int(b)} & sg) and ({int(a), int(b)} & cm)
+        1 for a, b in built.bonds if ({int(a), int(b)} & sg) and ({int(a), int(b)} & cm)
     )
     assert n_xlink == 1, "Cys-SG - methyllysine-CM thioether crosslink missing"
 
@@ -1797,8 +1849,11 @@ def test_full_pipeline_6mdx_mlz_openmm(tmp_path):
     specs = detectNonStandardResidues(mol)
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params"),
-        forcefield="gaff2", charge_method="gasteiger",
+        specs,
+        pmol,
+        outdir=str(tmp_path / "params"),
+        forcefield="gaff2",
+        charge_method="gasteiger",
     )
     built, system = openff_build(
         pmol.copy(),
@@ -1816,9 +1871,7 @@ def test_full_pipeline_6mdx_mlz_openmm(tmp_path):
     sg = set(np.where(built.name == "SG")[0].tolist())
     cm = set(np.where(built.name == "CM")[0].tolist())
     n_xlink = sum(
-        1
-        for a, b in built.bonds
-        if ({int(a), int(b)} & sg) and ({int(a), int(b)} & cm)
+        1 for a, b in built.bonds if ({int(a), int(b)} & sg) and ({int(a), int(b)} & cm)
     )
     assert n_xlink == 1, "Cys-SG - MLZ-CM crosslink missing in openmm build"
     _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6mdx")
@@ -1911,9 +1964,7 @@ def test_full_pipeline_5emz_k48_diubiquitin_openmm(tmp_path):
     c = set(np.where(built.name == "C")[0].tolist())
     nz = set(np.where(built.name == "NZ")[0].tolist())
     n_iso = sum(
-        1
-        for a, b in built.bonds
-        if ({int(a), int(b)} & c) and ({int(a), int(b)} & nz)
+        1 for a, b in built.bonds if ({int(a), int(b)} & c) and ({int(a), int(b)} & nz)
     )
     assert n_iso == 1, "Gly76.C - Lys48.NZ isopeptide bond missing in openmm build"
     _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "5emz")
@@ -2001,7 +2052,9 @@ def test_full_pipeline_6jch_pilin_isopeptide_openmm(tmp_path):
         a, b = int(a), int(b)
         if {str(built.name[a]), str(built.name[b])} == {"CG", "NZ"}:
             donor_cgs.add(a if str(built.name[a]) == "CG" else b)
-    assert len(donor_cgs) == 2, "expected two Asn.CG - Lys.NZ isopeptides in openmm build"
+    assert (
+        len(donor_cgs) == 2
+    ), "expected two Asn.CG - Lys.NZ isopeptides in openmm build"
     for cg in donor_cgs:
         neigh = sorted(str(built.name[n]) for n in built.getNeighbors(cg))
         assert neigh == ["CB", "NZ", "OD1"], f"donor CG mis-bonded: {neigh}"
@@ -2055,7 +2108,9 @@ def test_full_pipeline_6lxu_plp_lysine_openmm(tmp_path):
     """6LXU PLP-lysine (LLP) through openmm.build: the large chain-resident NCAA
     parameterizes via GAFF and emits OpenMM XML; the Schiff base (NZ=C4') and
     the 5'-phosphate must survive."""
-    built, system = _run_openmm_pipeline(Molecule(LXU_CIF), {"LLP": LLP_SMILES}, tmp_path)
+    built, system = _run_openmm_pipeline(
+        Molecule(LXU_CIF), {"LLP": LLP_SMILES}, tmp_path
+    )
     assert built is not None
     _check_no_overvalent_atoms(built)
     assert (built.resname == "LLP").any()
@@ -2099,7 +2154,9 @@ def test_6u17_chain_resident_modified_nucleotide_clear_error(tmp_path):
     specs = detectNonStandardResidues(mol)
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
 
-    with pytest.raises(RuntimeError, match=r"(?i)modified nucleotide.*nucleic-acid chain"):
+    with pytest.raises(
+        RuntimeError, match=r"(?i)modified nucleotide.*nucleic-acid chain"
+    ):
         parameterizeFromSpecs(
             specs, pmol, outdir=str(tmp_path / "params"), charge_method="gasteiger"
         )
@@ -2168,7 +2225,9 @@ def test_full_pipeline_2dpq_conantokin(tmp_path):
     mol.remove("element H", _logger=False)
 
     specs = detectNonStandardResidues(mol)
-    assert specs == [], f"CGU is a known modified residue; expected no specs, got {specs}"
+    assert (
+        specs == []
+    ), f"CGU is a known modified residue; expected no specs, got {specs}"
 
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
     built = amber_build(pmol, outdir=str(tmp_path / "build"), ionize=False)
@@ -2187,7 +2246,11 @@ def test_full_pipeline_2dpq_conantokin(tmp_path):
     assert len(nhe_n) == 1, "expected a single NHE cap"
     neigh = built.getNeighbors(int(nhe_n[0]))
     neigh_names = sorted(str(built.name[n]) for n in neigh)
-    assert neigh_names == ["C", "HN1", "HN2"], f"NHE cap not bonded to chain: {neigh_names}"
+    assert neigh_names == [
+        "C",
+        "HN1",
+        "HN2",
+    ], f"NHE cap not bonded to chain: {neigh_names}"
 
 
 @pytest.mark.skipif(not _openmm, reason="openmm build needs openmm")
@@ -2211,7 +2274,9 @@ def test_full_pipeline_2dpq_conantokin_openmm(tmp_path):
     mol = autoSegment(mol, fields=("segid", "chain"), _logger=False)
     mol.remove("element H", _logger=False)
     specs = detectNonStandardResidues(mol)
-    assert specs == [], f"CGU is a known modified residue; expected no specs, got {specs}"
+    assert (
+        specs == []
+    ), f"CGU is a known modified residue; expected no specs, got {specs}"
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
     built, system = openff_build(
         pmol.copy(), outdir=str(tmp_path / "openmm"), ionize=False, solvate=False
@@ -2277,7 +2342,15 @@ def test_full_pipeline_6a6l_5mc(tmp_path):
 # Fixtures under modrna_pdb/ are the RCSB chemical components in PDB-v3 naming.
 _MODRNA_PDB_DIR = os.path.join(DATA_DIR, "modrna_pdb")
 _MODRNA_RESIDUES = [
-    "5MC", "PSU", "5MU", "2MG", "1MG", "2MA", "4AC", "6IA", "1MA",
+    "5MC",
+    "PSU",
+    "5MU",
+    "2MG",
+    "1MG",
+    "2MA",
+    "4AC",
+    "6IA",
+    "1MA",
 ]
 
 
@@ -2338,7 +2411,9 @@ def test_prepare_modified_amino_acid_from_pdb(resname, tmp_path):
     assert specs == [], f"{resname} should be a known modified residue"
     pmol, _ = systemPrepare(mol, detect_specs=specs, verbose=False)
     built = amber_build(
-        pmol, outdir=str(tmp_path / "build"), ionize=False,
+        pmol,
+        outdir=str(tmp_path / "build"),
+        ionize=False,
         caps={"A": ("ACE", "NME")},
     )
 
@@ -2388,9 +2463,7 @@ def test_parameterize_from_specs_emits_openmm_xml(tmp_path):
 
     # GAFF path emits exactly one combined OpenMM XML appended to
     # ``xml_paths`` (named ``gaff_combined.xml``); locate it.
-    gaff_xml = next(
-        (p for p in out.xml_paths if p.endswith("gaff_combined.xml")), None
-    )
+    gaff_xml = next((p for p in out.xml_paths if p.endswith("gaff_combined.xml")), None)
     assert gaff_xml is not None, (
         f"GAFF run should have appended a gaff_combined.xml to xml_paths, "
         f"got {out.xml_paths}"
@@ -2452,8 +2525,9 @@ def test_full_pipeline_4tot_e(tmp_path):
 def test_full_pipeline_1r1j(tmp_path):
     """1R1J: glycoprotein with three NAG-Asn N-glycosylation sites. Each
     Asn ND2 - NAG C1 bond is recognized natively by systemPrepare's glycan
-    detection: NAG is emitted as a GlycanSpec (no SMILES templating needed)
-    and is renamed to GLYCAM's 0YB unit, with the anchor ASN renamed to NLN.
+    detection: NAG is emitted as a GlycanSpec (no SMILES templating needed),
+    and amber.build's own applyGlycamNaming step renames it to GLYCAM's
+    0YB unit, with the anchor ASN renamed to NLN, right before building.
     parameterizeFromSpecs skips GlycanSpec entirely; GLYCAM's own forcefield
     parameters build the sugar, not antechamber."""
     mol = Molecule(R1J_PDB)
@@ -2515,12 +2589,19 @@ def test_parameterize_from_specs_dedup_4tot(tmp_path):
     # of 33X / 34E / ABA / BMT / DAL / MVA), 4 free P6G ligands, and
     # 2 free SO4 ligands. Without dedup that's 42 antechamber runs.
     expected_spec_counts = {
-        "33X": 4, "34E": 4, "ABA": 4, "BMT": 4, "DAL": 4,
-        "MLE": 12, "MVA": 4, "P6G": 4, "SO4": 2,
+        "33X": 4,
+        "34E": 4,
+        "ABA": 4,
+        "BMT": 4,
+        "DAL": 4,
+        "MLE": 12,
+        "MVA": 4,
+        "P6G": 4,
+        "SO4": 2,
     }
-    assert dict(spec_counts) == expected_spec_counts, (
-        f"unexpected spec counts: {dict(spec_counts)}"
-    )
+    assert (
+        dict(spec_counts) == expected_spec_counts
+    ), f"unexpected spec counts: {dict(spec_counts)}"
 
     for resname, smi in smiles.items():
         if (mol.resname == resname).any():
@@ -2543,15 +2624,13 @@ def test_parameterize_from_specs_dedup_4tot(tmp_path):
     )
     # 42 specs collapse to 9 unique-resname prepi/frcmod files: 7 NCAA
     # singletons (one per unique resname) plus 2 free ligands (P6G, SO4).
-    expected_basenames = [
-        "33X", "34E", "ABA", "BMT", "DAL", "MLE", "MVA", "P6G", "SO4"
-    ]
-    assert topo_basenames == expected_basenames, (
-        f"topo basenames {topo_basenames} != {expected_basenames}"
-    )
-    assert frcmod_basenames == expected_basenames, (
-        f"frcmod basenames {frcmod_basenames} != {expected_basenames}"
-    )
+    expected_basenames = ["33X", "34E", "ABA", "BMT", "DAL", "MLE", "MVA", "P6G", "SO4"]
+    assert (
+        topo_basenames == expected_basenames
+    ), f"topo basenames {topo_basenames} != {expected_basenames}"
+    assert (
+        frcmod_basenames == expected_basenames
+    ), f"frcmod basenames {frcmod_basenames} != {expected_basenames}"
 
 
 # ---------------------------------------------------------------------------
@@ -2616,21 +2695,26 @@ def _alkane(resname, n_carbon):
 
 
 # Reusable residue fragments.
-_HEXANE = _alkane("HEX", 6)          # fully protonated, exercises the H-count path
+_HEXANE = _alkane("HEX", 6)  # fully protonated, exercises the H-count path
 _BARE_C4 = ("BC4", ["C"] * 4, [(0, 1), (1, 2), (2, 3)])  # 4-carbon chain, no H
-_BENZENE = ("BNZ", ["C"] * 6 + ["H"] * 6,
-            [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
-            + [(i, 6 + i) for i in range(6)])
+_BENZENE = (
+    "BNZ",
+    ["C"] * 6 + ["H"] * 6,
+    [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)] + [(i, 6 + i) for i in range(6)],
+)
 _ZINC = ("ZN", ["Zn"], [])
-_SULFATE = ("SO4", ["S", "O", "O", "O", "O"], [(0, 1), (0, 2), (0, 3), (0, 4)],
-            [0, 0, 0, -1, -1])
+_SULFATE = (
+    "SO4",
+    ["S", "O", "O", "O", "O"],
+    [(0, 1), (0, 2), (0, 3), (0, 4)],
+    [0, 0, 0, -1, -1],
+)
 _SMALL_CO2 = ("CO2", ["C", "O", "O"], [(0, 1), (0, 2)])  # H-free, below the gate
 # Lysine-ish heavy skeleton with only the backbone N-H / CA-HA present.
 _LYS_STRIPPED = (
     "LYX",
     ["N", "C", "C", "O", "C", "C", "C", "C", "N", "H", "H"],
-    [(0, 1), (1, 2), (2, 3), (1, 4), (4, 5), (5, 6), (6, 7), (7, 8),
-     (0, 9), (1, 10)],
+    [(0, 1), (1, 2), (2, 3), (1, 4), (4, 5), (5, 6), (6, 7), (7, 8), (0, 9), (1, 10)],
 )
 
 
@@ -2841,7 +2925,9 @@ def test_clean_frcmod_backbone_terms_dropped(tmp_path):
     assert ("c3", "c3", "c3", "c3") not in pset.dihedral_types
     # Backbone atom types themselves stay (referenced by mixed terms / atoms);
     # types absent from the fragment and not backbone go.
-    assert "CT" in pset.atom_types and "N" in pset.atom_types and "c3" in pset.atom_types
+    assert (
+        "CT" in pset.atom_types and "N" in pset.atom_types and "c3" in pset.atom_types
+    )
     assert "ca" not in pset.atom_types and "xx" not in pset.atom_types
 
 
@@ -2969,7 +3055,9 @@ def test_normalize_residue_charges_pin_only_skips_normalization():
     # per-residue pinning with one cluster-wide shift at the end.
     names = _BACKBONE_PLUS_SIDECHAIN
     sub = _charge_mol(names, [0.3] * len(names))
-    pinned = _normalize_residue_charges(sub, net_charge=None, charge_map=_NEUTRAL_BACKBONE)
+    pinned = _normalize_residue_charges(
+        sub, net_charge=None, charge_map=_NEUTRAL_BACKBONE
+    )
     # Pinned atoms got the map values.
     for name, q in _NEUTRAL_BACKBONE.items():
         assert float(sub.charge[sub.name == name][0]) == pytest.approx(q, abs=1e-4)
@@ -2988,9 +3076,18 @@ def test_backbone_charge_map_ncaa_charge_classes():
     # (it consults _FF14SB_BACKBONE_CHARGES_BY_CLASS), so an empty
     # dict is fine for the lib argument here.
     present = {"N", "H", "CA", "HA", "C", "O", "CB", "CG"}
-    assert _backbone_charge_map("", "", present, 0, ff14sb_lib={}) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
-    assert _backbone_charge_map("", "", present, 1, ff14sb_lib={}) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
-    assert _backbone_charge_map("", "", present, -1, ff14sb_lib={}) == _FF14SB_BACKBONE_CHARGES_BY_CLASS[-1]
+    assert (
+        _backbone_charge_map("", "", present, 0, ff14sb_lib={})
+        == _FF14SB_BACKBONE_CHARGES_BY_CLASS[0]
+    )
+    assert (
+        _backbone_charge_map("", "", present, 1, ff14sb_lib={})
+        == _FF14SB_BACKBONE_CHARGES_BY_CLASS[1]
+    )
+    assert (
+        _backbone_charge_map("", "", present, -1, ff14sb_lib={})
+        == _FF14SB_BACKBONE_CHARGES_BY_CLASS[-1]
+    )
     # A net charge with no standard backbone class pins nothing.
     assert _backbone_charge_map("", "", present, 2, ff14sb_lib={}) == {}
 
@@ -3011,7 +3108,11 @@ def test_backbone_charge_map_proline_like_ncaa_uses_pro():
     # (OIC vs. pipecolic vs. true PRO).
     present = {"N", "CA", "HA", "C", "O", "CB", "CG", "CD"}
     cmap = _backbone_charge_map(
-        "", "", present, 0, n_has_bonded_h=False,
+        "",
+        "",
+        present,
+        0,
+        n_has_bonded_h=False,
         ff14sb_lib=_amber_lib_or_none(),
     )
     assert set(cmap) == {"N", "CA", "C", "O", "HA"}
@@ -3030,9 +3131,7 @@ def test_backbone_charge_map_proline_like_terminal_is_empty():
     # the terminal ionisation. Falls through to the safe empty map.
     present = {"N", "CA", "HA", "C", "O", "OXT", "CB", "CG", "CD"}
     assert (
-        _backbone_charge_map(
-            "", "c", present, -1, n_has_bonded_h=False, ff14sb_lib={}
-        )
+        _backbone_charge_map("", "c", present, -1, n_has_bonded_h=False, ff14sb_lib={})
         == {}
     )
 
@@ -3043,9 +3142,7 @@ def test_backbone_charge_map_nterm_with_nh3_not_proline_like():
     # name-based "H absent" check would mis-classify it as proline-
     # like; the bond-based ``n_has_bonded_h`` flag does not.
     present = {"N", "CA", "HA", "C", "O", "H1", "H2", "H3", "CB", "CG", "CD"}
-    cmap = _backbone_charge_map(
-        "", "", present, 0, n_has_bonded_h=True, ff14sb_lib={}
-    )
+    cmap = _backbone_charge_map("", "", present, 0, n_has_bonded_h=True, ff14sb_lib={})
     # Without the n_has_bonded_h flag, this could have wrongly fallen
     # into the proline-like PRO map; with it, the residue is treated
     # as a normal amide NCAA and the universal charge-class fallback
@@ -3060,9 +3157,7 @@ def test_backbone_charge_map_canonical_midchain():
     # CA / HA included - from the ff14SB CYS library entry; the sidechain
     # is left to antechamber.
     present = {"N", "H", "CA", "HA", "C", "O", "CB", "HB2", "HB3", "SG"}
-    cmap = _backbone_charge_map(
-        "CYS", "", present, 0, ff14sb_lib=_amber_lib_or_none()
-    )
+    cmap = _backbone_charge_map("CYS", "", present, 0, ff14sb_lib=_amber_lib_or_none())
     assert set(cmap) == {"N", "H", "CA", "HA", "C", "O"}
     for name, q in _NEUTRAL_BACKBONE.items():
         assert cmap[name] == pytest.approx(q, abs=1e-4)
@@ -3171,6 +3266,7 @@ def htmd_logs_to_caplog():
     records never reach pytest's caplog root handler. Re-enable
     propagation for the duration of the test and restore it after."""
     import logging
+
     htmd_logger = logging.getLogger("htmd")
     original = htmd_logger.propagate
     htmd_logger.propagate = True
@@ -3196,15 +3292,11 @@ def test_warn_if_openff_mismatched_charges_silent_on_openff_plus_nagl(
 ):
     # SMIRNOFF + NAGL is the recommended combination - no warning.
     with caplog.at_level("WARNING"):
-        _warn_if_openff_mismatched_charges(
-            "openff_unconstrained-2.3.0.offxml", "nagl"
-        )
+        _warn_if_openff_mismatched_charges("openff_unconstrained-2.3.0.offxml", "nagl")
     assert not any("NAGL reproduces" in r.message for r in caplog.records)
 
 
-def test_warn_if_openff_mismatched_charges_silent_on_gaff(
-    caplog, htmd_logs_to_caplog
-):
+def test_warn_if_openff_mismatched_charges_silent_on_gaff(caplog, htmd_logs_to_caplog):
     # GAFF-only call - no SMIRNOFF in play, no warning regardless of
     # charge method. The charge-FF mismatch concern only applies to Sage.
     with caplog.at_level("WARNING"):
@@ -3333,9 +3425,7 @@ def test_ff14sb_amino_lib_parmed_vs_openmm_parity():
         for atom_name, (p_type, p_charge) in p_atoms.items():
             # Resolve the ACE/NME cap-atom alias on the parmed side
             # so the lookup finds the OpenMM-side atom.
-            lookup_name = _FF14SB_CAP_NAME_ALIASES.get(
-                (resname, atom_name), atom_name
-            )
+            lookup_name = _FF14SB_CAP_NAME_ALIASES.get((resname, atom_name), atom_name)
             if lookup_name not in o_atoms:
                 continue  # tolerate a missing alias gracefully
             o_type, o_charge = o_atoms[lookup_name]
@@ -3398,7 +3488,10 @@ def _check_against_reference(generated_paths, ref_dir, label, regenerate):
 
 
 def _run_8qfz_bicycle_param_reference(
-    tmp_path, normalize, ref_subdir, pin_backbone_charges=True,
+    tmp_path,
+    normalize,
+    ref_subdir,
+    pin_backbone_charges=True,
 ):
     """Shared driver for the 8QFZ_B_bicycle scaffolded cyclic peptide
     golden test under each ``normalize`` / ``pin_backbone_charges``
@@ -3449,7 +3542,10 @@ def test_custom_residue_param_reference_8qfz_per_residue(tmp_path):
 
 
 def _run_5vbl_param_reference(
-    tmp_path, normalize, ref_subdir, pin_backbone_charges=True,
+    tmp_path,
+    normalize,
+    ref_subdir,
+    pin_backbone_charges=True,
 ):
     """Shared driver for the 5VBL_A peptide reference tests. The
     fixture covers five chain-resident NCAAs (HRG, ALC, OIC, NLE, 200)
@@ -3483,7 +3579,9 @@ def _run_5vbl_param_reference(
     # moleculekit's Dunbrack-rotamer mutator pre-PDB2PQR to fill them
     # in at canonical coordinates.
     pmol = systemPrepare(
-        mol, detect_specs=specs, restore_missing_sidechains=True,
+        mol,
+        detect_specs=specs,
+        restore_missing_sidechains=True,
     )[0]
     out = parameterizeFromSpecs(
         specs,
@@ -3510,7 +3608,9 @@ def test_custom_residue_param_reference_5vbl_cluster(tmp_path):
     total is normalised to integer; per-residue totals stay at their
     natural Gasteiger values modulo a uniform shift."""
     _run_5vbl_param_reference(
-        tmp_path, normalize="cluster", ref_subdir="5VBL_A_cluster",
+        tmp_path,
+        normalize="cluster",
+        ref_subdir="5VBL_A_cluster",
     )
 
 
@@ -3522,7 +3622,9 @@ def test_custom_residue_param_reference_5vbl_per_residue(tmp_path):
     """5VBL_A under ``normalize='per_residue'``: every emitted unit
     sums to its integer formal charge (AMBER tLeap convention)."""
     _run_5vbl_param_reference(
-        tmp_path, normalize="per_residue", ref_subdir="5VBL_A_per_residue",
+        tmp_path,
+        normalize="per_residue",
+        ref_subdir="5VBL_A_per_residue",
     )
 
 
@@ -3542,9 +3644,7 @@ def test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
         pin_backbone_charges=False,
         ref_subdir="5VBL_A_no_pin_no_normalize",
     )
-    refdir = os.path.join(
-        _CUSTOM_PARAM_DIR, "reference", "5VBL_A_no_pin_no_normalize"
-    )
+    refdir = os.path.join(_CUSTOM_PARAM_DIR, "reference", "5VBL_A_no_pin_no_normalize")
 
     def _prepi_total(p):
         s = 0.0
@@ -3775,9 +3875,7 @@ def _assert_built_matches_references(built, refdir, charge_tol=1e-3):
             ref_imp = _read_prepi_intra_residue_impropers(path)
             built_imp = _intra_residue_impropers(built, name) or set()
             for fs in sorted(ref_imp - built_imp, key=sorted):
-                bad.append(
-                    f"{name}: improper {sorted(fs)} in prepi but not in built"
-                )
+                bad.append(f"{name}: improper {sorted(fs)} in prepi but not in built")
     assert not bad, "built mol disagrees with references:\n  " + "\n  ".join(bad)
 
 
@@ -3800,11 +3898,15 @@ def test_amber_build_8qfz_matches_reference(tmp_path):
     mol.chain[:] = "A"
     mol.segid[:] = "A"
     specs = detectNonStandardResidues(mol)
-    mol.templateResidueFromSmiles('resname "LFI"', LFI_SMILES, addHs=True, _logger=False)
+    mol.templateResidueFromSmiles(
+        'resname "LFI"', LFI_SMILES, addHs=True, _logger=False
+    )
     pmol, _ = systemPrepare(mol, detect_specs=specs)
 
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params"),
+        specs,
+        pmol,
+        outdir=str(tmp_path / "params"),
         charge_method="gasteiger",
     )
     # Disable auto-capping on the protein segment: the N-terminal CYS
@@ -3850,13 +3952,19 @@ def test_amber_build_5vbl_matches_reference(tmp_path):
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
     }
     for resname, smi in smiles.items():
-        mol.templateResidueFromSmiles(f'resname "{resname}"', smi, addHs=True, _logger=False)
+        mol.templateResidueFromSmiles(
+            f'resname "{resname}"', smi, addHs=True, _logger=False
+        )
     pmol = systemPrepare(
-        mol, detect_specs=specs, restore_missing_sidechains=True,
+        mol,
+        detect_specs=specs,
+        restore_missing_sidechains=True,
     )[0]
 
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params"),
+        specs,
+        pmol,
+        outdir=str(tmp_path / "params"),
         charge_method="gasteiger",
     )
     # The C-terminal NCAA (residue 200) carries its own OXT via the
@@ -3933,7 +4041,9 @@ def test_amber_build_1u5u_hem_matches_reference(tmp_path):
     pmol = systemPrepare(mol, detect_specs=specs)[0]
 
     out = parameterizeFromSpecs(
-        specs, pmol, outdir=str(tmp_path / "params"),
+        specs,
+        pmol,
+        outdir=str(tmp_path / "params"),
         charge_method="gasteiger",
     )
     built = amber_build(
@@ -4025,8 +4135,13 @@ def _methane_mol():
     mol.segid[:] = "L0"
     mol.chain[:] = "A"
     mol.coords = np.array(
-        [[0, 0, 0], [0.63, 0.63, 0.63], [-0.63, -0.63, 0.63],
-         [-0.63, 0.63, -0.63], [0.63, -0.63, -0.63]],
+        [
+            [0, 0, 0],
+            [0.63, 0.63, 0.63],
+            [-0.63, -0.63, 0.63],
+            [-0.63, 0.63, -0.63],
+            [0.63, -0.63, -0.63],
+        ],
         dtype=np.float32,
     ).reshape(5, 3, 1)
     mol.bonds = np.array([[0, 1], [0, 2], [0, 3], [0, 4]], dtype=np.uint32)
@@ -4069,3 +4184,132 @@ def test_parameterizeMolecule_parameterizes_free_ligand(tmp_path):
     assert out.topo_paths and out.frcmod_paths and out.xml_paths
     for f in out.topo_paths + out.frcmod_paths + out.xml_paths:
         assert os.path.exists(f), f
+
+
+def _junction_spec_mol():
+    """Two-residue mol: a GLU whose CD is bonded to a LYS NZ (an isopeptide),
+    which is what detectNonStandardResidues buckets into XX1 / XX2."""
+    names = ["N", "CA", "C", "O", "CB", "CG", "CD", "OE1"]
+    mol = Molecule().empty(len(names) + 1)
+    mol.name[:] = names + ["NZ"]
+    mol.element[:] = ["N", "C", "C", "O", "C", "C", "C", "O", "N"]
+    mol.resname[:] = ["GLU"] * len(names) + ["LYS"]
+    mol.resid[:] = [10] * len(names) + [13]
+    mol.chain[:] = "A"
+    mol.segid[:] = "P0"
+    mol.insertion[:] = ""
+    mol.coords = np.zeros((len(names) + 1, 3, 1), dtype=np.float32)
+    return mol
+
+
+def _chain_spec(resname, resid, new_resname):
+    from moleculekit.molecule import UniqueResidueID
+    from moleculekit.tools.nonstandard_residues import ChainResidueSpec
+
+    return ChainResidueSpec(
+        resname=resname,
+        residue=UniqueResidueID(
+            resname=resname, chain="A", resid=resid, insertion="", segid="P0"
+        ),
+        new_resname=new_resname,
+    )
+
+
+def test_apply_spec_renames_applies_chain_renames_in_place():
+    """parameterizeFromSpecs owns the force-field residue naming: systemPrepare
+    returns a crosslinked GLU still named GLU, and the topology files this
+    module emits are named after mol's resnames, so the rename has to land on
+    the caller's molecule."""
+    from htmd.builder.nonstandard import _apply_spec_renames
+
+    mol = _junction_spec_mol()
+    specs = [_chain_spec("GLU", 10, "XX1"), _chain_spec("LYS", 13, "XX2")]
+    _apply_spec_renames(mol, specs)
+    assert set(mol.resname[mol.resid == 10].tolist()) == {"XX1"}
+    assert set(mol.resname[mol.resid == 13].tolist()) == {"XX2"}
+
+
+def test_apply_spec_renames_is_idempotent():
+    """Applying the renames twice is a no-op, so it does not matter whether the
+    molecule reached here already renamed (an older prepared structure)."""
+    from htmd.builder.nonstandard import _apply_spec_renames
+
+    mol = _junction_spec_mol()
+    specs = [_chain_spec("GLU", 10, "XX1"), _chain_spec("LYS", 13, "XX2")]
+    _apply_spec_renames(mol, specs)
+    first = mol.resname.copy()
+    _apply_spec_renames(mol, specs)
+    assert (mol.resname == first).all()
+
+
+def test_apply_spec_renames_leaves_glycans_alone():
+    """GLYCAM naming is derivable from the sugar chemistry and belongs to the
+    builder (applyGlycamNaming), so a GlycanSpec must not be renamed here."""
+    from htmd.builder.nonstandard import _apply_spec_renames
+    from moleculekit.molecule import UniqueResidueID
+    from moleculekit.tools.nonstandard_residues import GlycanSpec
+
+    mol = Molecule().empty(1)
+    mol.name[:] = ["C1"]
+    mol.element[:] = ["C"]
+    mol.resname[:] = "NAG"
+    mol.resid[:] = 1
+    mol.chain[:] = "C"
+    mol.segid[:] = "C0"
+    mol.insertion[:] = ""
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+
+    spec = GlycanSpec(
+        resname="NAG",
+        residue=UniqueResidueID(
+            resname="NAG", chain="C", resid=1, insertion="", segid="C0"
+        ),
+        new_resname="0YB",
+    )
+    _apply_spec_renames(mol, [spec])
+    assert set(mol.resname.tolist()) == {"NAG"}
+
+
+def _write_prepi(path, unit):
+    with open(path, "w") as f:
+        f.write(f"    0    0    2\n\nremark\nmolecule.res\n{unit}   INT  0\n")
+        f.write("CORRECT     OMIT DU   BEG\n  0.0000\n")
+
+
+def test_warn_unmatched_topo_units_flags_a_stale_molecule(tmp_path, caplog):
+    """The ordering contract between parameterizeFromSpecs (which renames the
+    molecule in place) and amber.build is not otherwise enforced: building a
+    molecule taken before parameterization leaves tLeap an unused XX1 unit
+    while it rebuilds the residue from its canonical template."""
+    import logging
+    from htmd.builder.amber import _warn_unmatched_topo_units
+
+    prepi = str(tmp_path / "topo5_XX1.prepi")
+    _write_prepi(prepi, "XX1")
+
+    stale = _junction_spec_mol()  # still named GLU / LYS
+    with caplog.at_level(logging.WARNING, logger="htmd.builder.amber"):
+        _warn_unmatched_topo_units(stale, [prepi])
+    assert any("XX1" in r.message for r in caplog.records), caplog.text
+
+    caplog.clear()
+    renamed = _junction_spec_mol()
+    renamed.resname[renamed.resid == 10] = "XX1"
+    with caplog.at_level(logging.WARNING, logger="htmd.builder.amber"):
+        _warn_unmatched_topo_units(renamed, [prepi])
+    assert not caplog.records, caplog.text
+
+
+def test_warn_unmatched_topo_units_ignores_multi_unit_libraries(tmp_path, caplog):
+    """A prep library legitimately carries units the system does not use."""
+    import logging
+    from htmd.builder.amber import _warn_unmatched_topo_units
+
+    lib = str(tmp_path / "topo0_lib.in")
+    with open(lib, "w") as f:
+        f.write("    0    0    2\n\nremark\nmol.res\nAAA   INT  0\n")
+        f.write("remark\nmol.res\nBBB   INT  0\n")
+
+    with caplog.at_level(logging.WARNING, logger="htmd.builder.amber"):
+        _warn_unmatched_topo_units(_junction_spec_mol(), [lib])
+    assert not caplog.records, caplog.text

@@ -2442,6 +2442,56 @@ def _estimate_sp3_hydrogens(elem_upper, formalcharge, heavy_degree, atom_idx):
     return total
 
 
+def _apply_spec_renames(mol, specs):
+    """Apply every :class:`ChainResidueSpec` ``new_resname`` to ``mol`` in place.
+
+    The prepi unit name this function emits is taken from ``mol.resname``, so
+    the rename has to land on the molecule for the topology files and the
+    structure handed to tLeap to agree. ``systemPrepare`` deliberately returns
+    force-field-neutral names (a junction ``GLU`` stays ``GLU``, not ``XX1``),
+    so this is where the force-field naming is applied.
+
+    :class:`GlycanSpec` is not touched: GLYCAM naming is derivable from the
+    sugar chemistry alone and belongs to the builder that commits to GLYCAM
+    (:func:`moleculekit.tools.glycans.applyGlycamNaming`).
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule the specs describe. Modified in place.
+    specs : list
+        Per-residue specs from
+        :func:`moleculekit.tools.nonstandard_residues.detectNonStandardResidues`.
+
+    Returns
+    -------
+    None
+    """
+    from moleculekit.tools.nonstandard_residues import (
+        ChainResidueSpec,
+        getResidueMask,
+    )
+
+    applied = []
+    for spec in specs:
+        if not isinstance(spec, ChainResidueSpec) or not spec.new_resname:
+            continue
+        mask = getResidueMask(mol, spec)
+        if not mask.any() or str(mol.resname[mask][0]) == str(spec.new_resname):
+            continue
+        mol.resname[mask] = str(spec.new_resname)
+        rid = spec.residue
+        applied.append(
+            f"{spec.resname} {rid.chain}:{rid.resid}{rid.insertion}"
+            f"->{spec.new_resname}"
+        )
+    if applied:
+        logger.info(
+            f"Applied force-field residue naming to the input molecule: "
+            f"{', '.join(applied)}."
+        )
+
+
 def _check_specs_templated(mol, specs):
     """Refuse to parameterize a non-canonical residue that is not templated.
 
@@ -2622,7 +2672,11 @@ def parameterizeFromSpecs(
         :func:`moleculekit.tools.nonstandard_residues.detectNonStandardResidues`.
     mol : :class:`Molecule <moleculekit.molecule.Molecule>`
         The molecule the specs describe. Must already carry covalent
-        bonds (typically the post-``systemPrepare`` molecule).
+        bonds (typically the post-``systemPrepare`` molecule). **Modified
+        in place**: every ``ChainResidueSpec.new_resname`` is applied, so
+        the emitted topology unit names match the structure. Pass this
+        same object on to :func:`htmd.builder.amber.build` rather than a
+        copy taken beforehand, or the build will not find the units.
     outdir : str
         Output directory for all generated CIF / frcmod / XML files.
     forcefield : str or dict, optional
@@ -2800,6 +2854,14 @@ def parameterizeFromSpecs(
     # the user but don't reject - they may have a reason (e.g. comparing
     # backends with the same external charge model for diagnostic tests).
     _warn_if_openff_mismatched_charges(forcefield, charge_method)
+
+    # Apply the force-field residue naming to ``mol`` before anything reads a
+    # resname off it: the emitted topology files are named after mol's
+    # resnames, so the structure the builder later hands tLeap has to carry the
+    # same names. Done here rather than in systemPrepare, whose output stays
+    # force-field-neutral so a second detection pass over it still classifies a
+    # crosslinked canonical residue as the canonical residue it is.
+    _apply_spec_renames(mol, specs)
 
     # Non-alpha (beta/gamma) amino-acid backbones build, but their non-alpha
     # backbone atoms get GAFF/OpenFF charges + analogy torsions, which are

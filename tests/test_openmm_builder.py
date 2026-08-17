@@ -1856,12 +1856,14 @@ def test_maybe_add_glycam_does_not_misdetect_modified_ribonucleotide():
 def test_openmm_build_3ave_branched_nglycan(tmp_path):
     """End-to-end OpenMM build of 3AVE's branched N-glycan fragment (the same
     fixture amber's test_glycam_build_3ave_branched_nglycan builds).
-    systemPrepare renames the sugar tree to GLYCAM unit codes and the
-    glycosylated ASN to NLN; openmm.build must produce a system carrying
-    those GLYCAM resnames, the glycosidic bonds between them, and rebuilt
-    sugar hydrogens (the input PDB has none on the sugar tree -
-    _maybe_add_glycam strips whatever systemPrepare/pdb2pqr added and
-    Modeller.addHydrogens rebuilds them in GLYCAM naming)."""
+    systemPrepare protonates the sugar tree but leaves it under its
+    original PDB names; openmm.build's own applyGlycamNaming step renames
+    the sugars to GLYCAM unit codes and the glycosylated ASN to NLN before
+    building, so the built system must carry those GLYCAM resnames, the
+    glycosidic bonds between them, and rebuilt sugar hydrogens (the input
+    PDB has none on the sugar tree - _maybe_add_glycam strips whatever
+    systemPrepare/pdb2pqr added and Modeller.addHydrogens rebuilds them in
+    GLYCAM naming)."""
     from moleculekit.molecule import Molecule
     from moleculekit.tools.preparation import systemPrepare
     from htmd.builder.openmm import build as openmm_build

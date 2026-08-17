@@ -725,6 +725,17 @@ def build(
     # to an OpenMM template, register a hydrogen definition, and strip their
     # input Hs so addHydrogens rebuilds them in the template's naming.
     extra_xml = _maybe_add_ffptm_prepi(mol, outdir, extra_xml)
+    # systemPrepare intentionally leaves a glycan under its original PDB
+    # names (most GLYCAM unit codes collide with unrelated real PDB ligand
+    # codes, e.g. TLA is tartrate), so apply the GLYCAM-06 naming here:
+    # sugars to their unit names, the anchor to NLN/OLS/OLT/OLP, and the free
+    # reducing end split into ROH. Derived from mol.bonds, which are still
+    # intact at this point (_prepare_molecule above never deletes them). A
+    # no-op on a molecule with no glycan.
+    from moleculekit.tools.glycans import applyGlycamNaming
+
+    applyGlycamNaming(mol)
+
     # GLYCAM glycan residues (sugars, the ROH free reducing end, and the
     # NLN/OLS/OLT anchors): auto-load OpenMM's own bundled GLYCAM_06j-1 force
     # field and hydrogen definitions, and strip sugar hydrogens so
@@ -1711,6 +1722,12 @@ def _fix_water_naming(mol):
 
 
 _AMBER_TO_OPENMM_RNA = {
+    # moleculekit's systemPrepare no longer emits these R-prefixed names
+    # (PDB2PQR's own RNA convention, used internally to distinguish RNA from
+    # DNA); it renames them back to the plain forms before returning. This
+    # map stays in place to tolerate R-named RNA arriving from other
+    # sources: third-party tooling and older AMBER pipelines still produce
+    # it.
     "RG5": "G5",
     "RA5": "A5",
     "RC5": "C5",
@@ -1752,17 +1769,31 @@ _AMBER_TO_OPENMM_NUCLEIC_ATOMS = {
 
 
 def _fix_nucleic_naming(mol):
-    """Convert AMBER-style nucleic acid residue/atom names to OpenMM naming."""
+    """Convert AMBER-style nucleic acid residue/atom names to OpenMM naming.
+
+    The resname translation below only ever fires for the R-prefixed RNA
+    names (RG, RA5, ...): systemPrepare no longer emits them, renaming them
+    back to the plain forms before returning, so most callers arrive here
+    already canonical. The nucleic-residue detection must still recognise
+    those plain forms though (G, A5, C3, ...), because the atom-name
+    translation is independent of the resname: PDB2PQR always emits
+    AMBER-style atom names (H2'1, H5'1, HO'2, H3T, ...) regardless of
+    whether the resname carries the R prefix, while OpenMM's RNA.OL3 /
+    DNA.OL15 templates expect the OpenMM spelling (H2', H5', HO2', HO3').
+    """
     resname_map = {**_AMBER_TO_OPENMM_RNA, **_AMBER_TO_OPENMM_DNA}
-    nucleic_mask = np.zeros(mol.numAtoms, dtype=bool)
-    for amber_name, omm_name in resname_map.items():
-        mask = mol.resname == amber_name
-        if np.any(mask):
-            nucleic_mask |= mask
-            mol.resname[mask] = omm_name
+    nucleic_names = set(resname_map) | set(resname_map.values())
+    nucleic_mask = np.isin(mol.resname, list(nucleic_names))
 
     if not np.any(nucleic_mask):
         return
+
+    for amber_name, omm_name in resname_map.items():
+        if amber_name == omm_name:
+            continue
+        mask = mol.resname == amber_name
+        if np.any(mask):
+            mol.resname[mask] = omm_name
 
     for amber_aname, omm_aname in _AMBER_TO_OPENMM_NUCLEIC_ATOMS.items():
         mask = nucleic_mask & (mol.name == amber_aname)
