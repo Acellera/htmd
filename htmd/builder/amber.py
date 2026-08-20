@@ -1207,7 +1207,10 @@ def build(
     if glycan_bonds:
         custombonds = (custombonds or []) + glycan_bonds
 
-    backend, backend_value = _prepare_build(
+    # _prepare_build aliases residue names too wide for tleap's PDB resName
+    # field (the PDB's 5-character extended CCD codes) for the whole tleap
+    # round-trip; the deposited names go back on the built molecule below.
+    backend, backend_value, resname_aliases = _prepare_build(
         mol,
         ff=ff,
         topo=topo,
@@ -1280,6 +1283,7 @@ def build(
         molbuilt = None
 
     if molbuilt is not None:
+        _restore_long_resnames(molbuilt, resname_aliases)
         _write_residue_mapping(molbuilt, mol_orig, outdir)
     return molbuilt
 
@@ -1566,10 +1570,15 @@ def _prepare_build(
     - tleap.in: full build (solute + solvent + cyclic)
     - tleap_solute.in: solute-only build for fast charge calculation (only when water is present)
 
+    Residue names too wide for tleap's PDB resName field are aliased here, once
+    the force-field and topology files that decide which names are safe to use
+    are known (see :func:`_alias_long_resnames`).
+
     Returns
     -------
-    tuple of (str, str)
-        The (backend, value) tuple from _resolve_backend.
+    tuple of (str, str, dict)
+        The (backend, value) pair from _resolve_backend, plus the
+        original-name to alias map for the residues renamed for this build.
     """
     backend, value = _resolve_backend(teleap)
     if backend == "native":
@@ -1582,6 +1591,7 @@ def _prepare_build(
 
     # --- Copy force field files ---
     ff_sources = []
+    ff_paths = []
     for i, force in enumerate(ensurelist(ff)):
         if not os.path.isfile(force):
             force = _locateFile(force, "ff", amberhome)
@@ -1590,6 +1600,7 @@ def _prepare_build(
         newname = f"ff{i}_{os.path.basename(force)}"
         shutil.copy(force, os.path.join(outdir, newname))
         ff_sources.append(newname)
+        ff_paths.append(force)
 
     if gbsa:
         if igb not in (1, 2, 5, 7, 8):
@@ -1633,6 +1644,17 @@ def _prepare_build(
 
     _fix_parameterize_atomtype_collisions(mol, newparam, newtopo)
 
+    # Alias residue names too wide for tleap's PDB resName field. Done here
+    # because the alias has to dodge every name tleap resolves by lookup, which
+    # is only knowable once the leaprc and topology files are resolved.
+    resname_aliases = _alias_long_resnames(
+        mol,
+        disulfide,
+        custombonds,
+        remove,
+        reserved=_tleap_reserved_resnames(ff_paths, newtopo),
+    )
+
     # --- Generate topology loading commands ---
     topo_cmds = []
     for fname in newtopo:
@@ -1646,7 +1668,10 @@ def _prepare_build(
             # don't break the BONDS_INC_HYDROGEN split.
             _resmol = Molecule(fname)
             mol2_path = f"{os.path.splitext(fname)[0]}.mol2"
-            if ext == ".cif":
+            # A unit whose residue name was aliased for the input PDB has to be
+            # registered - and written out - under that same alias.
+            aliased = _alias_topo_unit(_resmol, resname_aliases)
+            if ext == ".cif" or aliased:
                 _resmol.write(mol2_path)
             # Use the residue name as the tleap variable name - tleap's
             # `loadpdb` looks up residue templates in the global variable
@@ -1738,7 +1763,7 @@ def _prepare_build(
             **script_kwargs,
         )
 
-    return backend, value
+    return backend, value, resname_aliases
 
 
 def _read_tleap_output(outdir, prefix, logpath):
@@ -2548,6 +2573,212 @@ def _logParser(fname):
         )
 
     return errors
+
+
+# tleap takes a residue name from the PDB resName field, columns 18-20, so it
+# only ever sees the first three characters of one. The PDB's extended chemical
+# component dictionary issues 5-character codes (A1C99, ...), and moleculekit's
+# writer spills a 4th character into column 21 - either way tleap ends up with a
+# clipped name that matches none of the topology units loaded for it.
+_TLEAP_RESNAME_WIDTH = 3
+
+
+def _short_resname_candidates(resname: str) -> list:
+    """List stand-in names for ``resname`` that fit tleap's resName field.
+
+    Ordered most-recognisable first: the name's own 3-character prefix, then
+    that prefix's first two characters plus a distinguishing alphanumeric, then
+    a generic ``Z00``-``Z99`` pool for the pathological cases.
+
+    Parameters
+    ----------
+    resname : str
+        The over-long residue name a stand-in is needed for.
+
+    Returns
+    -------
+    list of str
+        Candidate names, each at most ``_TLEAP_RESNAME_WIDTH`` characters.
+    """
+    import string
+
+    prefix = resname[:_TLEAP_RESNAME_WIDTH]
+    return (
+        [prefix]
+        + [prefix[:2] + c for c in string.digits + string.ascii_uppercase]
+        + [f"Z{i:02d}" for i in range(100)]
+    )
+
+
+_RESMAP_BLOCK_RE = re.compile(r"addPdbResMap\s*\{(.*?)\n\}", re.DOTALL | re.IGNORECASE)
+_RESMAP_ENTRY_RE = re.compile(r"\{[^{}]*?\}")
+_QUOTED_RE = re.compile(r'"([^"]*)"')
+
+
+def _tleap_reserved_resnames(ff_paths: list, topo_paths: list) -> set:
+    """Collect residue names tleap resolves by NAME, which an alias must avoid.
+
+    Overriding a force-field unit is harmless - our ``<name> = loadmol2``
+    assignment simply shadows it, and no other residue in the system carries
+    that name (:func:`_alias_long_resnames` excludes the ones that do). What is
+    NOT harmless is colliding with an ``addPdbResMap`` entry: ``loadpdb``
+    rewrites those names before it looks the unit up, so an alias of ``HIS`` on
+    a single-residue chain becomes ``CHIS`` -> ``CHIE`` and never reaches our
+    unit at all. The reverse direction is just as bad - hijacking a mapped-TO
+    name would silently capture a real residue that tleap rewrites onto it.
+    Multi-unit prep libraries are included too, since they are sourced after the
+    per-residue ``loadmol2`` commands and would clobber the variable.
+
+    Over-collecting is safe here: a reserved name only removes one candidate
+    from a pool of well over a hundred.
+
+    Parameters
+    ----------
+    ff_paths : list
+        Resolved paths of the leaprc files this build will source.
+    topo_paths : list
+        Resolved paths of the topology files this build will load.
+
+    Returns
+    -------
+    set of str
+        Every residue name tleap could rewrite to or from.
+    """
+    reserved = set()
+    for path in ff_paths:
+        try:
+            with open(path) as fh:
+                content = fh.read()
+        except OSError:
+            continue
+        for block in _RESMAP_BLOCK_RE.findall(content):
+            # Drop commented-out lines so disabled legacy maps are not read.
+            live = "\n".join(ln.split("#")[0] for ln in block.splitlines())
+            for entry in _RESMAP_ENTRY_RE.findall(live):
+                reserved.update(_QUOTED_RE.findall(entry))
+    for path in topo_paths:
+        if os.path.splitext(path)[1].lower() in (".mol2", ".cif"):
+            continue  # single-unit, and its name is a resname already in use
+        try:
+            with open(path) as fh:
+                reserved.update(_PREPI_UNIT_RE.findall(fh.read()))
+        except OSError:
+            continue
+    return reserved
+
+
+def _alias_long_resnames(
+    mol: Molecule, *residue_ids: list, reserved: set = None
+) -> dict:
+    """Rename residues whose name is too wide for tleap, and report the mapping.
+
+    A residue name longer than :data:`_TLEAP_RESNAME_WIDTH` cannot survive the
+    PDB tleap is handed, so it is swapped for a short alias that is unique
+    against every other name in ``mol``. :func:`_restore_long_resnames` puts the
+    original names back on the built molecule.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The molecule about to be written out for tleap. Renamed in place.
+    *residue_ids : list
+        Lists of already-resolved ``UniqueAtomID`` / ``UniqueResidueID``
+        objects (or of pairs of them, as ``disulfide`` and ``custombonds``
+        hold). These match on resname, so they are renamed alongside ``mol``.
+        Entries that are not identifier objects are ignored.
+    reserved : set
+        Extra names the alias must avoid on top of the ones ``mol`` already
+        uses - the names the builder resolves by lookup (see
+        :func:`_tleap_reserved_resnames`). ``None`` reserves nothing beyond
+        ``mol``'s own resnames.
+
+    Returns
+    -------
+    dict of str
+        Map of original residue name to its build-time alias. Empty when every
+        name already fits, in which case nothing was renamed.
+    """
+    long_names = sorted(
+        {n for n in np.unique(mol.resname) if len(n) > _TLEAP_RESNAME_WIDTH}
+    )
+    if not long_names:
+        return {}
+
+    def _flatten(obj):
+        if isinstance(obj, (list, tuple)):
+            for item in obj:
+                yield from _flatten(item)
+        else:
+            yield obj
+
+    all_ids = [x for group in residue_ids for x in _flatten(group)]
+    taken = set(np.unique(mol.resname).tolist()) | set(reserved or ())
+    aliases = {}
+    for name in long_names:
+        candidates = _short_resname_candidates(name)
+        alias = next((c for c in candidates if c not in taken), None)
+        if alias is None:
+            raise RuntimeError(
+                f"Could not find a free {_TLEAP_RESNAME_WIDTH}-character stand-in "
+                f"for residue name '{name}'. Rename it in the input molecule."
+            )
+        taken.add(alias)
+        aliases[name] = alias
+        mol.resname[mol.resname == name] = alias
+        for res_id in all_ids:
+            if getattr(res_id, "resname", None) == name:
+                res_id.resname = alias
+        logger.info(
+            f"Residue name '{name}' exceeds the {_TLEAP_RESNAME_WIDTH} characters "
+            f"tleap reads from a PDB. Building it as '{alias}' and restoring "
+            f"'{name}' on the returned molecule."
+        )
+    return aliases
+
+
+def _alias_topo_unit(mol: Molecule, aliases: dict) -> bool:
+    """Apply the build-time resname aliases to a single-residue topology unit.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The topology unit loaded from a caller-supplied cif/mol2. Renamed in
+        place.
+    aliases : dict of str
+        The original-name to alias map from :func:`_alias_long_resnames`, or
+        ``None`` when no name needed aliasing.
+
+    Returns
+    -------
+    bool
+        Whether the unit was renamed.
+    """
+    if not aliases:
+        return False
+    alias = aliases.get(str(mol.resname[0]))
+    if alias is None:
+        return False
+    mol.resname[:] = alias
+    return True
+
+
+def _restore_long_resnames(mol: Molecule, aliases: dict) -> None:
+    """Undo :func:`_alias_long_resnames` on a molecule.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        Molecule carrying the build-time aliases. Renamed in place.
+    aliases : dict of str
+        The original-name to alias map returned by
+        :func:`_alias_long_resnames`.
+
+    Returns
+    -------
+    None
+    """
+    for name, alias in aliases.items():
+        mol.resname[mol.resname == alias] = name
 
 
 _PREPI_UNIT_RE = re.compile(r"^(\S{1,4})\s+INT\s+\d", re.MULTILINE)

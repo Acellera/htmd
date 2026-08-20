@@ -124,6 +124,17 @@ DPQ_CIF = os.path.join(DATA_DIR, "2DPQ.cif")
 # leaves on bond formation, so the mature structure has no ND2. Water stripped.
 JCH_CIF = os.path.join(DATA_DIR, "6JCH.cif")
 
+# 11OY: human p38-alpha MAPK with TWO drug-like ligands, one of them carrying a
+# 5-character extended-CCD code (A1C99), plus a surface Zn. Water stripped.
+# The 5-character code is the point of the test: the PDB resName field tleap
+# reads is only 3 characters wide.
+OY_CIF = os.path.join(DATA_DIR, "11OY.cif")
+# 4-[3-(4-fluorophenyl)-1H-pyrazol-4-yl]pyridine, the 11OY co-crystallized
+# fragment (CCD GG5), and (3P)-6-(4-methylpiperazin-1-yl)-3-(naphthalen-1-yl)-
+# 4-(pyridin-4-yl)pyridazine (CCD A1C99). Both neutral, as deposited.
+GG5_SMILES = "c1cc(ccc1c2c(c[nH]n2)c3ccncc3)F"
+A1C99_SMILES = "CN1CCN(CC1)c2cc(c(nn2)c3cccc4c3cccc4)c5ccncc5"
+
 # Pre-reaction LFI warhead: 1,3,5-triazinane core with three bromoacetyl arms.
 # After reaction with the three Cys SG atoms, the Br leaving groups are
 # displaced and replaced by S-Cys connections.
@@ -1442,6 +1453,21 @@ def test_full_pipeline_6lxu_openmm_vs_amber(tmp_path):
 
 
 @pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end build comparison needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_11oy_openmm_vs_amber(tmp_path):
+    """11OY: two drug-like ligands, one under a 5-character extended CCD code.
+    Both builders have to alias the over-long name for their PDB round-trip;
+    building the identical system through both and comparing energies is the
+    check that the alias is a pure renaming and changes no chemistry."""
+    mol = Molecule(OY_CIF)
+    _assert_openmm_amber_equivalent(
+        mol, {"GG5": GG5_SMILES, "A1C99": A1C99_SMILES}, None, tmp_path
+    )
+
+
+@pytest.mark.skipif(
     not (_tleap and _openmm),
     reason="end-to-end build comparison needs teLeap + openmm",
 )
@@ -2124,6 +2150,201 @@ def test_full_pipeline_6lxu_plp_lysine_openmm(tmp_path):
     assert n_sb == 1, "Lys NZ = PLP C4' Schiff base missing in openmm build"
     assert int(((built.resname == "LLP") & (built.element == "P")).sum()) == 1
     _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "6lxu")
+
+
+def test_alias_long_resnames_for_tleap():
+    """Residue names wider than the 3-character PDB resName field tleap reads
+    must be aliased for the build and restored afterwards.
+
+    The alias has to be unique against every other name in the system (so a
+    5-character code cannot be collapsed onto a real residue) and it has to be
+    pushed into the resolved disulfide/custombond/remove identifiers, which
+    match on resname."""
+    from moleculekit.molecule import UniqueAtomID
+    from htmd.builder.amber import _alias_long_resnames, _restore_long_resnames
+
+    mol = Molecule().empty(4)
+    mol.name[:] = ["C1", "C2", "C3", "C4"]
+    mol.element[:] = ["C", "C", "C", "C"]
+    mol.resname[:] = ["A1C99", "A1C", "A1C98", "ALA"]
+    mol.resid[:] = [1, 2, 3, 4]
+    mol.coords = np.zeros((4, 3, 1), dtype=np.float32)
+
+    bond = [
+        UniqueAtomID.fromMolecule(mol, idx=0),
+        UniqueAtomID.fromMolecule(mol, idx=3),
+    ]
+    aliases = _alias_long_resnames(mol, [bond])
+
+    assert set(aliases) == {"A1C99", "A1C98"}
+    assert all(len(a) <= 3 for a in aliases.values())
+    # Unique against each other and against the pre-existing "A1C"/"ALA".
+    assert len(set(aliases.values()) | {"A1C", "ALA"}) == 4
+    assert mol.resname[0] == aliases["A1C99"]
+    assert mol.resname[2] == aliases["A1C98"]
+    # Untouched short names.
+    assert mol.resname[1] == "A1C"
+    assert mol.resname[3] == "ALA"
+    # The custombond identifier followed the rename, so it still matches.
+    assert bond[0].resname == aliases["A1C99"]
+    assert bond[0].selectAtom(mol) == 0
+    assert bond[1].resname == "ALA"
+
+    _restore_long_resnames(mol, aliases)
+    assert list(mol.resname) == ["A1C99", "A1C", "A1C98", "ALA"]
+
+
+def test_tleap_reserved_resnames_parses_pdbresmap(tmp_path):
+    """The reserved set must cover both directions of every live
+    ``addPdbResMap`` entry, plus multi-unit prep libraries.
+
+    A collision with a mapped-FROM name means ``loadpdb`` rewrites our alias
+    before the lookup (``HIS`` on a single-residue chain becomes ``CHIS``), and a
+    collision with a mapped-TO name means our unit silently captures a real
+    residue tleap rewrites onto it. Commented-out legacy maps must NOT be
+    collected, since they are inert."""
+    from htmd.builder.amber import _tleap_reserved_resnames
+
+    leaprc = tmp_path / "leaprc.test"
+    leaprc.write_text(
+        "addPdbResMap {\n"
+        '  { 0 "ALA" "NALA" } { 1 "ALA" "CALA" }\n'
+        '  { 0 "G" "G5" } { 1 "G" "G3" }\n'
+        '  { "RA" "A" }\n'  # position-independent 2-element form
+        '# { 0 "GUA" "G5" } { 1 "GUA" "G3" }\n'  # inert, must be skipped
+        "}\n"
+        'addPdbAtomMap {\n  { "O5*" "O5\'" }\n}\n'
+    )
+    prepi = tmp_path / "lib.prepi"
+    prepi.write_text("HELLO\nXYZ  INT  1\nsomething\nQRS  INT  1\n")
+
+    reserved = _tleap_reserved_resnames([str(leaprc)], [str(prepi)])
+
+    # Mapped-from and mapped-to names, both forms.
+    assert {"ALA", "NALA", "CALA", "G", "G5", "G3", "RA", "A"} <= reserved
+    # Inert commented-out entry is not collected.
+    assert "GUA" not in reserved
+    # Units from a multi-unit prep library are reserved (they load after the
+    # per-residue loadmol2 commands and would clobber the variable).
+    assert {"XYZ", "QRS"} <= reserved
+    # A missing / unreadable file must not blow up the build.
+    assert _tleap_reserved_resnames([str(tmp_path / "nope")], []) == set()
+
+
+def test_alias_long_resnames_skips_reserved_names():
+    """A reserved name is never used as an alias even when it is free in the
+    molecule. ``HIS`` is the motivating case: after ``systemPrepare`` a system
+    holds HID/HIE/HIP, so bare ``HIS`` looks unused - but tleap's residue map
+    still rewrites it, so an alias of ``HIS`` never reaches our unit."""
+    from htmd.builder.amber import _alias_long_resnames
+
+    mol = Molecule().empty(1)
+    mol.name[:] = ["C1"]
+    mol.element[:] = ["C"]
+    mol.resname[:] = ["HIS99"]
+    mol.resid[:] = [1]
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+
+    # Without a reserved set the readable prefix "HIS" would be chosen.
+    unguarded = _alias_long_resnames(mol.copy())
+    assert unguarded == {"HIS99": "HIS"}
+
+    guarded = _alias_long_resnames(mol, reserved={"HIS"})
+    assert guarded["HIS99"] != "HIS"
+    assert len(guarded["HIS99"]) <= 3
+    assert mol.resname[0] == guarded["HIS99"]
+
+
+def test_alias_long_resnames_raises_when_no_alias_is_free():
+    """Exhausting the candidate pool must fail loudly rather than reuse a name
+    that tleap resolves elsewhere."""
+    from htmd.builder.amber import _alias_long_resnames, _short_resname_candidates
+
+    mol = Molecule().empty(1)
+    mol.name[:] = ["C1"]
+    mol.element[:] = ["C"]
+    mol.resname[:] = ["A1C99"]
+    mol.resid[:] = [1]
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+
+    with pytest.raises(RuntimeError, match="Could not find a free"):
+        _alias_long_resnames(mol, reserved=set(_short_resname_candidates("A1C99")))
+
+
+def test_alias_long_resnames_noop_for_short_names():
+    """Nothing is renamed - and no alias map returned - when every residue name
+    already fits the PDB resName field."""
+    from htmd.builder.amber import _alias_long_resnames
+
+    mol = Molecule().empty(2)
+    mol.name[:] = ["C1", "C2"]
+    mol.element[:] = ["C", "C"]
+    mol.resname[:] = ["ALA", "GG5"]
+    mol.resid[:] = [1, 2]
+    mol.coords = np.zeros((2, 3, 1), dtype=np.float32)
+
+    assert _alias_long_resnames(mol) == {}
+    assert list(mol.resname) == ["ALA", "GG5"]
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap),
+    reason="end-to-end ligand build needs antechamber + teLeap",
+)
+def test_full_pipeline_11oy_extended_ccd_ligands(tmp_path):
+    """11OY: p38-alpha MAPK with two drug-like ligands, one of which carries a
+    5-character extended-CCD code (A1C99).
+
+    tleap reads a residue name from the 3-character PDB resName field
+    (columns 18-20), so a name that long is clipped - ``A1C99`` reaches tleap as
+    ``A1C`` and never matches the topology unit written for it. amber.build
+    therefore aliases over-long names for the tleap round-trip and restores them
+    on the returned molecule, which is what this test locks in: both ligands
+    come back under their deposited CCD codes with every atom present.
+    """
+    mol = Molecule(OY_CIF)
+    built = _run_pipeline(mol, {"GG5": GG5_SMILES, "A1C99": A1C99_SMILES}, tmp_path)
+
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+
+    # Both ligands survive under their original (un-aliased) CCD codes.
+    assert (built.resname == "GG5").any(), "GG5 missing from the build"
+    assert (built.resname == "A1C99").any(), (
+        "A1C99 came back under its build-time alias instead of its CCD code"
+    )
+    # C14 H10 F N3 and C24 H23 N5, both neutral as deposited.
+    gg5 = built.resname == "GG5"
+    a1c99 = built.resname == "A1C99"
+    assert Counter(built.element[gg5]) == Counter({"C": 14, "H": 10, "N": 3, "F": 1})
+    assert Counter(built.element[a1c99]) == Counter({"C": 24, "H": 23, "N": 5})
+    # The surface Zn rides along as a stripped-coordination ion.
+    assert int((built.resname == "ZN").sum()) == 1
+
+
+@pytest.mark.skipif(
+    not (_antechamber and _tleap and _openmm),
+    reason="end-to-end ligand openmm build needs antechamber + teLeap + openmm",
+)
+def test_full_pipeline_11oy_extended_ccd_ligands_openmm(tmp_path):
+    """11OY through openmm.build. The failure mode here is quieter than amber's:
+    OpenMM's PDBFile reads a 4-character resName, so ``A1C99`` was silently
+    clipped to ``A1C9`` and the ligand came back misnamed (the ForceField still
+    matched it by graph, so nothing raised). The same aliasing keeps the two
+    builders naming the residue identically and restores the CCD code."""
+    built, system = _run_openmm_pipeline(
+        Molecule(OY_CIF), {"GG5": GG5_SMILES, "A1C99": A1C99_SMILES}, tmp_path
+    )
+    assert built is not None
+    _check_no_overvalent_atoms(built)
+    assert (built.resname == "GG5").any()
+    assert (built.resname == "A1C99").any(), (
+        "A1C99 came back under its build-time alias instead of its CCD code"
+    )
+    assert Counter(built.element[built.resname == "A1C99"]) == Counter(
+        {"C": 24, "H": 23, "N": 5}
+    )
+    _assert_openmm_build_matches_reference(system, str(tmp_path / "openmm"), "11oy")
 
 
 def test_6u17_chain_resident_modified_nucleotide_clear_error(tmp_path):

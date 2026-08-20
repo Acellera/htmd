@@ -742,8 +742,22 @@ def build(
     # addHydrogens rebuilds them in GLYCAM naming.
     extra_xml = _maybe_add_glycam(mol, extra_xml)
 
+    # A residue name wider than the PDB resName field cannot survive the
+    # PDB / prmtop round-trip (the PDB's 5-character extended CCD codes are
+    # silently clipped to 4 by the writer and again by ParmEd), so alias those
+    # names for the round-trip and restore them on the built molecule below.
+    # Shared with amber.build so both builders name the residue identically.
+    from htmd.builder.amber import _alias_long_resnames, _restore_long_resnames
+
+    resname_aliases = _alias_long_resnames(mol, reserved=_openmm_reserved_resnames())
+    skip_peptide_n = {resname_aliases.get(n, n) for n in skip_peptide_n}
+
     topology, positions = _mol_to_openmm(
-        mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
+        mol,
+        outdir,
+        extra_xml=extra_xml,
+        skip_peptide_n=skip_peptide_n,
+        resname_aliases=resname_aliases,
     )
 
     forcefield, smallmol_ffxml = _setup_forcefield(
@@ -866,6 +880,7 @@ def build(
     # Topology + bonds from the prmtop; coordinates straight from the OpenMM
     # positions (full precision, no PDB round-trip); box from the topology.
     molbuilt = _read_built_molecule(outdir, prefix, topology, positions)
+    _restore_long_resnames(molbuilt, resname_aliases)
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
 
     # ForceField-XML handoff for ACEMD: moleculekit writes the mmCIF (always)
@@ -1836,7 +1851,31 @@ def _strip_metal_coordination_bonds(mol):
     return mol
 
 
-def _mol_to_openmm(mol, outdir, extra_xml=None, skip_peptide_n=None):
+def _openmm_reserved_resnames():
+    """Residue names an alias must avoid because OpenMM resolves them by NAME.
+
+    ``PDBFile.createStandardBonds`` looks each residue up in
+    ``Topology._standardBonds`` by name, so an alias colliding with one of
+    those (``HIS``, ``ALA``, ``DA``, ...) gets that residue's standard bonds
+    injected into an unrelated ligand - a wrong bond graph rather than a clean
+    failure. Templates are matched by graph, so no other name matters here.
+
+    Returns
+    -------
+    set of str
+        The residue names ``createStandardBonds`` knows about.
+    """
+    from openmm.app import Topology
+
+    if not Topology._standardBonds:
+        # Populates the class-level dict from OpenMM's bundled residues.xml.
+        Topology().createStandardBonds()
+    return set(Topology._standardBonds)
+
+
+def _mol_to_openmm(
+    mol, outdir, extra_xml=None, skip_peptide_n=None, resname_aliases=None
+):
     """Write *mol* to PDB and read back with OpenMM.
 
     Before reading the PDB we temporarily register the residue bond
@@ -1855,6 +1894,11 @@ def _mol_to_openmm(mol, outdir, extra_xml=None, skip_peptide_n=None):
     of resnames whose backbone N is an isopeptide acceptor and so must NOT
     get a ``(-C, N)`` peptide bond from ``createStandardBonds``.
 
+    *resname_aliases* (from
+    :func:`htmd.builder.amber._alias_long_resnames`) maps a residue name too
+    wide for the PDB resName field to the short alias written in its place, so
+    the bond definitions register under the name the PDB actually carries.
+
     Returns ``(topology, positions)`` ready for ``ForceField.createSystem``.
     """
     import openmm.app as app
@@ -1868,7 +1912,9 @@ def _mol_to_openmm(mol, outdir, extra_xml=None, skip_peptide_n=None):
 
     pdb_path = os.path.join(outdir, "input.pdb")
     mol.write(pdb_path, writebonds=True)
-    with _temporary_residue_bond_defs(extra_xml, skip_peptide_n=skip_peptide_n):
+    with _temporary_residue_bond_defs(
+        extra_xml, skip_peptide_n=skip_peptide_n, resname_aliases=resname_aliases
+    ):
         pdb = app.PDBFile(pdb_path)
 
     topology = pdb.topology
@@ -1908,7 +1954,7 @@ def _isopeptide_acceptor_resnames(mol, custombonds):
 
 
 @contextlib.contextmanager
-def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
+def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None, resname_aliases=None):
     """Register the ``<Residue>``/``<Bond>`` entries from each OpenMM
     force-field XML in *extra_xml* into ``Topology._standardBonds`` for
     the duration of the ``with`` block.
@@ -1923,6 +1969,11 @@ def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
     isopeptide / side-chain acceptor rather than a normal peptide-bond
     acceptor. For those we do NOT emit the ``(-C, N)`` peptide bond (see
     :func:`_isopeptide_acceptor_resnames`).
+
+    *resname_aliases* maps an over-long residue name to the short alias the
+    PDB carries in its place, so a template written by
+    :func:`parameterizeFromSpecs` under the full name still registers against
+    the residue PDBFile sees.
 
     On exit we restore the snapshot of every entry we touched so other
     builds in the same Python process see a pristine dict.
@@ -1945,6 +1996,8 @@ def _temporary_residue_bond_defs(extra_xml, skip_peptide_n=None):
                 name = res.attrib.get("name")
                 if not name:
                     continue
+                if resname_aliases:
+                    name = resname_aliases.get(name, name)
                 if name not in snapshot:
                     snapshot[name] = Topology._standardBonds.get(name)
                 bonds = []
