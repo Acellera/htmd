@@ -30,7 +30,7 @@ HTMD prints a short copyright reminder on import in interactive sessions. To sil
 htmd_register
 ```
 
-Registration is optional - the package works fully without it.
+Registration is optional; the package works fully without it.
 
 ## Verify
 

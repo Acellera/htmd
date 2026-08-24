@@ -24,7 +24,7 @@ system.write("./protein-in-membrane.pdb")
 | Parameter | What it does |
 | --- | --- |
 | `mol1`, `mol2` | The two molecules to merge. The function removes residues of `mol2` clashing with `mol1`, then appends `mol1` onto the trimmed `mol2`. For protein-in-membrane: pass the **protein as `mol1`** and the **membrane as `mol2`** so lipids get carved away around the protein. |
-| `gap` | Minimum allowed atom-atom distance in Å. Default 1.3 Å - increase to ~2.0 Å for tighter packing if your equilibrated membrane is already dense. |
+| `gap` | Minimum allowed atom-atom distance in Å. Default 1.3 Å; increase to ~2.0 Å for tighter packing if your equilibrated membrane is already dense. |
 
 ## Common variations
 
@@ -43,7 +43,7 @@ system.append(trimmed_memb)
 system.append(prot)
 ```
 
-{py:func}`~htmd.builder.builder.removeLipidsInProtein` is more surgical than `embed` - it only touches atoms matching `lipidsel`, leaving waters and ions alone.
+{py:func}`~htmd.builder.builder.removeLipidsInProtein` is more surgical than `embed`: it only touches atoms matching `lipidsel`, leaving waters and ions alone.
 
 ### Re-centering the membrane on the protein
 
@@ -68,7 +68,7 @@ After `embed` produces a clash-free protein + membrane + (existing) waters, solv
 from htmd.builder.solvate import solvate
 from htmd.builder import amber
 
-# Drop the membrane's water layer first - we re-solvate to cover the protein's
+# Drop the membrane's water layer first; we re-solvate to cover the protein's
 # extramembrane domains too
 system.remove("water", _logger=False)
 
@@ -85,11 +85,11 @@ amber.build(system, outdir="./build", ionize=True, saltconc=0.15)
 ## Gotchas
 
 - The protein and the membrane must be in the **same coordinate frame** before `embed`. If the membrane sits at `z ∈ [50, 90]` but the protein is OPM-aligned (`z=0` is the bilayer centre), `embed` will see no overlap and the protein ends up floating in the water layer.
-- `embed` removes **entire residues** of `mol2` whose any-atom comes within `gap` of `mol1`. For a membrane this means whole lipids get dropped, not partial ones — so the carved hole is the union of every clashing lipid residue (no convex-hull expansion; that's a separate function, {py:func}`~htmd.builder.builder.removeLipidsInProtein`).
+- `embed` removes **entire residues** of `mol2` whose any-atom comes within `gap` of `mol1`. For a membrane this means whole lipids get dropped, not partial ones, so the carved hole is the union of every clashing lipid residue (no convex-hull expansion; that's a separate function, {py:func}`~htmd.builder.builder.removeLipidsInProtein`).
 - After `embed`, the membrane's water layer probably doesn't cover the protein's intracellular / extracellular domains. Always re-solvate with a membrane-aware box (XY from the lipid extent, Z padded above and below the tallest atom) before the build.
-- When in doubt, prefer {py:func}`buildMembrane(solute=...) <htmd.membranebuilder.build_membrane.buildMembrane>` - it handles re-centering, carve-out, and waters in one call. Reach for `embed` only when you have a pre-equilibrated membrane you want to preserve.
+- When in doubt, prefer {py:func}`buildMembrane(solute=...) <htmd.membranebuilder.build_membrane.buildMembrane>`: it handles re-centering, carve-out, and waters in one call. Reach for `embed` only when you have a pre-equilibrated membrane you want to preserve.
 
 ## See also
 
-- {doc}`Build a membrane-embedded protein <../tutorials/system-prep/07-membrane>` - the canonical `buildMembrane(solute=...)` path.
-- {py:func}`htmd.builder.builder.embed` and {py:func}`htmd.builder.builder.removeLipidsInProtein` - API references.
+- {doc}`Build a membrane-embedded protein <../tutorials/system-prep/07-membrane>`: the canonical `buildMembrane(solute=...)` path.
+- {py:func}`htmd.builder.builder.embed` and {py:func}`htmd.builder.builder.removeLipidsInProtein`: API references.

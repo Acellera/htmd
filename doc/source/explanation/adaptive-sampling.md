@@ -2,7 +2,7 @@
 
 Exploring conformational space with brute-force MD wastes simulation time on regions you've already sampled. Adaptive sampling addresses this by running simulations in **sequential batches called epochs**, using the data from previous epochs to decide where the next epoch should start. The selection logic favors **under-sampled conformational regions**, which is what lets adaptive runs cross energetic barriers and reach the configurations that brute force can take orders of magnitude longer to find.
 
-The mechanism: after each epoch HTMD discretises the conformational space sampled so far with a Markov state model, and samples the next epoch's starting frames from a distribution related to the population of each metastable state. Rare states get over-weighted; well-sampled ones get under-weighted.
+After each epoch HTMD discretises the conformational space sampled so far with a Markov state model, and samples the next epoch's starting frames from a distribution related to the population of each metastable state. Rare states get over-weighted; well-sampled ones get under-weighted.
 
 The two papers below set out the algorithm and its first applications:
 
@@ -41,8 +41,8 @@ As the run progresses HTMD creates three more folders:
 
 Simulations are named with the pattern `e4s3_e2s1p0f45`. Parsed:
 
-- `e4s3` - generated in **epoch 4**, the **3rd simulation** of that batch.
-- `e2s1p0f45` - the starting conformation came from **epoch 2**, **simulation 1**, **piece 0**, **frame 45**.
+- `e4s3`: generated in **epoch 4**, the **3rd simulation** of that batch.
+- `e2s1p0f45`: the starting conformation came from **epoch 2**, **simulation 1**, **piece 0**, **frame 45**.
 
 The `e<n>s<m>` prefix (epoch / spawn) is the only part that is always present; everything after the `_` records provenance and varies in shape. Epoch-1 sims descend directly from a generator rather than from another sim, so they take the form `e1s3_<generator-name>` (epoch 1, spawn 3, descended from the named generator) instead of the `e<n>s<m>p<piece>f<frame>` parent reference used from epoch 2 onward.
 
@@ -50,7 +50,7 @@ Some MD engines split long simulations into pieces; the piece index is usually 0
 
 ## Simulation length
 
-Per-simulation length is system-dependent. As a rule of thumb use **about twice the expected lag time** for the molecular process you're studying (e.g. 30-100 ns per simulation for ligand binding). Each frame seeds only coordinates - velocities are re-initialised from the Maxwell-Boltzmann distribution at the configured temperature, so velocity files are not transferred between epochs.
+Per-simulation length is system-dependent. As a rule of thumb use **about twice the expected lag time** for the molecular process you're studying (e.g. 30-100 ns per simulation for ligand binding). Each frame seeds only coordinates; velocities are re-initialised from the Maxwell-Boltzmann distribution at the configured temperature, so velocity files are not transferred between epochs.
 
 ## Sync vs async execution
 

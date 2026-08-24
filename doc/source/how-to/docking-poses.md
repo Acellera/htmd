@@ -34,8 +34,8 @@ for i, pose in enumerate(poses):
 | `center` | XYZ centre of the search box in Å. Pass the centroid of a known binding pocket residue, or a literal `[x, y, z]`. |
 | `extent` | Box edge lengths in Å (`[dx, dy, dz]`). Larger boxes cover more of the protein surface but slow the search and dilute scoring. |
 | `numposes` | Maximum number of poses Vina emits. Vina caps this at **20**; values above 20 silently return at most 20 poses. |
-| `babelexe` | Path to `obabel` (Open Babel) for format conversion. Default `"obabel"` - must be on `$PATH`. |
-| `vinaexe` | Path to the Vina binary. Default is `f"{platform.system()}-vina"` (e.g. `Linux-vina`, `Darwin-vina`), resolved via `shutil.which` - the platform-prefixed binary must be on `$PATH`. |
+| `babelexe` | Path to `obabel` (Open Babel) for format conversion. Default `"obabel"`; must be on `$PATH`. |
+| `vinaexe` | Path to the Vina binary. Default is `f"{platform.system()}-vina"` (e.g. `Linux-vina`, `Darwin-vina`), resolved via `shutil.which`; the platform-prefixed binary must be on `$PATH`. |
 
 ## Common variations
 
@@ -63,7 +63,7 @@ This is the docking → MD pipeline: generate poses, build a complete simulation
 poses, scores = dock(protein, ligand, numposes=20)
 ```
 
-Omitting `center` and `extent` triggers the whole-protein auto-bounding-box: `dock` sets the box centre to the protein's geometric centre and the extent to the protein's bounding-box dimensions plus a 10 Å buffer on each side. Useful when the binding site is unknown - no need to compute the box yourself. Expect noisier scores and more time per dock.
+Omitting `center` and `extent` triggers the whole-protein auto-bounding-box: `dock` sets the box centre to the protein's geometric centre and the extent to the protein's bounding-box dimensions plus a 10 Å buffer on each side. Useful when the binding site is unknown, since you don't have to compute the box yourself. Expect noisier scores and more time per dock.
 
 ### Targeted docking with multiple ligands
 
@@ -78,7 +78,7 @@ for ligand_path in glob("./compound_library/*.mol2"):
     all_scores[ligand_path] = scores
 ```
 
-For library screening you'd want a more featureful Vina wrapper (parallel docking, per-compound scoring) - this loop pattern handles small libraries (≤100 compounds) on a single workstation.
+For library screening you'd want a more featureful Vina wrapper (parallel docking, per-compound scoring); this loop pattern handles small libraries (≤100 compounds) on a single workstation.
 
 ### Re-score Vina poses with FFEvaluate
 
@@ -109,19 +109,19 @@ for i, pose in enumerate(poses):
     print(f"pose {i}: ff-score {score:.2f} kcal/mol")
 ```
 
-Useful sanity check: Vina's score isn't a real energy - cross-checking with a force-field re-score (or MM-GBSA later) can flag obviously-wrong poses.
+Useful sanity check: Vina's score isn't a real energy, so cross-checking with a force-field re-score (or MM-GBSA later) can flag obviously wrong poses.
 
 ## Gotchas
 
-- **Inputs must be single-frame.** Both `protein` and `ligand` must have exactly one frame in `mol.coords` (third axis = 1). `dock` raises `NameError` otherwise - drop extra frames with `mol.dropFrames(keep=0)` before calling.
-- **Vina expects PDBQT format.** HTMD's `dock` calls Open Babel internally to convert your `.pdb` / `.mol2` to PDBQT and back. If `obabel` is missing or returns a malformed PDBQT, `dock` raises a confusing Vina error - check `obabel --version` first.
+- **Inputs must be single-frame.** Both `protein` and `ligand` must have exactly one frame in `mol.coords` (third axis = 1). `dock` raises `NameError` otherwise; drop extra frames with `mol.dropFrames(keep=0)` before calling.
+- **Vina expects PDBQT format.** HTMD's `dock` calls Open Babel internally to convert your `.pdb` / `.mol2` to PDBQT and back. If `obabel` is missing or returns a malformed PDBQT, `dock` raises a confusing Vina error; check `obabel --version` first.
 - Hydrogens **must** be assigned before docking. Vina assumes the ligand and protein are at their correct protonation states; running `dock` on a heavy-atom-only PDB gives docked-but-wrong poses. Use `systemPrepare` upstream.
 - A 20 Å × 20 Å × 20 Å search box is the usual default for a single pocket. For metal-binding sites, peptide-binding grooves, or large allosteric cavities, increase the box.
-- The poses returned are **ligand-only** - you need to append the protein (or build the system from the complex) for any MD downstream.
+- The poses returned are **ligand-only**; you need to append the protein (or build the system from the complex) for any MD downstream.
 - Vina scores are not free energies. Use them for ranking, not for thermodynamic claims.
 
 ## See also
 
-- {doc}`How to use a custom force field with amber.build <system-build-custom-forcefield>` - feeding the docked complex into the build pipeline.
-- {doc}`How to evaluate force-field energies on a frame <ffevaluate-energies>` - re-scoring poses with a real force field.
-- [AutoDock Vina docs](https://vina.scripps.edu/) - flags / scoring details not exposed by HTMD's wrapper.
+- {doc}`How to use a custom force field with amber.build <system-build-custom-forcefield>`: feeding the docked complex into the build pipeline.
+- {doc}`How to evaluate force-field energies on a frame <ffevaluate-energies>`: re-scoring poses with a real force field.
+- [AutoDock Vina docs](https://vina.scripps.edu/): flags / scoring details not exposed by HTMD's wrapper.

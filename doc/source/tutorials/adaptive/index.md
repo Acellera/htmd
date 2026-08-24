@@ -1,6 +1,6 @@
 # Adaptive sampling
 
-Run multi-epoch simulations whose next starting frames are picked from a Markov state model of what's been simulated so far. The [Adaptive sampling concept page](../../explanation/adaptive-sampling.md) explains the rationale before you dive in.
+Run multi-epoch simulations whose next starting frames are picked from a Markov state model of what's been simulated so far. The [Adaptive sampling concept page](../../explanation/adaptive-sampling.md) explains the rationale.
 
 ```{toctree}
 :maxdepth: 1

@@ -36,7 +36,7 @@ ad.ucscale = 0.5                                               # 50% undirected 
 ad.run()
 ```
 
-`goal_function(mol)` takes a {py:class}`~moleculekit.molecule.Molecule` (one or many frames) and returns a 1-D NumPy array with one score per frame. Higher scores are "better" - adaptive uses them to pick which sampled microstates to re-spawn from.
+`goal_function(mol)` takes a {py:class}`~moleculekit.molecule.Molecule` (one or many frames) and returns a 1-D NumPy array with one score per frame. Higher scores are "better"; adaptive uses them to pick which sampled microstates to re-spawn from.
 
 ## Parameters that matter
 
@@ -44,9 +44,9 @@ ad.run()
 | --- | --- |
 | `goalfunction` | A callable `mol -> np.ndarray` of shape `(n_frames,)`. Closures / `functools.partial` are fine. |
 | `ucscale` | Mixing ratio between **undirected** (exploration of under-sampled microstates) and **directed** (goal-driven) components. `0` = pure goal, `1` = pure exploration, `0.5` = balanced. |
-| `statetype` | `"micro"` (default) or `"macro"` - which state granularity scores get aggregated to. (`"cluster"` is inherited from `AdaptiveMD` but **not supported** here - the directed-component code only handles `micro` / `macro`.) |
+| `statetype` | `"micro"` (default) or `"macro"`: which state granularity scores get aggregated to. (`"cluster"` is inherited from `AdaptiveMD` but **not supported** here; the directed-component code only handles `micro` / `macro`.) |
 | `autoscale` | When `True`, adjusts `ucscale` automatically based on how stuck the run is on its goal score. Companion knobs: `autoscalediff` (default 10, epochs window), `autoscalemult` (default 1, ucscale step), `autoscaletol` (default 0.2, goal-improvement tolerance). |
-| `savegoal` | Optional path to a `.pkl` file. If set, AdaptiveGoal pickles the projected goal values per trajectory each epoch - useful when iterating on the goal function. |
+| `savegoal` | Optional path to a `.pkl` file. If set, AdaptiveGoal pickles the projected goal values per trajectory each epoch, which helps when iterating on the goal function. |
 
 ## Common variations
 
@@ -96,11 +96,11 @@ ad.goalfunction = partial(goal, ref=ref_features)
 
 - The goal function must return **one score per frame**. Returning `(n_frames, k)` raises a confusing error inside the spawn logic.
 - Adaptive calls the goal once per epoch on **every accumulated frame**, so an O(n²) goal becomes prohibitive after a few epochs. Vectorise / cache.
-- Don't make the goal too sharp - if only 0.01% of frames score above zero, the directed component degenerates to the highest-scoring single frame and you lose diversity. Use a smooth scoring function (`1 / (1 + x)`, tanh-shaped, etc.).
+- Don't make the goal too sharp: if only 0.01% of frames score above zero, the directed component degenerates to the highest-scoring single frame and you lose diversity. Use a smooth scoring function (`1 / (1 + x)`, tanh-shaped, etc.).
 - `ucscale=0` (pure goal) tends to over-exploit one basin. `ucscale=0.5` is a good default; `autoscale=True` adapts it dynamically.
 
 ## See also
 
-- {doc}`How to configure adaptive sampling <adaptive-configure>` - all the `AdaptiveMD` knobs that `AdaptiveGoal` inherits.
-- {doc}`Adaptive sampling explanation <../explanation/adaptive-sampling>` - how directed + undirected components combine in FAST.
-- {py:class}`htmd.adaptive.adaptivegoal.AdaptiveGoal` - API reference.
+- {doc}`How to configure adaptive sampling <adaptive-configure>`: all the `AdaptiveMD` knobs that `AdaptiveGoal` inherits.
+- {doc}`Adaptive sampling explanation <../explanation/adaptive-sampling>`: how directed and undirected components combine in FAST.
+- {py:class}`htmd.adaptive.adaptivegoal.AdaptiveGoal`: API reference.

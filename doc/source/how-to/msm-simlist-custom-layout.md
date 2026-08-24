@@ -2,7 +2,7 @@
 
 ## Goal
 
-Construct an {py:class}`htmd.simlist.Sim` list for trajectories whose directory structure doesn't fit the default `data/<simname>/{topology, traj.xtc}` pattern - per-trajectory topology, multiple trajectories per simulation, manually-curated subsets, or trajectories spread across several roots.
+Construct an {py:class}`htmd.simlist.Sim` list for trajectories whose directory structure doesn't fit the default `data/<simname>/{topology, traj.xtc}` pattern: per-trajectory topology, multiple trajectories per simulation, manually-curated subsets, or trajectories spread across several roots.
 
 ## Minimal example
 
@@ -28,7 +28,7 @@ The simplest case: every sim folder uses the same topology PDB. `simlist` discov
 | --- | --- |
 | `datafolders` | List of directories, each containing one or more trajectory files for that sim. |
 | `topologies` | Either a single path (shared topology) or a list with one path per `datafolder` (per-sim topology). Folder names must match for the list form. |
-| `inputfolders` | Optional - list of input directories matching `datafolders`. Required for adaptive-sampling traceback. |
+| `inputfolders` | Optional list of input directories matching `datafolders`. Required for adaptive-sampling traceback. |
 
 ## Common variations
 
@@ -37,11 +37,11 @@ The simplest case: every sim folder uses the same topology PDB. `simlist` discov
 ```python
 sims = simlist(
     glob("./data/*/"),
-    glob("./input/*/structure.pdb"),    # one PDB per sim - matched by folder name
+    glob("./input/*/structure.pdb"),    # one PDB per sim, matched by folder name
 )
 ```
 
-`simlist` matches by **directory basename** - `data/sim_42/` is paired with the topology under `input/sim_42/structure.pdb`. Missing topologies raise `FileNotFoundError`; **duplicate folder basenames** within a single call raise `RuntimeError`.
+`simlist` matches by **directory basename**: `data/sim_42/` is paired with the topology under `input/sim_42/structure.pdb`. Missing topologies raise `FileNotFoundError`; **duplicate folder basenames** within a single call raise `RuntimeError`.
 
 ### Trajectories spread across multiple roots
 
@@ -60,7 +60,7 @@ This is the pattern the {doc}`villin folding <../tutorials/analysis/villin-foldi
 
 ### Custom file extension or naming
 
-`simlist` walks moleculekit's trajectory-reader list (xtc, dcd, nc/netcdf, trr, binpos, h5, lh5) and stops at the **first** extension that matches inside each folder - if a folder happens to contain both `.xtc` and `.dcd`, only one set is picked up. If your trajectories live one level deeper (e.g. `data/<sim>/output/traj.xtc`):
+`simlist` walks moleculekit's trajectory-reader list (xtc, dcd, nc/netcdf, trr, binpos, h5, lh5) and stops at the **first** extension that matches inside each folder. If a folder happens to contain both `.xtc` and `.dcd`, only one set is picked up. If your trajectories live one level deeper (e.g. `data/<sim>/output/traj.xtc`):
 
 ```python
 sims = simlist(
@@ -81,14 +81,14 @@ Or pass {py:func}`~htmd.simlist.simfilter` post-hoc to subset by content (see {d
 
 ## Gotchas
 
-- Trajectory folder names must be **unique within a single `simlist` call** - the dedup logic raises on duplicates. If you have epochs that reuse names, split per-epoch and `simmerge`.
+- Trajectory folder names must be **unique within a single `simlist` call**; the dedup logic raises on duplicates. If you have epochs that reuse names, split per-epoch and `simmerge`.
 - The topology must contain the **same number of atoms** as the trajectory's first frame. Stripping waters in one but not the other breaks the projection step downstream.
 - `inputfolders` only matters for adaptive-sampling traceback ({doc}`see how-to <adaptive-inspect-run>`); skip it for static analysis.
 - `simlist` is cheap: it doesn't open the trajectory files for coordinate data. Frame counts on each `Sim` may show up as `None` until projection actually reads each trajectory.
 
 ## See also
 
-- {doc}`How to filter trajectories with simfilter <msm-filter-trajectories>` - strip waters / ions before projection.
-- {doc}`How to drop bad trajectories <msm-drop-bad-trajectories>` - prune the resulting simlist.
-- {doc}`Villin folding MSM <../tutorials/analysis/villin-folding>` - real example with multi-epoch merge.
-- {py:mod}`htmd.simlist` - API reference.
+- {doc}`How to filter trajectories with simfilter <msm-filter-trajectories>`: strip waters / ions before projection.
+- {doc}`How to drop bad trajectories <msm-drop-bad-trajectories>`: prune the resulting simlist.
+- {doc}`Villin folding MSM <../tutorials/analysis/villin-folding>`: a real example with a multi-epoch merge.
+- {py:mod}`htmd.simlist`: API reference.

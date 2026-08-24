@@ -2,7 +2,7 @@
 
 ```{note}
 This tutorial drives real MD simulations through a GPU queue, so it is not
-executed when the documentation is built — the code blocks below are a
+executed when the documentation is built; the code blocks below are a
 read-through walkthrough. Run them on a machine with a GPU and a configured
 queue to reproduce the campaign.
 ```
@@ -41,10 +41,10 @@ Journal of Machine Learning Research. 2002; 3(Nov):397-422.
 
 ## Getting started
 
-This tutorial shows you how to properly set up an `AdaptiveBandit` project,
-highlighting the main differences with respect to standard adaptive sampling. As
-an example, we will perform some folding simulations using the chicken villin
-headpiece (PDB: 2F4K).
+This tutorial shows how to set up an `AdaptiveBandit` project, highlighting the
+main differences with respect to standard adaptive sampling. As an example, we
+will perform some folding simulations using the chicken villin headpiece
+(PDB: 2F4K).
 
 Let's start by importing HTMD and the {py:class}`~htmd.adaptive.adaptivebandit.AdaptiveBandit` class:
 

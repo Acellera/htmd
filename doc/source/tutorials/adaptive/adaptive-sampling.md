@@ -1,11 +1,11 @@
 # Adaptive sampling
 
-In this tutorial we showcase how to run adaptive sampling simulations on a
-molecular system. The sample system here is the NTL9 protein.
+This tutorial runs adaptive sampling simulations on a molecular system. The
+sample system here is the NTL9 protein.
 
 ```{note}
 This tutorial drives real MD simulations through a GPU queue, so it is not
-executed when the documentation is built — the code blocks below are a
+executed when the documentation is built; the code blocks below are a
 read-through walkthrough. Run them on a machine with a GPU and a configured
 queue to reproduce the campaign.
 ```

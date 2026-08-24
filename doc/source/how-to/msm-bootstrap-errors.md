@@ -21,9 +21,9 @@ for i in range(n_boots):
     # Timescales live on the underlying deeptime MSM at model.msm
     timescales.append(model.msm.timescales() * model.data.fstep)
 
-# Each row has length (n_active_states - 1) - active = the largest strongly-connected
+# Each row has length (n_active_states - 1); active = the largest strongly-connected
 # microstate set kept by counts.submodel_largest() at this lag. The count can differ
-# across bootstraps if connectivity changes, so the array may be ragged - wrap in a
+# across bootstraps if connectivity changes, so the array may be ragged; wrap in a
 # list and pad if you need a rectangular array.
 timescales = np.array(timescales)                        # shape (n_boots, n_active_states - 1)
 slowest = timescales[:, :3]                              # top three implied timescales
@@ -31,9 +31,9 @@ print("mean top-3 timescales (ns):", slowest.mean(axis=0))
 print("std  top-3 timescales (ns):", slowest.std(axis=0))
 ```
 
-{py:meth}`~htmd.metricdata.MetricData.bootstrap(ratio)` returns a new `MetricData` containing a random `ratio` fraction of the trajectories (no replacement by default). The kept count is `int(floor(numtraj * ratio))` - on small N this rounds down (e.g. 7 trajs × 0.8 = 5 kept, not 5.6), so bootstrapping ratios are coarser than they look. Each bootstrap is independent - re-cluster + re-fit from scratch.
+{py:meth}`~htmd.metricdata.MetricData.bootstrap(ratio)` returns a new `MetricData` containing a random `ratio` fraction of the trajectories (no replacement by default). The kept count is `int(floor(numtraj * ratio))`; on small N this rounds down (e.g. 7 trajs × 0.8 = 5 kept, not 5.6), so bootstrapping ratios are coarser than they look. Each bootstrap is independent, so re-cluster and re-fit from scratch.
 
-`model.msm.timescales()` returns timescales in frames, so each row above is multiplied by `model.data.fstep` to get ns - see {doc}`How to read off and interpret an ITS plot <msm-interpret-its-plot>` ("Compare lag times by direct call") for the full explanation.
+`model.msm.timescales()` returns timescales in frames, so each row above is multiplied by `model.data.fstep` to get ns; see {doc}`How to read off and interpret an ITS plot <msm-interpret-its-plot>` ("Compare lag times by direct call") for the full explanation.
 
 ## Parameters that matter
 
@@ -88,17 +88,17 @@ std_its  = its.std(axis=0)
 
 `plot=False` suppresses the matplotlib figure (otherwise `plotTimescales` opens one per bootstrap), and `results=True` makes it return the timescales array + lag list instead of `None`.
 
-Plot `mean_its ± std_its` per slow process vs lag time - that's the **bootstrap-version of the ITS plot**, much more informative than a single deterministic line.
+Plot `mean_its ± std_its` per slow process against lag time. That's the **bootstrap version of the ITS plot**, and it's much more informative than a single deterministic line.
 
 ## Gotchas
 
-- `bootstrap(0.8)` samples **at the trajectory level**, not the frame level. Each bootstrap drops or keeps whole trajectories - if you have 10 trajectories, you can't get cleaner-than-10% error bars.
-- `bootstrap()` only copies the trajectory subset - independence across bootstraps **only** holds if you also call `boot.cluster(...)` on every draw, so each bootstrap gets its own cluster centroids and transition counts. Reusing cluster assignments from the full data biases the result toward the full model.
+- `bootstrap(0.8)` samples **at the trajectory level**, not the frame level. Each bootstrap drops or keeps whole trajectories: if you have 10 trajectories, you can't get cleaner-than-10% error bars.
+- `bootstrap()` only copies the trajectory subset; independence across bootstraps **only** holds if you also call `boot.cluster(...)` on every draw, so each bootstrap gets its own cluster centroids and transition counts. Reusing cluster assignments from the full data biases the result toward the full model.
 - 10 bootstraps with 1000 clusters each on a multi-million-frame dataset is the slow step in this workflow. Cache `dataTica` between bootstraps; only the cluster + Model fit re-runs.
-- If different bootstraps give qualitatively different macrostate **count** (PCCA picks different `n_macro`), the underlying dataset doesn't support the macrostate decomposition - reduce `n_macro` until bootstraps converge.
+- If different bootstraps give qualitatively different macrostate **count** (PCCA picks different `n_macro`), the underlying dataset doesn't support the macrostate decomposition; reduce `n_macro` until bootstraps converge.
 
 ## See also
 
-- {doc}`How to read off and interpret an ITS plot <msm-interpret-its-plot>` - what bootstrapped timescales look like in practice.
-- {doc}`How to drop bad trajectories <msm-drop-bad-trajectories>` - relevant pre-bootstrap cleanup.
-- {py:meth}`htmd.metricdata.MetricData.bootstrap` - API reference.
+- {doc}`How to read off and interpret an ITS plot <msm-interpret-its-plot>`: what bootstrapped timescales look like in practice.
+- {doc}`How to drop bad trajectories <msm-drop-bad-trajectories>`: relevant pre-bootstrap cleanup.
+- {py:meth}`htmd.metricdata.MetricData.bootstrap`: API reference.

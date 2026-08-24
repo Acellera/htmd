@@ -22,9 +22,9 @@ print("total energy:", energies.sum())                    # kcal/mol
 
 `FFEvaluate.calculate(coords)` returns three arrays:
 
-- `energies` - `(6, n_frames)` per-term system totals in the order `(bond, vdw, elec, angle, dihedral, improper)`.
-- `forces` - `(n_atoms, 3, n_frames)` per-atom force vector in kcal/mol/Å.
-- `atmnrg` - `(n_atoms, 6, n_frames)` per-atom energy contributions in the same term order.
+- `energies`: `(6, n_frames)` per-term system totals in the order `(bond, vdw, elec, angle, dihedral, improper)`.
+- `forces`: `(n_atoms, 3, n_frames)` per-atom force vector in kcal/mol/Å.
+- `atmnrg`: `(n_atoms, 6, n_frames)` per-atom energy contributions in the same term order.
 
 `FFEvaluate.calculateEnergies(coords)` is a thin wrapper that calls `calculate` and discards both `forces` and `atmnrg`, returning only the energies (as a dict when `formatted=True`).
 
@@ -35,9 +35,9 @@ Both `calculate` and `calculateEnergies` accept an optional `box=mol.box` argume
 | Parameter | What it does |
 | --- | --- |
 | `mol` | Molecule whose topology defines the bond / angle / dihedral graph. Frames in `mol.coords` define how many coordinate snapshots get evaluated. |
-| `prm` | A parmed `ParameterSet` - load from prmtop with `loadParameters("...")` or build from a CHARMM `.prm` via `loadParameters(prm_path)`. |
-| `betweensets` | A tuple of two atom-selection strings - restricts non-bonded energy / force calc to interactions **between** the two sets. Computes only LJ + electrostatics, no intramolecular bonded terms. |
-| `cutoff` | Non-bonded cutoff in Å. `0` (default) means no cutoff - exact electrostatics + LJ. Set to e.g. `9.0` to match a simulation's cutoff. |
+| `prm` | A parmed `ParameterSet`. Load from prmtop with `loadParameters("...")` or build from a CHARMM `.prm` via `loadParameters(prm_path)`. |
+| `betweensets` | A tuple of two atom-selection strings. Restricts non-bonded energy / force calculation to interactions **between** the two sets. Computes only LJ + electrostatics, no intramolecular bonded terms. |
+| `cutoff` | Non-bonded cutoff in Å. `0` (default) means no cutoff: exact electrostatics + LJ. Set to e.g. `9.0` to match a simulation's cutoff. |
 | `rfa` | Use with `cutoff` to enable the reaction-field approximation for electrostatics beyond the cutoff. |
 | `solventDielectric` | Solvent dielectric used when `rfa=True`. Default 78.5 (water). |
 
@@ -59,7 +59,7 @@ e, _, _ = ffev.calculate(mol.coords)
 print("protein-ligand interaction energy:", e.sum(axis=0))
 ```
 
-Restricting to a pair of sets is much cheaper than the full system - no bonded terms are computed and the non-bonded loop is restricted to inter-set pairs.
+Restricting to a pair of sets is much cheaper than the full system: no bonded terms are computed and the non-bonded loop is restricted to inter-set pairs.
 
 ### Use a CHARMM parameter file instead of prmtop
 
@@ -68,7 +68,7 @@ prm = loadParameters("./params.prm")                      # CHARMM .prm
 ffev = FFEvaluate(mol, prm)
 ```
 
-`loadParameters` dispatches by extension - only `.prmtop`, `.prm`, and `.frcmod` are recognised. Any other extension raises `RuntimeError`. For CHARMM systems built from a PSF, point `loadParameters` at the matching `.prm`; for AMBER pass the `.prmtop` directly.
+`loadParameters` dispatches by extension: only `.prmtop`, `.prm`, and `.frcmod` are recognised. Any other extension raises `RuntimeError`. For CHARMM systems built from a PSF, point `loadParameters` at the matching `.prm`; for AMBER pass the `.prmtop` directly.
 
 ### Decomposed energy report
 
@@ -85,10 +85,10 @@ for k, v in e_by_term.items():
 
 - `FFEvaluate` expects the same atom order in `mol.coords` and in the parameter set. If your `mol` has been reordered / filtered after the parmtop was loaded, the bond graph won't match. Always load both from the same source.
 - With `betweensets`, the result excludes intra-set bonded **and** intra-set non-bonded energies. The reported number is the cross-set interaction only.
-- Default `cutoff=0` is exact but O(N²) - on >100k-atom systems this is slow. Setting `cutoff > 0` only short-circuits the per-pair maths *inside* the loop; the pair iteration itself is still O(N²) (there's no neighbour list). Match your simulation's cutoff (typically 9-12 Å) for production-scale evaluations, but don't expect linear-scaling.
+- Default `cutoff=0` is exact but O(N²), so on >100k-atom systems this is slow. Setting `cutoff > 0` only short-circuits the per-pair maths *inside* the loop; the pair iteration itself is still O(N²) (there's no neighbour list). Match your simulation's cutoff (typically 9-12 Å) for production-scale evaluations, but don't expect linear-scaling.
 - The output unit is kcal/mol regardless of the parameter file format.
 
 ## See also
 
-- {doc}`How to use a custom force field with amber.build <system-build-custom-forcefield>` - producing the prmtop that `loadParameters` consumes.
-- [ffevaluation on GitHub](https://github.com/Acellera/ffevaluation) - the full API + benchmarks.
+- {doc}`How to use a custom force field with amber.build <system-build-custom-forcefield>`: producing the prmtop that `loadParameters` consumes.
+- [ffevaluation on GitHub](https://github.com/Acellera/ffevaluation): the full API and benchmarks.

@@ -19,15 +19,15 @@ kernelspec:
 
 ## When you need this flow
 
-If your structure contains any residue your force field doesn't know - a small-molecule ligand, a non-canonical amino acid, a covalently-bound drug, a phosphorylated residue - the canonical {doc}`protein build <01-protein>` won't work as-is. The builder will raise a *"could not find residue X"* error.
+If your structure contains any residue your force field doesn't know (a small-molecule ligand, a non-canonical amino acid, a covalently-bound drug, a phosphorylated residue), the canonical {doc}`protein build <01-protein>` won't work as-is. The builder will raise a *"could not find residue X"* error.
 
-The full flow adds two steps between `systemPrepare` and `amber.build`:
+The full flow adds three steps around `systemPrepare`:
 
-1. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues` - inspect the molecule, return one spec per non-canonical residue.
-2. {py:meth}`~moleculekit.molecule.Molecule.templateResidueFromSmiles` - fix bond orders and hydrogens on each non-canonical residue from its reference SMILES.
-3. {py:func}`~moleculekit.tools.preparation.systemPrepare` - protonate canonicals, preserve templated non-canonicals.
-4. {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` - run antechamber on the cluster of each non-canonical, emit topology / parameter files and a `custombonds` list.
-5. {py:func}`~htmd.builder.amber.build` - tLeap consumes those outputs.
+1. {py:func}`~moleculekit.tools.nonstandard_residues.detectNonStandardResidues`: inspect the molecule, return one spec per non-canonical residue.
+2. {py:meth}`~moleculekit.molecule.Molecule.templateResidueFromSmiles`: fix bond orders and hydrogens on each non-canonical residue from its reference SMILES.
+3. {py:func}`~moleculekit.tools.preparation.systemPrepare`: protonate canonicals, preserve templated non-canonicals.
+4. {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs`: run antechamber on the cluster of each non-canonical, emit topology / parameter files and a `custombonds` list.
+5. {py:func}`~htmd.builder.amber.build`: tLeap consumes those outputs.
 
 ## Setup
 
@@ -46,7 +46,7 @@ from htmd.builder.solvate import solvate
 from acellera_docs_theme.molstar import show3d
 ```
 
-## Step 1 - Load and segment
+## Step 1: Load and segment
 
 We use trypsin in complex with benzamidine (PDB `3PTB`). `BEN` is the non-canonical residue:
 
@@ -60,7 +60,7 @@ mol = autoSegment(mol, fields=("segid", "chain"))
 show3d(mol)
 ```
 
-## Step 2 - Detect non-standard residues
+## Step 2: Detect non-standard residues
 
 ```{code-cell} python
 specs = detectNonStandardResidues(mol)
@@ -68,9 +68,9 @@ for spec in specs:
     print(spec)
 ```
 
-You should see one spec for `BEN` - a {py:class}`~moleculekit.tools.nonstandard_residues.LigandSpec`. The spec records what kind of non-canonical we're looking at (free ligand, covalent ligand, chain-resident NCAA, scaffold, ...) and any anchor information needed to handle crosslinks.
+You should see one spec for `BEN`, a {py:class}`~moleculekit.tools.nonstandard_residues.LigandSpec`. The spec records what kind of non-canonical we're looking at (free ligand, covalent ligand, chain-resident NCAA, scaffold, ...) and any anchor information needed to handle crosslinks.
 
-## Step 3 - Template the non-canonical residues from SMILES
+## Step 3: Template the non-canonical residues from SMILES
 
 `templateResidueFromSmiles` matches the SMILES against the atoms in the selection, sets correct bond orders and formal charges, and adds the missing hydrogens. It requires the input residue to already have **bonds** in `mol.bonds`; PDBs without CONECT records need `mol.guessBonds()` (or load with `guessBonds=True`) first:
 
@@ -79,7 +79,7 @@ BEN_SMILES = "[NH2+]=C(N)c1ccccc1"
 mol.templateResidueFromSmiles('resname "BEN"', BEN_SMILES, addHs=True)
 ```
 
-The SMILES carries the **protonated** benzamidinium form (one of the amidine nitrogens is `[NH2+]`), which is the physiologically relevant state at pH 7.4. The RCSB chemical component for `BEN` is stored as the neutral amidine `N=C(N)c1ccccc1` - that's a starting point, but the SMILES you pass to `templateResidueFromSmiles` must encode the **protonation state at your target pH** with explicit formal charges. Templating the neutral form locks the wrong charges into the parameterization.
+The SMILES carries the **protonated** benzamidinium form (one of the amidine nitrogens is `[NH2+]`), which is the physiologically relevant state at pH 7.4. The RCSB chemical component for `BEN` is stored as the neutral amidine `N=C(N)c1ccccc1`, which is a starting point, but the SMILES you pass to `templateResidueFromSmiles` must encode the **protonation state at your target pH** with explicit formal charges. Templating the neutral form locks the wrong charges into the parameterization.
 
 You don't have to hand-edit the SMILES for the mid-chain case: when a residue is peptide-bonded on one or both sides, the function automatically strips the terminal `-OH` / `-OXT` that's absent in the bonded copy and retries the match. Full heavy-atom coverage and explicit hydrogens still work best.
 
@@ -88,9 +88,9 @@ You don't have to hand-edit the SMILES for the mid-chain case: when a residue is
 show3d(mol, ball_and_stick="resname BEN", focus="resname BEN")
 ```
 
-The viewer opens zoomed in on `BEN` (ball-and-stick on top of the protein cartoon). Look at the templating result: the amidine carbon now carries a double bond, the protonated `[NH2+]` nitrogen has two explicit hydrogens, and the `+1` formal charge sits as a small black label by the protonated nitrogen. None of that connectivity / charge information was in the input PDB - `templateResidueFromSmiles` pulled it from the SMILES and reconciled it with the existing heavy-atom positions.
+The viewer opens zoomed in on `BEN` (ball-and-stick on top of the protein cartoon). Look at the templating result: the amidine carbon now carries a double bond, the protonated `[NH2+]` nitrogen has two explicit hydrogens, and the `+1` formal charge sits as a small black label by the protonated nitrogen. None of that connectivity / charge information was in the input PDB; `templateResidueFromSmiles` pulled it from the SMILES and reconciled it with the existing heavy-atom positions.
 
-## Step 4 - Prepare with the spec list
+## Step 4: Prepare with the spec list
 
 ```{code-cell} python
 prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
@@ -98,7 +98,7 @@ prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
 
 If you don't pass `detect_specs`, `systemPrepare` calls `detectNonStandardResidues` for you. Passing `detect_specs=specs` explicitly is useful when you want to **reuse** the list we already computed in step 2 (avoiding the duplicate detect call), **edit it** before prep (drop specs for residues you want to leave alone, tweak a `new_resname`, etc.), and **thread** the same list into `parameterizeFromSpecs` in step 5. `systemPrepare` returns the spec list unchanged as its second value; the rebind keeps the data flow visually obvious. To opt out of non-standard residue handling entirely, pass `detect_specs=[]`.
 
-## Step 5 - Parameterize
+## Step 5: Parameterize
 
 ```{code-cell} python
 out = parameterizeFromSpecs(
@@ -112,22 +112,22 @@ print(out)
 
 For each unique `(resname, terminal-position)` bucket, `parameterizeFromSpecs` runs antechamber to assign GAFF2 atom types and per-atom partial charges, then writes:
 
-- `out.topo_paths` - one topology file per unique non-canonical bucket. Free ligands like `BEN` get a `.cif`; chain-resident NCAAs get a `.prepi`.
-- `out.frcmod_paths` - the matching `BEN.frcmod` with bond / angle / dihedral parameters.
-- `out.custombonds` - atom-selection pairs naming the inter-residue bonds tLeap should add (empty here because `BEN` is a free ligand with no covalent connection to the protein).
-- `out.xml_paths` - OpenMM force-field XML(s), in case you later want to switch the build backend. For free ligands with the default GAFF backend you get one combined `gaff_combined.xml`; for cluster-bonded residues you get a per-cluster XML.
+- `out.topo_paths`: one topology file per unique non-canonical bucket. Free ligands like `BEN` get a `.cif`; chain-resident NCAAs get a `.prepi`.
+- `out.frcmod_paths`: the matching `BEN.frcmod` with bond / angle / dihedral parameters.
+- `out.custombonds`: atom-selection pairs naming the inter-residue bonds tLeap should add (empty here because `BEN` is a free ligand with no covalent connection to the protein).
+- `out.xml_paths`: OpenMM force-field XML(s), in case you later want to switch the build backend. For free ligands with the default GAFF backend you get one combined `gaff_combined.xml`; for cluster-bonded residues you get a per-cluster XML.
 
-The default charge method is **AM1-BCC** - antechamber runs an AM1-BCC calculation per **parameterisation cluster** (a small model compound with `ACE`/`NME` caps that closes off the chemistry around each non-canonical residue); the resulting charges are then split back to the constituent residues. We pass `charge_method="gasteiger"` here because it's much faster and good enough for a tutorial; for production builds drop the argument (or set it explicitly to `"am1-bcc"`) for higher-quality electrostatics.
+The default charge method is **AM1-BCC**: antechamber runs an AM1-BCC calculation per **parameterization cluster** (a small model compound with `ACE`/`NME` caps that closes off the chemistry around each non-canonical residue); the resulting charges are then split back to the constituent residues. We pass `charge_method="gasteiger"` here because it's much faster and good enough for a tutorial; for production builds drop the argument (or set it explicitly to `"am1-bcc"`) for higher-quality electrostatics.
 
-## Step 6 - Solvate
+## Step 6: Solvate
 
 ```{code-cell} python
 solvated = solvate(prepared, pad=10)
 ```
 
-`amber.build` does not wrap a water box on its own, so we solvate the prepared structure first - same as in the {doc}`canonical protein tutorial <01-protein>`.
+`amber.build` does not wrap a water box on its own, so we solvate the prepared structure first, same as in the {doc}`canonical protein tutorial <01-protein>`.
 
-## Step 7 - Build
+## Step 7: Build
 
 ```{code-cell} python
 built = amber.build(
@@ -156,6 +156,6 @@ show3d(built)
 
 ## See also
 
-- {doc}`Build a cyclic peptide <05-cyclic-peptide>` - same flow with a head-to-tail cyclisation.
-- {doc}`Build a stapled peptide <04-stapled-peptide>` - chemical crosslink between two NCAAs.
-- {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.
+- {doc}`Build a cyclic peptide <05-cyclic-peptide>`: the same flow, with a head-to-tail cyclisation.
+- {doc}`Build a stapled peptide <04-stapled-peptide>`: a chemical crosslink between two NCAAs.
+- {doc}`System-building overview <../../explanation/system-building>`: the conceptual map of the whole stack.

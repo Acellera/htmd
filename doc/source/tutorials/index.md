@@ -4,7 +4,7 @@ Step-by-step lessons that take you from zero to a working result. For working wi
 
 ## System building
 
-The headline capability. Each tutorial walks through building a real, simulation-ready system end-to-end - protein preparation, segmentation, ligand placement, membrane embedding, and parameter assignment under CHARMM / AMBER. The {doc}`system-building overview <../explanation/system-building>` lays out the full feature set, including non-canonical amino acids, stapled peptides, isopeptides, and disulfide handling.
+Each tutorial walks through building a real, simulation-ready system end to end: protein preparation, segmentation, ligand placement, membrane embedding, and parameter assignment under CHARMM / AMBER. The {doc}`system-building overview <../explanation/system-building>` lays out the full feature set, including non-canonical amino acids, stapled peptides, isopeptides, and disulfide handling.
 
 ```{toctree}
 :maxdepth: 1
@@ -24,7 +24,7 @@ simulation/index
 
 ## MSM analysis
 
-Two end-to-end MSM analyses on real systems - benchmark trypsin/benzamidine and villin folding. Each tutorial walks the full simulation-list → projection → clustering → model → kinetics pipeline. The {doc}`MSM workflow concept page <../explanation/msm-workflow>` sketches that pipeline before you start.
+Two end-to-end MSM analyses on real systems: benchmark trypsin/benzamidine and villin folding. Each tutorial walks the full simulation-list → projection → clustering → model → kinetics pipeline. The {doc}`MSM workflow concept page <../explanation/msm-workflow>` sketches that pipeline before you start.
 
 ```{toctree}
 :maxdepth: 1

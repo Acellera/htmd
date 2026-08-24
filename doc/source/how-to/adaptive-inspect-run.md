@@ -17,7 +17,7 @@ sims = simlist(glob("./data/*/"),                  # one subdir per completed si
 # Per-sim metadata
 for s in sims[:5]:
     print(s.simid,       # numeric index assigned in load order
-          s.input,       # input folder path - encodes epoch/spawn/parent in its name
+          s.input,       # input folder path; encodes epoch/spawn/parent in its name
           s.molfile)     # topology file(s) for this sim
 ```
 
@@ -96,12 +96,12 @@ For an {py:class}`~htmd.adaptive.adaptivegoal.AdaptiveGoal` run, plotting the pe
 ## Gotchas
 
 - The epoch / spawn numbers live in the **directory name** (e.g. `e3s7_e1s2p0f120`), not in any database. If you rename or reorganise the `data/` tree post-hoc you lose the lineage.
-- `sim.input` and `sim.molfile` use absolute paths from when adaptive ran - if you move the project directory, regenerate the simlist with the new paths.
+- `sim.input` and `sim.molfile` use absolute paths from when adaptive ran; if you move the project directory, regenerate the simlist with the new paths.
 - `reconstructAdaptiveTraj` walks the **simlist you pass it**: every ancestor sim must be present in that simlist (typically the simlist over `data/` or `filtered/`). If you've dropped trajectories before reconstruction it'll fail to find their parents.
-- If adaptive is still running, `data/*/` will gain new subdirs while you inspect - re-run `simlist(...)` to refresh.
+- If adaptive is still running, `data/*/` will gain new subdirs while you inspect; re-run `simlist(...)` to refresh.
 
 ## See also
 
-- {doc}`How to configure adaptive sampling <adaptive-configure>` - the producer side of the data this how-to consumes.
-- {doc}`Adaptive sampling explanation <../explanation/adaptive-sampling>` - what the epoch / spawn naming actually means.
-- {py:func}`htmd.adaptive.adaptive.reconstructAdaptiveTraj` - API reference for ancestor-chain reconstruction.
+- {doc}`How to configure adaptive sampling <adaptive-configure>`: the producer side of the data this how-to consumes.
+- {doc}`Adaptive sampling explanation <../explanation/adaptive-sampling>`: what the epoch / spawn naming actually means.
+- {py:func}`htmd.adaptive.adaptive.reconstructAdaptiveTraj`: API reference for ancestor-chain reconstruction.

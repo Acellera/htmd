@@ -18,13 +18,13 @@ amber.build(
 )
 ```
 
-Each of the three arguments **independently** overrides its corresponding default - passing `topo=...` doesn't affect `ff`, etc. The defaults are:
+Each of the three arguments **independently** overrides its corresponding default: passing `topo=...` doesn't affect `ff`, etc. The defaults are:
 
 - `ff` defaults to {py:func}`~htmd.builder.amber.defaultFf` = `["leaprc.protein.ff14SB", "leaprc.lipid21", "leaprc.gaff2", "leaprc.RNA.OL3", "leaprc.DNA.bsc1", "leaprc.water.tip3p"]`. Replacing it drops all bundled parameters; re-add the leaprc entries you still need.
 - `topo` and `param` default to **empty lists** ({py:func}`~htmd.builder.amber.defaultTopo`, {py:func}`~htmd.builder.amber.defaultParam`). The bundled GAFF / RNA / DNA / lipid21 parameters all come from the leaprc files in `ff`, not from `topo` / `param`. Appending is the usual mode: `topo=[..., "./ligand.cif"]`.
 
 ```{tip}
-tLeap pairs parameters to atoms by the **atom-type names inside the files** - the topo and param filenames don't have to match each other for the build to succeed. However, a useful convention is to **name each pair after the residue's resname** (`LIG.cif` + `LIG.frcmod` for a residue `LIG`): when HTMD's built-in cofactor / NCAA / PTM library contains an entry with the same name, the auto-load logic detects the user-supplied `LIG.frcmod` and skips re-adding the built-in `LIG` parameters on top - avoiding duplicate-atomtype errors when your custom parameters reuse atom types that collide with the built-in set.
+tLeap pairs parameters to atoms by the **atom-type names inside the files**; the topo and param filenames don't have to match each other for the build to succeed. However, a useful convention is to **name each pair after the residue's resname** (`LIG.cif` + `LIG.frcmod` for a residue `LIG`): when HTMD's built-in cofactor / NCAA / PTM library contains an entry with the same name, the auto-load logic detects the user-supplied `LIG.frcmod` and skips re-adding the built-in `LIG` parameters on top, avoiding duplicate-atomtype errors when your custom parameters reuse atom types that collide with the built-in set.
 ```
 
 ## Parameters that matter
@@ -32,7 +32,7 @@ tLeap pairs parameters to atoms by the **atom-type names inside the files** - th
 | Parameter | What it does |
 | --- | --- |
 | `ff` | List of `leaprc.*` file paths or names. Overrides the entire default protein/water/ion stack. |
-| `topo` | List of topology files - one per non-canonical residue. `.prepi` / `.prep` / `.in` are loaded with tLeap's `loadamberprep`; `.cif` / `.mol2` are loaded with `loadmol2` (the CIF is converted to mol2 internally first, no `prepgen` involved). |
+| `topo` | List of topology files, one per non-canonical residue. `.prepi` / `.prep` / `.in` are loaded with tLeap's `loadamberprep`; `.cif` / `.mol2` are loaded with `loadmol2` (the CIF is converted to mol2 internally first, no `prepgen` involved). |
 | `param` | List of `.frcmod` files containing the bond / angle / dihedral / VdW parameters for the residues in `topo`. |
 | `atomtypes` | Extra atom-type triplets `(type, element, hybrid)` passed to tLeap's `addAtomTypes`. Example: `atomtypes=[("C1", "C", "sp2"), ("CI", "C", "sp3")]`. |
 | `offlibraries` | Additional AMBER OFF / LIB residue libraries to load via `loadoff`. |
@@ -52,7 +52,7 @@ amber.build(
 )
 ```
 
-`defaultTopo()` and `defaultParam()` are both empty lists, so appending is unnecessary — just pass the new files. The {doc}`protein-with-ligand tutorial <../tutorials/system-prep/02-protein-ligand>` does this directly via {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs`'s `out.topo_paths` / `out.frcmod_paths`.
+`defaultTopo()` and `defaultParam()` are both empty lists, so appending is unnecessary; just pass the new files. The {doc}`protein-with-ligand tutorial <../tutorials/system-prep/02-protein-ligand>` does this directly via {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs`'s `out.topo_paths` / `out.frcmod_paths`.
 
 ### Using a different protein force field
 
@@ -64,15 +64,15 @@ amber.build(mol, outdir="./build", ff=[
 ])
 ```
 
-ff19SB + OPC is the AMBER-recommended modern stack (replacing ff14SB + TIP3P). Make sure `leaprc.water.opc` and `leaprc.protein.ff19SB` are in your tLeap search path - {py:func}`htmd.builder.amber.listFiles` lists what's available.
+ff19SB + OPC is the AMBER-recommended modern stack (replacing ff14SB + TIP3P). Make sure `leaprc.water.opc` and `leaprc.protein.ff19SB` are in your tLeap search path; {py:func}`htmd.builder.amber.listFiles` lists what's available.
 
 ## Gotchas
 
-- The default `topo` / `param` lists are **empty**; all bundled parameters (water, GAFF, lipid21, RNA, DNA) come from the leaprc entries in `ff`. So you usually only need to *append* to `topo` / `param` for new residues - no re-adding of defaults required. If you replace `ff`, on the other hand, re-add the leaprc entries you still need or tLeap will fail on residues whose parameters aren't loaded.
+- The default `topo` / `param` lists are **empty**; all bundled parameters (water, GAFF, lipid21, RNA, DNA) come from the leaprc entries in `ff`. So you usually only need to *append* to `topo` / `param` for new residues, with no re-adding of defaults required. If you replace `ff`, on the other hand, re-add the leaprc entries you still need or tLeap will fail on residues whose parameters aren't loaded.
 - The order of `leaprc.*` files in `ff` matters: tLeap applies them in sequence, so later entries can shadow earlier ones. Put `leaprc.water.<model>` last so the water model isn't overwritten by an earlier protein/lipid leaprc.
 
 ## See also
 
-- {doc}`Build a protein with a ligand <../tutorials/system-prep/02-protein-ligand>` - the full NCAA pipeline that emits the `topo` / `param` lists you'd pass here.
-- {doc}`How to mix AMBER and OpenFF parameters <system-build-amber-openff>` - same problem but using OpenFF small-molecule parameters.
-- {py:mod}`htmd.builder.amber` - full API reference.
+- {doc}`Build a protein with a ligand <../tutorials/system-prep/02-protein-ligand>`: the full NCAA pipeline that emits the `topo` / `param` lists you'd pass here.
+- {doc}`How to mix AMBER and OpenFF parameters <system-build-amber-openff>`: the same problem, but using OpenFF small-molecule parameters.
+- {py:mod}`htmd.builder.amber`: full API reference.

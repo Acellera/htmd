@@ -1,6 +1,6 @@
 # How-to guides
 
-Task-oriented recipes. Each page solves one concrete problem; pick the one matching your situation. Molecule-level recipes (reading, selection, wrapping, projections, ...) live in [moleculekit's how-to guides](https://software.acellera.com/moleculekit/howto/index.html) - the pages here cover the HTMD layer above that (system building, simulation orchestration, MSM analysis).
+Task-oriented recipes. Each page solves one concrete problem; pick the one matching your situation. Molecule-level recipes (reading, selection, wrapping, projections, ...) live in [moleculekit's how-to guides](https://software.acellera.com/moleculekit/howto/index.html); the pages here cover the HTMD layer above that (system building, simulation orchestration, MSM analysis).
 
 ## System building
 

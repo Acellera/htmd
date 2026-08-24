@@ -16,7 +16,7 @@ kernelspec:
 
 **Prerequisites:**
 - HTMD installed with the OpenFF extra: `pip install acellera-htmd[openff,nagl]`.
-- You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>` - this tutorial reuses the same five prep steps and only changes the small-molecule force field.
+- You've worked through {doc}`Build a protein with a ligand <02-protein-ligand>`; this tutorial reuses the same five prep steps and only changes the small-molecule force field.
 
 ## Why a different small-molecule force field
 
@@ -25,15 +25,15 @@ kernelspec:
 - **Direct SMARTS-based parameter assignment** via the [SMIRNOFF format](https://openforcefield.github.io/standards/standards/smirnoff/): a single ~300-line force-field XML replaces GAFF2's many-line atom-typing rules, with chemistry-aware specificity (sulfonamides, phosphates, and bridgehead nitrogens are typed correctly from Sage 2.1 onwards).
 - **vdW parameters retrained** against experimental mass density and enthalpy-of-mixing data from NIST.
 - **Valence parameters** (bonds, angles, torsions) fit against quantum-chemical optimised geometries and torsion profiles, with torsions split per central-bond multiplicity from Sage 2.3.
-- **Charges via NAGL**, an AM1-BCC graph-neural-network surrogate introduced with Sage 2.3 - much faster than running AM1-BCC per-residue, and what the Sage release was validated against.
+- **Charges via NAGL**, an AM1-BCC graph-neural-network surrogate introduced with Sage 2.3, much faster than running AM1-BCC per-residue, and what the Sage release was validated against.
 - **Native OpenMM XML output**, no tLeap round-trip. Training inputs, scripts, and results are public on the [OpenFF GitHub org](https://github.com/openforcefield).
 
-For any ligand where you want the latest, externally-validated force-field assignment, swap GAFF2 for an OpenFF release. The {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` interface is unchanged - you flip two arguments:
+For any ligand where you want the latest, externally-validated force-field assignment, swap GAFF2 for an OpenFF release. The {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` interface is unchanged; you flip two arguments:
 
 - `forcefield="openff_unconstrained-2.3.0.offxml"` (Sage 2.3, the current production line).
 - `charge_method="nagl"` (the GNN surrogate for AM1-BCC that Sage was fit against).
 
-The OpenMM builder ({py:func}`htmd.builder.openmm.build`) consumes the emitted force-field XML directly - no separate prepi/frcmod step.
+The OpenMM builder ({py:func}`htmd.builder.openmm.build`) consumes the emitted force-field XML directly, with no separate prepi/frcmod step.
 
 ```{warning}
 Parameterizing **any** residue under OpenFF binds the whole system to the OpenMM builder. The `.frcmod` format that tLeap consumes can't represent the full SMIRNOFF feature set, so {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` emits only the OpenMM force-field XML on the SMIRNOFF branch and {py:func}`htmd.builder.amber.build` has nothing to consume. If you need an AMBER `prmtop` produced by tLeap, stay on the GAFF2 path in {doc}`tutorial 02 <02-protein-ligand>`. The OpenMM builder still writes a `prmtop` + `pdb` pair, so the *downstream* MD engine (ACEMD, OpenMM, GROMACS, ...) doesn't care.
@@ -55,9 +55,9 @@ from htmd.builder.nonstandard import parameterizeFromSpecs
 from acellera_docs_theme.molstar import show3d
 ```
 
-## Steps 1-4 - Same as the GAFF2 tutorial
+## Steps 1-4: Same as the GAFF2 tutorial
 
-The prep pipeline is unchanged from {doc}`tutorial 02 <02-protein-ligand>` - see that tutorial for the per-step prose. Code-only recap:
+The prep pipeline is unchanged from {doc}`tutorial 02 <02-protein-ligand>`; see that tutorial for the per-step prose. Code-only recap:
 
 ```{code-cell} python
 mol = Molecule("3PTB")
@@ -78,7 +78,7 @@ mol.templateResidueFromSmiles('resname "BEN"', BEN_SMILES, addHs=True)
 prepared, specs = systemPrepare(mol, pH=7.4, detect_specs=specs)
 ```
 
-## Step 5 - Parameterize with OpenFF Sage
+## Step 5: Parameterize with OpenFF Sage
 
 ```{code-cell} python
 out = parameterizeFromSpecs(
@@ -91,11 +91,11 @@ out = parameterizeFromSpecs(
 print(out)
 ```
 
-`forcefield` strings that don't start with `gaff` are treated as SMIRNOFF offxml filenames and dispatched through OpenFF Interchange. The output `ClusterOutputs` carries `.xml` files in `xml_paths` - one `<resname>.xml` per **free ligand** (like the benzamidine here), and one `cluster_<idx>.xml` per cluster of covalently-bonded NCAAs. `topo_paths` and `frcmod_paths` may be empty for the SMIRNOFF branch, since the XML is self-contained.
+`forcefield` strings that don't start with `gaff` are treated as SMIRNOFF offxml filenames and dispatched through OpenFF Interchange. The output `ClusterOutputs` carries `.xml` files in `xml_paths`: one `<resname>.xml` per **free ligand** (like the benzamidine here), and one `cluster_<idx>.xml` per cluster of covalently-bonded NCAAs. `topo_paths` and `frcmod_paths` may be empty for the SMIRNOFF branch, since the XML is self-contained.
 
-`charge_method="nagl"` runs the OpenFF NAGL GNN surrogate for the charge model Sage's vdW and torsion parameters were fit against (AM1-BCC for Sage 2.0–2.2, AshGC for Sage 2.3). Passing any non-`"nagl"` `charge_method` (`"am1-bcc"`, `"gasteiger"`, `"resp"`, …) emits a mismatched-charges warning - it works, but you lose some of the consistency the Sage release was validated for.
+`charge_method="nagl"` runs the OpenFF NAGL GNN surrogate for the charge model Sage's vdW and torsion parameters were fit against (AM1-BCC for Sage 2.0–2.2, AshGC for Sage 2.3). Passing any non-`"nagl"` `charge_method` (`"am1-bcc"`, `"gasteiger"`, `"resp"`, …) emits a mismatched-charges warning; it works, but you lose some of the consistency the Sage release was validated for.
 
-## Step 6 - Build under OpenMM
+## Step 6: Build under OpenMM
 
 ```{code-cell} python
 # 3PTB ships with a handful of crystallographic waters that systemPrepare keeps.
@@ -121,7 +121,7 @@ Argument breakdown:
 
 | Argument | Effect |
 | --- | --- |
-| `extra_xml` | Additional XML files describing the non-canonical residues - here, the per-cluster Sage XML emitted by `parameterizeFromSpecs`. |
+| `extra_xml` | Additional XML files describing the non-canonical residues; here, the per-cluster Sage XML emitted by `parameterizeFromSpecs`. |
 | `custombonds` | Inter-residue bonds (same shape as in `amber.build`). |
 | `solvate=True` | The OpenMM builder solvates internally; no separate {py:func}`~htmd.builder.solvate.solvate` call is needed. If you'd rather pre-solvate (with your own padding, water model, or `centersel`), call {py:func}`~htmd.builder.solvate.solvate` on `prepared` first, then pass `solvate=False` here and the builder will skip the internal step. |
 | `padding` | Solvation padding in Å. |
@@ -131,12 +131,12 @@ Argument breakdown:
 
 ## Gotchas
 
-- `frcmod` (tLeap's input format) can't express the full SMIRNOFF feature set, so the OpenFF path emits OpenMM XML only - `amber.build` cannot consume it. Picking OpenFF for one residue commits the whole build to {py:func}`htmd.builder.openmm.build`.
+- `frcmod` (tLeap's input format) can't express the full SMIRNOFF feature set, so the OpenFF path emits OpenMM XML only; `amber.build` cannot consume it. Picking OpenFF for one residue commits the whole build to {py:func}`htmd.builder.openmm.build`.
 - Pair `forcefield="openff_*.offxml"` with `charge_method="nagl"`. Sage's parameters were fit alongside AM1-BCC charges, and NAGL is the recommended fast surrogate; other charge models (Gasteiger, antechamber's AM1-BCC) work but emit a mismatched-charges warning and lose some of the consistency the Sage release was validated for.
-- `openmm.build` does its own solvation when `solvate=True`. If you want to pre-solvate (e.g. to use a non-default padding or `centersel`), call {py:func}`~htmd.builder.solvate.solvate` first and pass `solvate=False` to the builder. Don't pre-solvate and leave `solvate=True` - you'd end up with a doubly-solvated box.
+- `openmm.build` does its own solvation when `solvate=True`. If you want to pre-solvate (e.g. to use a non-default padding or `centersel`), call {py:func}`~htmd.builder.solvate.solvate` first and pass `solvate=False` to the builder. Don't pre-solvate and leave `solvate=True`; you'd end up with a doubly-solvated box.
 - For pure-canonical protein systems (no ligand, no NCAA) there's nothing for OpenFF to do at the small-molecule level; you don't need Sage and the GAFF2 path in tutorial 02 is enough. This tutorial pays off when the ligand is the focus.
 
 ## See also
 
-- {doc}`Build a protein with a ligand <02-protein-ligand>` - the same system parameterized under GAFF2 via tLeap.
-- {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.
+- {doc}`Build a protein with a ligand <02-protein-ligand>`: the same system parameterized under GAFF2 via tLeap.
+- {doc}`System-building overview <../../explanation/system-building>`: the conceptual map of the whole stack.

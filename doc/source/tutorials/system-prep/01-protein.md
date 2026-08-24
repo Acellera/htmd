@@ -21,10 +21,10 @@ kernelspec:
 
 For a protein containing only canonical residues, building is four steps after loading:
 
-1. {py:func}`~moleculekit.tools.autosegment.autoSegment` - automatically split the structure into independent segments by walking the residue connectivity and starting a new segment at every real chain break (decided from the backbone-atom distance between consecutive residues - resid numbering is not consulted).
-2. {py:func}`~moleculekit.tools.preparation.systemPrepare` - protonate at the chosen pH, fix protonation states, and patch a few missing heavy atoms (full missing-sidechain restoration is off by default; opt in with `restore_missing_sidechains=True`).
-3. {py:func}`~htmd.builder.solvate.solvate` - wrap a water box around the prepared structure.
-4. {py:func}`htmd.builder.amber.build` - run tLeap to produce a `prmtop` + `pdb` pair (and ionise to the requested salt concentration).
+1. {py:func}`~moleculekit.tools.autosegment.autoSegment`: automatically split the structure into independent segments by walking the residue connectivity and starting a new segment at every real chain break (decided from the backbone-atom distance between consecutive residues; resid numbering is not consulted).
+2. {py:func}`~moleculekit.tools.preparation.systemPrepare`: protonate at the chosen pH, fix protonation states, and patch a few missing heavy atoms (full missing-sidechain restoration is off by default; opt in with `restore_missing_sidechains=True`).
+3. {py:func}`~htmd.builder.solvate.solvate`: wrap a water box around the prepared structure.
+4. {py:func}`htmd.builder.amber.build`: run tLeap to produce a `prmtop` + `pdb` pair (and ionise to the requested salt concentration).
 
 No NCAA detection or parameterization step is needed when every residue is in tLeap's built-in ff14SB library.
 
@@ -43,7 +43,7 @@ from htmd.builder.solvate import solvate
 from acellera_docs_theme.molstar import show3d
 ```
 
-## Step 1 - Load the structure
+## Step 1: Load the structure
 
 We use Trp-cage (PDB `1L2Y`): a 20-residue mini-protein with no ligands and no non-standard residues. {py:class}`~moleculekit.molecule.Molecule` accepts either a local file path (PDB, mmCIF, PSF, PRMTOP, ...) or a four-character PDB ID it downloads from RCSB on the fly:
 
@@ -56,17 +56,17 @@ mol = Molecule("1L2Y")
 show3d(mol)
 ```
 
-## Step 2 - Segment the chains
+## Step 2: Segment the chains
 
 ```{code-cell} python
 mol = autoSegment(mol, fields=("segid", "chain"))
 ```
 
-{py:func}`~moleculekit.tools.autosegment.autoSegment` walks the structure residue-by-residue and starts a new segment whenever the backbone-atom distance between consecutive residues exceeds the chain-continuity threshold (a ~2.5 Å C–N for proteins, a ~3 Å O3'–P for nucleic acids). Residue-number jumps are ignored — only backbone geometry counts. Each contiguous run of bonded residues gets its own segid. This is what stops {py:func}`~htmd.builder.amber.build` from extending a protein chain through a HETATM ligand later, and from auto-capping the wrong terminus when a non-canonical residue sits at the chain end.
+{py:func}`~moleculekit.tools.autosegment.autoSegment` walks the structure residue-by-residue and starts a new segment whenever the backbone-atom distance between consecutive residues exceeds the chain-continuity threshold (a ~2.5 Å C–N for proteins, a ~3 Å O3'–P for nucleic acids). Residue-number jumps are ignored; only backbone geometry counts. Each contiguous run of bonded residues gets its own segid. This is what stops {py:func}`~htmd.builder.amber.build` from extending a protein chain through a HETATM ligand later, and from auto-capping the wrong terminus when a non-canonical residue sits at the chain end.
 
 For Trp-cage there's just one continuous chain, so autoSegment produces a single segment named `P0`.
 
-## Step 3 - Prepare
+## Step 3: Prepare
 
 ```{code-cell} python
 prepared, specs = systemPrepare(mol, pH=7.4)
@@ -79,7 +79,7 @@ show3d(prepared, ball_and_stick="all")
 
 {py:func}`~moleculekit.tools.preparation.systemPrepare` runs PDB2PQR under the hood: predicts pKa values, picks protonation states at the requested pH, adds missing hydrogens, and returns the prepared molecule plus a list of non-canonical specs. When no `detect_specs` argument is supplied the function auto-detects and returns that list; when one is supplied it is returned unchanged. For a canonical-only protein the spec list is empty and you can ignore it.
 
-## Step 4 - Solvate
+## Step 4: Solvate
 
 ```{code-cell} python
 solvated = solvate(prepared, pad=10)
@@ -92,7 +92,7 @@ show3d(solvated)
 
 {py:func}`~htmd.builder.solvate.solvate` wraps a pre-equilibrated water box around the prepared molecule. The actual water model that tLeap parameterizes those atoms with is whatever the `leaprc.water.*` entry in `ff` selects (default TIP3P via `leaprc.water.tip3p`). `pad=10` adds 10 Å of water in every direction beyond the molecule's bounding box. We keep the box small to keep the tutorial fast; for a production run you'd typically use a larger pad (15-20 Å) so that any local unfolding or large-scale motion can't reach across the periodic boundary and interact with the protein's own image.
 
-## Step 5 - Build under AMBER
+## Step 5: Build under AMBER
 
 ```{code-cell} python
 amber.build(solvated, outdir="./build", ionize=True, saltconc=0.15)
@@ -101,7 +101,7 @@ amber.build(solvated, outdir="./build", ionize=True, saltconc=0.15)
 That single call:
 
 - Writes a tLeap input script consuming ff14SB for protein, TIP3P for water, and standard ion parameters.
-- Detects disulfide bridges in `solvated` and feeds them to tLeap as `bond` directives - the default is auto-detect; override with `disulfide=[(sel1, sel2), ...]` if needed.
+- Detects disulfide bridges in `solvated` and feeds them to tLeap as `bond` directives. Auto-detect is the default; override with `disulfide=[(sel1, sel2), ...]` if needed.
 - Adds Na⁺ / Cl⁻ counter-ions to neutralise the system and reach 0.15 M NaCl.
 - Returns a built {py:class}`~moleculekit.molecule.Molecule` and writes the AMBER files into `./build/`:
 
@@ -125,7 +125,7 @@ The `structure.prmtop` + `structure.pdb` pair is what {py:func}`acemd.protocols.
 | Argument | Default | Format |
 | --- | --- | --- |
 | `ff` | {py:func}`amber.defaultFf() <htmd.builder.amber.defaultFf>` | tLeap `leaprc.*` files (the master force-field selectors). |
-| `topo` | {py:func}`amber.defaultTopo() <htmd.builder.amber.defaultTopo>` (empty) | Residue topology templates: `.prepi` / `.prep` / `.in` (loaded with `loadamberprep`), or `.cif` / `.mol2` (loaded with tLeap's `loadmol2` after an internal CIF→mol2 conversion - `prepgen` is not invoked). |
+| `topo` | {py:func}`amber.defaultTopo() <htmd.builder.amber.defaultTopo>` (empty) | Residue topology templates: `.prepi` / `.prep` / `.in` (loaded with `loadamberprep`), or `.cif` / `.mol2` (loaded with tLeap's `loadmol2` after an internal CIF→mol2 conversion; `prepgen` is not invoked). |
 | `param` | {py:func}`amber.defaultParam() <htmd.builder.amber.defaultParam>` (empty) | Parameter overlays: `.frcmod`. |
 
 Inspect the active defaults:
@@ -155,7 +155,7 @@ amber.build(
 )
 ```
 
-This is exactly what {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` produces for non-canonical residues in {doc}`tutorial 02 <02-protein-ligand>` and onwards - the function returns `topo_paths` and `frcmod_paths` ready to feed straight in.
+This is exactly what {py:func}`~htmd.builder.nonstandard.parameterizeFromSpecs` produces for non-canonical residues in {doc}`tutorial 02 <02-protein-ligand>` and onwards: the function returns `topo_paths` and `frcmod_paths` ready to feed straight in.
 
 To browse what's bundled with HTMD's tLeap install (leaprc files, prepi templates, frcmod overlays):
 
@@ -172,7 +172,7 @@ amber.listFiles()
 | `ionize` | Add counter-ions and salt. `True` by default. |
 | `saltconc` | NaCl concentration in mol/L when `ionize=True`. Defaults to `0` (counter-ions only). |
 | `disulfide` | `None` for auto-detect, or a list of `(sel1, sel2)` atom-selection pairs. |
-| `caps` | Per-segment caps as `{"P0": ("ACE", "NME")}` (the cap names are **uppercase** - they map to `ACE.pdb`/`NME.pdb` in HTMD's cap library, so lowercase raises `FileNotFoundError`). Auto by default; pass `("none", "none")` for a free terminus. |
+| `caps` | Per-segment caps as `{"P0": ("ACE", "NME")}` (the cap names are **uppercase**: they map to `ACE.pdb`/`NME.pdb` in HTMD's cap library, so lowercase raises `FileNotFoundError`). Auto by default; pass `("none", "none")` for a free terminus. |
 
 ## Gotchas
 
@@ -180,9 +180,9 @@ amber.listFiles()
 - You don't have to strip input hydrogens before `systemPrepare`. If `titration=True` (the default) PDB2PQR re-protonates all titratable residues at the chosen pH and effectively overrides whatever Hs the input carried; passing `titration=False` keeps your input protonation. Either way, the prep is what reconciles the hydrogens with the rest of the build.
 - Solvate *before* `amber.build`, not after. `amber.build` does not wrap a water box on its own.
 - `saltconc` defaults to `0` (just neutralising counter-ions). Pass `saltconc=0.15` (or your target) for physiological ionic strength.
-- For systems with bound metals like Zn or Ca, you'll usually want to keep them by including them in the input - tLeap has parameters for the common ones.
+- For systems with bound metals like Zn or Ca, you'll usually want to keep them by including them in the input; tLeap has parameters for the common ones.
 
 ## See also
 
-- {doc}`Build a protein with a ligand <02-protein-ligand>` - the next step up: non-canonical residues, SMILES templating, parameterization.
-- {doc}`System-building overview <../../explanation/system-building>` - the conceptual map of the whole stack.
+- {doc}`Build a protein with a ligand <02-protein-ligand>`: the next step up, with non-canonical residues, SMILES templating, and parameterization.
+- {doc}`System-building overview <../../explanation/system-building>`: the conceptual map of the whole stack.

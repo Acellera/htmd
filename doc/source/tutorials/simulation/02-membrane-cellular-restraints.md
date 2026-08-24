@@ -19,23 +19,23 @@ kernelspec:
 - ACEMD installed.
 - You've worked through {doc}`Build a membrane-embedded protein <../system-prep/07-membrane>` and {doc}`Run an MD simulation with ACEMD <01-acemd-md>`.
 
-## Why this matters
+## The periodic-image problem
 
-In a membrane-protein simulation the box wraps periodically in all three directions. The bilayer extends across the XY plane, with the protein crossing it once - but in the **+z / -z direction**, a ligand or peptide on the extracellular side can diffuse out of the top of the box and reappear at the bottom, suddenly sitting on the intracellular side. The same atom is one image away; the simulation doesn't know the difference. For binding / unbinding studies this completely scrambles the kinetics.
+In a membrane-protein simulation the box wraps periodically in all three directions. The bilayer extends across the XY plane, with the protein crossing it once. In the **+z / -z direction**, though, a ligand or peptide on the extracellular side can diffuse out of the top of the box and reappear at the bottom, suddenly sitting on the intracellular side. The same atom is one image away; the simulation doesn't know the difference. For binding / unbinding studies this completely scrambles the kinetics.
 
-{py:func}`acemd.protocols.get_cellular_restraints` derives a set of **flat-bottomed positional restraints** that confine a chosen molecule to its native compartment, optionally allowing it to *enter* but not *cross* the bilayer, or to cross only one way. The restraints are anchored to the lipid centre of mass so they track the membrane through translation but assume the box height stays fixed - hence "only use these in NVT" (the docstring spells this out).
+{py:func}`acemd.protocols.get_cellular_restraints` derives a set of **flat-bottomed positional restraints** that confine a chosen molecule to its native compartment, optionally allowing it to *enter* but not *cross* the bilayer, or to cross only one way. The restraints are anchored to the lipid centre of mass so they track the membrane through translation but assume the box height stays fixed, hence "only use these in NVT" (the docstring spells this out).
 
 ## The flow
 
 1. Start from a pre-built membrane-embedded system (see {doc}`tutorial 07 <../system-prep/07-membrane>` for the full build).
 2. Compute the restraint list with {py:func}`~acemd.protocols.get_cellular_restraints`.
 3. {py:func}`~acemd.protocols.setup_equilibration` with **conventional positional restraints** on the ligand (because equilibration runs as NPT and the box height changes).
-4. Run the equilibration via the `acemd` CLI - this produces the `output.coor` (final equilibrated coordinates) and `output.xsc` (final box) that production setup reads.
+4. Run the equilibration via the `acemd` CLI. This produces the `output.coor` (final equilibrated coordinates) and `output.xsc` (final box) that production setup reads.
 5. {py:func}`~acemd.protocols.setup_production` with the **cellular restraints** for the NVT production run.
 6. Run production via the `acemd` CLI.
 
 ```{note}
-Steps 1-3 execute in the docs build. Step 5 (`setup_production`) is shown but not executed because it needs the equilibration's `output.coor` + `output.xsc`, and steps 4 / 6 (the `acemd` CLI) run on a GPU - copy the commands into a script when you're ready.
+Steps 1-3 execute in the docs build. Step 5 (`setup_production`) is shown but not executed because it needs the equilibration's `output.coor` + `output.xsc`, and steps 4 / 6 (the `acemd` CLI) run on a GPU; copy the commands into a script when you're ready.
 ```
 
 ## Setup
@@ -54,9 +54,9 @@ from acemd.protocols import (
 from acellera_docs_theme.molstar import show3d
 ```
 
-## Step 1 - Load a built apelin receptor + membrane system
+## Step 1: Load a built apelin receptor and membrane system
 
-The {doc}`membrane tutorial <../system-prep/07-membrane>` walks through the OPM-aligned 5VBL build end to end. We reuse its output: `structure.prmtop` + `structure.pdb` for the apelin receptor (a GPCR) embedded in a POPC + cholesterol bilayer with the agonist peptide bound on the extracellular side. The pre-built pair lives under `tutorials/simulation/_systems/`; the cell below copies it into a local `./build/` and loads it into a Molecule. The box dimensions come from the PDB's `CRYST1` record - `get_cellular_restraints` needs them.
+The {doc}`membrane tutorial <../system-prep/07-membrane>` walks through the OPM-aligned 5VBL build end to end. We reuse its output: `structure.prmtop` + `structure.pdb` for the apelin receptor (a GPCR) embedded in a POPC + cholesterol bilayer with the agonist peptide bound on the extracellular side. The pre-built pair lives under `tutorials/simulation/_systems/`; the cell below copies it into a local `./build/` and loads it into a Molecule. The box dimensions come from the PDB's `CRYST1` record, which `get_cellular_restraints` needs.
 
 ```{code-cell} python
 :tags: [remove-cell]
@@ -78,7 +78,7 @@ built.read("./build/structure.pdb")
 show3d(built, focus='segid "P0"', ball_and_stick='segid "P0"')
 ```
 
-## Step 2 - Compute the cellular restraints
+## Step 2: Compute the cellular restraints
 
 The apelin peptide sits in segment `P0` (chain A of the original PDB). On the OPM-aligned structure, `+z` points toward the extracellular side of the membrane, so the peptide lives in the **extracellular** compartment. We want a restraint that keeps it there throughout production.
 
@@ -106,21 +106,21 @@ for r in restraints:
     print(r)
 ```
 
-Each entry is a dict in ACEMD's `extforces` format - the same shape `setup_equilibration` and `setup_production` accept. The restraint is a one-dimensional flat-bottomed potential along z, centred on the lipid centre of mass with an offset that places the "free zone" entirely in the extracellular compartment. Inside the free zone the ligand feels nothing; cross the boundary and a harmonic force kicks in to push it back.
+Each entry is a dict in ACEMD's `extforces` format, the same shape `setup_equilibration` and `setup_production` accept. The restraint is a one-dimensional flat-bottomed potential along z, centred on the lipid centre of mass with an offset that places the "free zone" entirely in the extracellular compartment. Inside the free zone the ligand feels nothing; cross the boundary and a harmonic force kicks in to push it back.
 
 The `extracellular_crossing` knob controls what's allowed:
 
 | Value | Behaviour |
 | --- | --- |
 | `"cross"` | Ligand may travel through the membrane and reach the intracellular side (still no PBC wrapping). |
-| `"enter"` | Ligand may enter the membrane but not cross it - useful for partition-coefficient studies. |
-| `None` | Ligand stays in the extracellular compartment - the default for "keep it on one side". |
+| `"enter"` | Ligand may enter the membrane but not cross it; useful for partition-coefficient studies. |
+| `None` | Ligand stays in the extracellular compartment; the default for "keep it on one side". |
 
 `intracellular_crossing` is the mirror knob for any intracellular ligand. Pass `None` for either selection when you don't need a restraint on that side.
 
-## Step 3 - Equilibration (NPT) with positional restraints
+## Step 3: Equilibration (NPT) with positional restraints
 
-Equilibration runs NPT - the box height changes as the lipid bilayer relaxes - so **cellular restraints aren't safe here**. Use simple positional restraints to keep the peptide near its starting coordinates while the rest of the system settles.
+Equilibration runs NPT, and the box height changes as the lipid bilayer relaxes, so **cellular restraints aren't safe here**. Use simple positional restraints to keep the peptide near its starting coordinates while the rest of the system settles.
 
 ```{code-cell} python
 equil_restraints = [
@@ -134,17 +134,17 @@ equil_restraints = [
 setup_equilibration(
     "./build", "./equil",
     run="4ns",
-    barostatconstratio=True,           # XY scale together, Z relaxes independently - required for membrane systems
+    barostatconstratio=True,           # XY scale together, Z relaxes independently; required for membrane systems
     extforces=equil_restraints,
 )
 print(open("./equil/input.yaml").read())
 ```
 
-The peptide's heavy atoms (`... and noh`) are held with a force constant of 5 kcal/mol/Å² for the whole 4 ns - long enough for the bilayer and water box to settle without the peptide drifting. Hydrogens are left unrestrained so the peptide can still relax internally. The minimisation + protein-backbone defaults from {py:func}`~acemd.protocols.setup_equilibration` still fire on top of this.
+The peptide's heavy atoms (`... and noh`) are held with a force constant of 5 kcal/mol/Å² for the whole 4 ns, long enough for the bilayer and water box to settle without the peptide drifting. Hydrogens are left unrestrained so the peptide can still relax internally. The minimisation + protein-backbone defaults from {py:func}`~acemd.protocols.setup_equilibration` still fire on top of this.
 
-## Step 4 - Run the equilibration
+## Step 4: Run the equilibration
 
-Hand the equilibration directory to the `acemd` CLI from your shell. This is the slow step - it needs a GPU and runs for hours - so don't try to execute it inside a notebook.
+Hand the equilibration directory to the `acemd` CLI from your shell. This is the slow step: it needs a GPU and runs for hours, so don't try to execute it inside a notebook.
 
 ```bash
 acemd --input ./equil
@@ -152,14 +152,14 @@ acemd --input ./equil
 
 When the command exits, `./equil/` contains:
 
-- `output.coor` - the final equilibrated coordinates.
-- `output.xsc` - the final equilibrated box.
-- `output.vel` - the final velocities (production regenerates its own at the requested temperature, so this isn't strictly needed downstream).
-- `output.xtc` + `restart.chk` - the trajectory and resume checkpoint. The bundled `./equil/run.sh` wrapper redirects ACEMD's stdout/stderr into `log.txt`; calling `acemd --input ./equil` directly sends it to the terminal.
+- `output.coor`: the final equilibrated coordinates.
+- `output.xsc`: the final equilibrated box.
+- `output.vel`: the final velocities (production regenerates its own at the requested temperature, so this isn't strictly needed downstream).
+- `output.xtc` + `restart.chk`: the trajectory and resume checkpoint. The bundled `./equil/run.sh` wrapper redirects ACEMD's stdout/stderr into `log.txt`; calling `acemd --input ./equil` directly sends it to the terminal.
 
 `setup_production` reads `output.coor` (starting coordinates) and `output.xsc` (the production box) from this directory, so you must run equilibration *before* setting up production. The topology (`structure.prmtop`) and force-field parameter files are reused from the equilibration directory as-is.
 
-## Step 5 - Production setup (NVT) with cellular restraints
+## Step 5: Production setup (NVT) with cellular restraints
 
 Once equilibration has fixed the box dimensions, switch to NVT for production and replace the positional restraints with the cellular ones from step 2.
 
@@ -172,9 +172,9 @@ setup_production(
 )
 ```
 
-`setup_production` already defaults `barostat=False` (production is NVT by default), so we don't need to pass it — that's exactly the constant-box regime the cellular restraints assume. The `extforces` list flows straight from `get_cellular_restraints` into the production `input.yaml`.
+`setup_production` already defaults `barostat=False` (production is NVT by default), so we don't need to pass it, and that's exactly the constant-box regime the cellular restraints assume. The `extforces` list flows straight from `get_cellular_restraints` into the production `input.yaml`.
 
-## Step 6 - Run production
+## Step 6: Run production
 
 ```bash
 acemd --input ./prod
@@ -182,12 +182,12 @@ acemd --input ./prod
 
 ## Gotchas
 
-- `get_cellular_restraints` reads the box from `mol.box`, the lipid positions from `mol.coords`, and the membrane location from `membrane_rel_z`. Always compute `membrane_rel_z` from `mol.coords[mol.atomselect("lipid"), 2, 0].mean() / mol.box[2, 0]` rather than hardcoding `0.5` - the asymmetric water padding above and below the bilayer shifts the relative centre away from mid-box in practice. (`mol.box` is `(3, n_frames)`, so the `[2, 0]` indexing picks the box-z of the first frame.)
+- `get_cellular_restraints` reads the box from `mol.box`, the lipid positions from `mol.coords`, and the membrane location from `membrane_rel_z`. Always compute `membrane_rel_z` from `mol.coords[mol.atomselect("lipid"), 2, 0].mean() / mol.box[2, 0]` rather than hardcoding `0.5`; the asymmetric water padding above and below the bilayer shifts the relative centre away from mid-box in practice. (`mol.box` is `(3, n_frames)`, so the `[2, 0]` indexing picks the box-z of the first frame.)
 - **NVT only.** The restraints are anchored to the lipid centre and to a fraction of the box height; an NPT run where the box rescales would silently misalign the free-zone with the lipids. Equilibrate the box dimensions under NPT with conventional positional restraints first, then switch to NVT for production.
 - `lipidsel` defaults to moleculekit's `"lipid"` macro plus a list of common lipid resnames (POPC, POPE, POPG, CHL1, etc.). If you're using a custom lipid that isn't in the macro, pass `lipidsel="<your selection>"` explicitly.
-- Use `barostatconstratio=True` on `setup_equilibration` for membrane systems - without it ACEMD warns that the box scaling will distort the bilayer (lateral pressure should scale isotropically in XY while Z relaxes independently).
+- Use `barostatconstratio=True` on `setup_equilibration` for membrane systems; without it ACEMD warns that the box scaling will distort the bilayer (lateral pressure should scale isotropically in XY while Z relaxes independently).
 
 ## See also
 
-- {doc}`Run an MD simulation with ACEMD <01-acemd-md>` - the canonical equilibration → production flow this tutorial extends.
-- {doc}`Build a membrane-embedded protein <../system-prep/07-membrane>` - the long-form membrane build whose output we load here.
+- {doc}`Run an MD simulation with ACEMD <01-acemd-md>`: the canonical equilibration → production flow this tutorial extends.
+- {doc}`Build a membrane-embedded protein <../system-prep/07-membrane>`: the long-form membrane build whose output we load here.

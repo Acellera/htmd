@@ -35,7 +35,7 @@ Concepts and mental models.
 
 ::::
 
-## Headline capabilities
+## Main capabilities
 
 ```{list-table}
 :header-rows: 1
@@ -61,7 +61,7 @@ See [Installation](installation.md) for the conda install, `uv`, and licence reg
 
 ## Quick start: build, simulate and analyse
 
-A complete run end to end - prepare a protein, build it under AMBER, equilibrate, produce, then project, cluster, build an MSM, and extract kinetics.
+A complete run end to end: prepare a protein, build it under AMBER, equilibrate, produce, then project, cluster, build an MSM, and extract kinetics.
 
 ```python
 from htmd.ui import *
