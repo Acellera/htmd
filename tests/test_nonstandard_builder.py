@@ -1517,7 +1517,7 @@ def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
     smiles = {
         "ALO": "C[C@@H](O)[C@H](N)C=O",
         "G5G": "O=C[C@@H](N)CC(C)(O)CO",
-        "ADP": "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O",
+        "ADP": "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)([O-])OP(=O)([O-])[O-])[C@@H](O)[C@H]1O",
     }
 
     mol = Molecule(PHALLOIDIN_ADP_CIF)
@@ -1574,7 +1574,7 @@ def test_full_pipeline_7bti_phalloidin_adp(tmp_path):
         assert _backbone_closure_resname_pairs(built) == [frozenset({"HYP", "CYS"})]
         # HYP flows as a (modified) standard residue, cofactor + metal survive.
         assert (built.resname == "HYP").any()
-        assert int((built.resname == "ADP").sum()) == 41
+        assert int((built.resname == "ADP").sum()) == 39
         assert int((built.resname == "MG").sum()) == 1
 
 
