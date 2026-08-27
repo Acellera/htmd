@@ -1183,7 +1183,7 @@ def test_full_pipeline_5vbl(tmp_path):
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
         "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
-        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=[NH2+])N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
         "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
@@ -1300,7 +1300,7 @@ def test_full_pipeline_5vbl_openmm_vs_amber(tmp_path):
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
         "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
-        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=[NH2+])N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
         "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
@@ -2664,7 +2664,7 @@ def test_parameterize_from_specs_emits_openmm_xml(tmp_path):
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
         "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
-        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=[NH2+])N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
         "OLC": "CCCCCCCC(=O)OC[C@H](O)CO",
@@ -3785,7 +3785,7 @@ def _run_5vbl_param_reference(
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
         "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
-        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=[NH2+])N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
     }
@@ -3890,18 +3890,21 @@ def test_custom_residue_param_reference_5vbl_no_pin_no_normalize(tmp_path):
             cluster_total += _prepi_total(path)
         elif fname.endswith(".cif"):
             cluster_total += float(Molecule(path).charge.sum())
-    # The C-terminal NCAA (residue 200) is a carboxylate (formal -1) at pH 7.4;
-    # every other chain-resident NCAA here is neutral, so the emitted units sum
-    # to about -1. 5VBL has 7 chain-resident specs which split into 6 separate
-    # antechamber runs (one XX1+XX2 multi-cluster + 5 singletons), so the natural
-    # Gasteiger smear into the (discarded) ACE/NME-style cap atoms compounds
-    # across clusters; with no pin and no normalize, expect drift up to ~0.1
-    # around that -1. The reference-file diff locks each per-atom charge, so this
-    # side-check just guards against gross regressions (e.g. a future change
-    # silently turning normalize back on).
-    assert abs(cluster_total + 1.0) < 0.15, (
+    # Two formal charges cancel here. The C-terminal NCAA (residue 200) is a
+    # carboxylate (-1) at pH 7.4 and HRG's homoarginine sidechain is a
+    # guanidinium (+1) - its pKa is ~12.5, so it is charged at any pH a build
+    # cares about; every other chain-resident NCAA is neutral. The emitted units
+    # therefore sum to about 0. 5VBL has 7 chain-resident specs which split into
+    # 6 separate antechamber runs (one XX1+XX2 multi-cluster + 5 singletons), so
+    # the natural Gasteiger smear into the (discarded) ACE/NME-style cap atoms
+    # compounds across clusters; with no pin and no normalize, expect drift up to
+    # ~0.1 around that 0. The reference-file diff locks each per-atom charge, so
+    # this side-check just guards against gross regressions (e.g. a future change
+    # silently turning normalize back on, or the guanidinium losing its proton).
+    assert abs(cluster_total) < 0.15, (
         f"5VBL_A unpinned + unnormalised cluster total {cluster_total:+.4f} "
-        f"(expected ~-1 from the C-terminal carboxylate + cap smear)"
+        f"(expected ~0: the C-terminal carboxylate and the HRG guanidinium "
+        f"cancel, plus cap smear)"
     )
 
 
@@ -4168,7 +4171,7 @@ def test_amber_build_5vbl_matches_reference(tmp_path):
     smiles = {
         "200": "c1cc(ccc1C[C@@H](C(=O)O)N)Cl",
         "ALC": "C1CCC(CC1)C[C@@H](C=O)N",
-        "HRG": "C(CCNC(=N)N)C[C@@H](C=O)N",
+        "HRG": "C(CCNC(=[NH2+])N)C[C@@H](C=O)N",
         "NLE": "CCCC[C@@H](C=O)N",
         "OIC": "C1CC[C@H]2[C@@H](C1)C[C@H](N2)C=O",
     }
