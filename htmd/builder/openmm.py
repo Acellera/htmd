@@ -688,7 +688,10 @@ def build(
     molbuilt : Molecule
         The fully built system.
     system : openmm.System
-        The parameterised OpenMM System object.
+        The parameterised OpenMM System object. Its particle order is the
+        OpenMM topology's, which can differ from ``molbuilt``'s (the prmtop's)
+        when ParmEd had to reorder atoms to keep a molecule contiguous for
+        AMBER - so do not feed ``molbuilt.coords`` to this System.
     """
     import openmm
     import openmm.app as app
@@ -875,7 +878,10 @@ def build(
 
     system = forcefield.createSystem(topology, **sys_kw)
 
-    _export_amber(topology, system, positions, outdir, prefix, export_ff)
+    # ParmEd may reorder atoms to keep each molecule contiguous for AMBER;
+    # molbuilt's topology comes from that prmtop, so it needs the matching
+    # coordinate order, not the original OpenMM one.
+    positions = _export_amber(topology, system, positions, outdir, prefix, export_ff)
 
     # Topology + bonds from the prmtop; coordinates straight from the OpenMM
     # positions (full precision, no PDB round-trip); box from the topology.
@@ -2840,6 +2846,9 @@ def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
     carries an explicit force constant (AMBER's prmtop format requires
     that). ParmEd's ``openmm.load_topology`` then turns the OpenMM
     System into an ``AmberParm`` and writes prmtop / inpcrd.
+
+    Returns the coordinates in the prmtop's atom order, which may differ from
+    the input ``positions`` order (see the reordering note below).
     """
     import openmm.app as app
     import openmm.unit as unit
@@ -2865,9 +2874,18 @@ def _export_amber(topology, system, positions, outdir, prefix, forcefield=None):
 
         struct = parmed.openmm.load_topology(topology, export_system, xyz=positions)
         _rigidify_three_point_water(struct)
-        struct.save(prmtop, overwrite=True)
-        struct.save(inpcrd, overwrite=True)
+        # AMBER needs each molecule's atoms contiguous, so ParmEd reorders
+        # them when they are not - e.g. a glycan or covalent ligand sitting
+        # after other chains in the input file. ``Structure.save(prmtop)``
+        # does that in a throwaway copy and leaves ``struct`` (hence the
+        # inpcrd, and the caller's ``positions``) in the original order,
+        # silently pairing atoms with other atoms' coordinates. Write both
+        # files from one AmberParm so the coordinates follow the atoms.
+        parm = parmed.amber.AmberParm.from_structure(struct)
+        parm.write_parm(prmtop)  # reorders parm.atoms in place when needed
+        parm.save(inpcrd, overwrite=True)
         logger.info(f"Wrote {prmtop} and {inpcrd} via ParmEd")
+        return unit.Quantity(parm.coordinates, unit.angstrom)
     except Exception as exc2:
         logger.error(f"ParmEd AMBER export failed: {exc2}")
         raise

@@ -2665,3 +2665,68 @@ def test_build_emits_ffxml_handoff(tmpdir):
     assert len(sy["boxsize"]) == 3
     rt = Molecule(os.path.join(outdir, "structure.cif"))
     assert len(rt.bonds) > 0
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="OpenMM not installed")
+def test_export_amber_coords_follow_parmed_reordering(tmpdir):
+    """AMBER needs every molecule's atoms contiguous, so ParmEd reorders the
+    prmtop when they are not - which happens whenever something covalently
+    bound to a chain (a glycan, a covalent ligand) sits after other chains in
+    the input file. The inpcrd and the coordinates handed back to the caller
+    must follow that reordering, or every atom past the first discontinuity is
+    paired with another atom's coordinates.
+
+    Three single-atom residues A/B/C where A and C are bonded: ParmEd moves C
+    next to A, so the naive path would give C atom B's coordinates.
+    """
+    import openmm
+    import openmm.app as app
+    import openmm.unit as unit
+    import parmed
+    from htmd.builder.openmm import _export_amber
+
+    xyz = {"AAA": (0.0, 0.0, 0.0), "BBB": (20.0, 0.0, 0.0), "CCC": (1.5, 0.0, 0.0)}
+
+    topology = app.Topology()
+    chain = topology.addChain()
+    atoms = {}
+    for resname in ("AAA", "BBB", "CCC"):
+        res = topology.addResidue(resname, chain)
+        atoms[resname] = topology.addAtom("C1", app.element.carbon, res)
+    topology.addBond(atoms["AAA"], atoms["CCC"])  # makes AAA+CCC non-contiguous
+    topology.setPeriodicBoxVectors(np.eye(3) * 5.0 * unit.nanometers)
+
+    system = openmm.System()
+    bonds = openmm.HarmonicBondForce()
+    nonbonded = openmm.NonbondedForce()
+    for resname in ("AAA", "BBB", "CCC"):
+        system.addParticle(12.0 * unit.amu)
+        nonbonded.addParticle(0.0, 0.34 * unit.nanometer, 0.36 * unit.kilojoule_per_mole)
+    bonds.addBond(0, 2, 0.15 * unit.nanometer, 2.0e5 * unit.kilojoule_per_mole / unit.nanometer**2)
+    # ParmEd rejects a NonbondedForce whose 1-2 exclusions are missing.
+    nonbonded.addException(0, 2, 0.0, 0.34 * unit.nanometer, 0.0)
+    nonbonded.setNonbondedMethod(openmm.NonbondedForce.PME)
+    nonbonded.setCutoffDistance(1.0 * unit.nanometer)
+    system.addForce(bonds)
+    system.addForce(nonbonded)
+    system.setDefaultPeriodicBoxVectors(*(np.eye(3) * 5.0 * unit.nanometers))
+
+    positions = unit.Quantity(
+        np.array([xyz["AAA"], xyz["BBB"], xyz["CCC"]]), unit.angstrom
+    )
+
+    returned = _export_amber(topology, system, positions, tmpdir, "structure")
+
+    parm = parmed.load_file(
+        os.path.join(tmpdir, "structure.prmtop"),
+        xyz=os.path.join(tmpdir, "structure.inpcrd"),
+    )
+    written = np.array(parm.coordinates)
+    for atom, coord in zip(parm.atoms, written):
+        assert np.allclose(coord, xyz[atom.residue.name], atol=1e-3), (
+            f"{atom.residue.name} got {coord}, expected {xyz[atom.residue.name]} - "
+            "prmtop atom order and inpcrd coordinate order disagree"
+        )
+    assert np.allclose(
+        returned.value_in_unit(unit.angstrom), written, atol=1e-3
+    ), "returned coordinates are not in the prmtop's atom order"
