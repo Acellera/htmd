@@ -1271,6 +1271,8 @@ def build(
         solvent_mol.write(os.path.join(outdir, "solvent.pdb"), writebonds=False)
 
     if execute:
+        # mol_orig, not `mol`: _add_caps splices caps in with Molecule.insert,
+        # which zeroes box/boxangles when the fragment carries none.
         molbuilt = _run_tleap(
             outdir,
             prefix,
@@ -1278,6 +1280,7 @@ def build(
             backend_value=backend_value,
             ff=ff,
             teleapimports=teleapimports,
+            mol=mol_orig,
         )
     else:
         molbuilt = None
@@ -1766,7 +1769,77 @@ def _prepare_build(
     return backend, value, resname_aliases
 
 
-def _read_tleap_output(outdir, prefix, logpath):
+def _stamp_cell(outdir: str, prefix: str, mol: Molecule, molbuilt: Molecule) -> None:
+    """Write `mol`'s unit cell onto the built prmtop, crd and Molecule.
+
+    tleap has no command that sets box angles (``set unit box`` takes lengths
+    only, ``setBox`` takes only "vdw" or "centers") and ``loadpdb`` discards
+    CRYST1, so a non-rectangular cell has to be written after the build. The
+    rectangular case is stamped too, replacing tleap's ``setBox "vdw"``
+    re-measurement with the cell solvate actually filled.
+
+    Parameters
+    ----------
+    outdir : str
+        The build output directory.
+    prefix : str
+        The output file prefix, normally ``"structure"``.
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The input Molecule, whose cell is authoritative.
+    molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The Molecule read back from the build, mutated in place.
+    """
+    import parmed
+
+    from htmd.builder.builder import _cell_angles, _has_cell
+
+    if not _has_cell(mol):
+        return
+
+    lengths = [float(v) for v in mol.box[:3, 0]]
+    angles = _cell_angles(mol)
+
+    prmtop_path = os.path.join(outdir, f"{prefix}.prmtop")
+    crd_path = os.path.join(outdir, f"{prefix}.crd")
+
+    # Validate before writing either file, so a refusal leaves both untouched.
+    with open(crd_path) as fh:
+        lines = fh.read().splitlines(True)
+
+    # An inpcrd is title + count + ceil(natoms / 2) coordinate lines + one box
+    # line. Overwriting a last line that is not the box would corrupt coords.
+    expected = 2 + -(-molbuilt.numAtoms // 2) + 1
+    if len(lines) != expected:
+        raise BuildError(
+            f"Refusing to stamp the unit cell: {crd_path} has {len(lines)} "
+            f"lines but {molbuilt.numAtoms} atoms imply {expected}. The last "
+            "line is not the periodic box, so overwriting it would corrupt "
+            "coordinates."
+        )
+
+    # Topology only, so ParmEd does not rewrite the coordinates.
+    parm = parmed.load_file(prmtop_path)
+    parm.box = lengths + angles
+    parm.write_parm(prmtop_path)
+
+    # parm.save() writes a CHARMM CRD for a .crd extension and loses the box.
+    lines[-1] = "".join(f"{v:12.7f}" for v in lengths + angles) + "\n"
+    with open(crd_path, "w") as fh:
+        fh.writelines(lines)
+
+    molbuilt.box = np.array(lengths, dtype=np.float32).reshape(3, 1)
+    molbuilt.boxangles = np.array(angles, dtype=np.float32).reshape(3, 1)
+    molbuilt.crystalinfo = dict(
+        zip(("a", "b", "c", "alpha", "beta", "gamma"), lengths + angles)
+    )
+    logger.info(
+        f"Stamped unit cell onto {prefix}.prmtop / {prefix}.crd: "
+        f"lengths [{lengths[0]:.3f}, {lengths[1]:.3f}, {lengths[2]:.3f}], "
+        f"angles [{angles[0]:.3f}, {angles[1]:.3f}, {angles[2]:.3f}]"
+    )
+
+
+def _read_tleap_output(outdir, prefix, logpath, mol: Molecule | None = None):
     """Shared post-processing: parse log, read prmtop/crd, return Molecule."""
     if not os.path.exists(logpath) or os.path.getsize(logpath) == 0:
         raise BuildError(
@@ -1806,13 +1879,22 @@ def _read_tleap_output(outdir, prefix, logpath):
             f"No {prefix} pdb/prmtop file was generated. Check {logpath} for errors in building."
         )
 
+    if mol is not None:
+        _stamp_cell(outdir, prefix, mol, molbuilt)
     molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
     return molbuilt
 
 
 def _run_tleap_native(
-    outdir, prefix, teleap, amberhome, ff=None, teleapimports=None, script="tleap.in"
+    outdir,
+    prefix,
+    teleap,
+    amberhome,
+    ff=None,
+    teleapimports=None,
+    script="tleap.in",
+    mol: Molecule | None = None,
 ):
     """Execute native teLeap binary as a subprocess."""
     teleapimportflags = _getTeLeapImportFlags(amberhome, ff, teleapimports)
@@ -1838,10 +1920,12 @@ def _run_tleap_native(
             f"Check {logpath} for details."
         )
 
-    return _read_tleap_output(outdir, prefix, logpath)
+    return _read_tleap_output(outdir, prefix, logpath, mol=mol)
 
 
-def _run_tleap_pyodide(outdir, prefix, ff=None, script="tleap.in"):
+def _run_tleap_pyodide(
+    outdir, prefix, ff=None, script="tleap.in", mol: Molecule | None = None
+):
     """Execute tleap via tleap_pyodide.run_tleap using the work_dir parameter."""
     from tleap_pyodide import run_tleap as _pyodide_run
 
@@ -1859,7 +1943,7 @@ def _run_tleap_pyodide(outdir, prefix, ff=None, script="tleap.in"):
     with open(logpath, "wb") as f:
         f.write(result.get("stdout", b""))
 
-    return _read_tleap_output(outdir, prefix, logpath)
+    return _read_tleap_output(outdir, prefix, logpath, mol=mol)
 
 
 def _run_tleap(
@@ -1870,10 +1954,11 @@ def _run_tleap(
     ff=None,
     teleapimports=None,
     script="tleap.in",
+    mol: Molecule | None = None,
 ):
     """Dispatch tleap execution to native or pyodide backend."""
     if backend == "pyodide":
-        return _run_tleap_pyodide(outdir, prefix, ff=ff, script=script)
+        return _run_tleap_pyodide(outdir, prefix, ff=ff, script=script, mol=mol)
     else:
         teleap = backend_value
         if teleap is None:
@@ -1887,6 +1972,7 @@ def _run_tleap(
             ff=ff,
             teleapimports=teleapimports,
             script=script,
+            mol=mol,
         )
 
 

@@ -249,3 +249,53 @@ def test_solute_footprint_2kdc():
     # between leaflets (lower atoms are more spread), so absolute fractions
     # differ more than at zero buffer.
     assert abs(f_l - f_u) < 0.20, f"unexpectedly asymmetric: u={f_u} l={f_l}"
+
+
+def test_build_membrane_has_no_water_in_the_bilayer(tmp_path):
+    """Water must not sit between the phosphate planes.
+
+    A solvate call spanning the full z range of a bilayer places water in the
+    lipid tail region, where free volume lets a water sit further than the
+    2.4 A clash buffer from any lipid atom. Measured at 14.6% of all water on
+    a freshly packed 45x45 POPC bilayer before exclude_z was used.
+    """
+    import numpy as np
+
+    memb = buildMembrane(
+        [45, 45],
+        {"popc": 1},
+        {"popc": 1},
+        waterbuff=20,
+        platform=PLATFORM,
+        outdir=str(tmp_path),
+    )
+
+    p_z = memb.coords[memb.name == "P", 2, 0]
+    assert p_z.size > 0, "no phosphate atoms found"
+
+    # Both leaflets must be non-empty. numpy's mean of an empty slice is nan,
+    # not an error, and every comparison against nan is False, so a structure
+    # whose phosphates do not split into two groups would leave z_lo and z_up
+    # as nan, make n_inside come out 0, and pass this test without asserting
+    # anything. That happens for a monolayer, a single phosphate, or any case
+    # where all phosphates fall on one side of their own mean.
+    lower = p_z[p_z < p_z.mean()]
+    upper = p_z[p_z > p_z.mean()]
+    assert lower.size > 0 and upper.size > 0, (
+        f"phosphates did not split into two leaflets: {lower.size} below the "
+        f"mean, {upper.size} above. This test cannot assert anything without "
+        "two distinct leaflet planes."
+    )
+    z_lo = lower.mean()
+    z_up = upper.mean()
+    assert np.isfinite(z_lo) and np.isfinite(z_up), (z_lo, z_up)
+
+    is_water_o = memb.atomselect("water") & np.isin(memb.name, ["OH2", "O"])
+    z_o = memb.coords[is_water_o, 2, 0]
+    assert z_o.size > 0, "membrane has no water"
+
+    n_inside = int(((z_o > z_lo) & (z_o < z_up)).sum())
+    assert n_inside == 0, (
+        f"{n_inside} of {z_o.size} waters sit between the phosphate planes "
+        f"z=[{z_lo:.1f}, {z_up:.1f}]"
+    )

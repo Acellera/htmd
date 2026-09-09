@@ -744,9 +744,7 @@ def test_glycam_modrna_collision_set_is_1ma_2ma():
     from moleculekit.residues import MODIFIED_NUCLEIC_RESIDUE_NAMES
     from moleculekit.tools.glycans import GLYCAM_UNIT_NAMES
 
-    collision = set(MODIFIED_NUCLEIC_RESIDUE_NAMES) & (
-        set(GLYCAM_UNIT_NAMES) | {"ROH"}
-    )
+    collision = set(MODIFIED_NUCLEIC_RESIDUE_NAMES) & (set(GLYCAM_UNIT_NAMES) | {"ROH"})
     assert collision == {"1MA", "2MA"}
 
 
@@ -759,7 +757,16 @@ def test_detect_glycam_residues_ff_and_hydrogens():
         os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
     )
     # simulate prepared naming (subset is enough for this unit test)
-    ren = {1: "UYB", 2: "4YB", 3: "VMB", 4: "2MA", 5: "0YB", 6: "2MA", 7: "0YB", 8: "0fA"}
+    ren = {
+        1: "UYB",
+        2: "4YB",
+        3: "VMB",
+        4: "2MA",
+        5: "0YB",
+        6: "2MA",
+        7: "0YB",
+        8: "0fA",
+    }
     for resid, code in ren.items():
         mol.resname[(mol.chain == "C") & (mol.resid == resid)] = code
     mol.resname[(mol.chain == "A") & (mol.resid == 297)] = "NLN"
@@ -768,9 +775,9 @@ def test_detect_glycam_residues_ff_and_hydrogens():
     # systemPrepare/pdb2pqr protonation would, so the "anchor hydrogens are
     # untouched" assertion below is actually exercised rather than trivially
     # true.
-    nd2_idx = np.where(
-        (mol.chain == "A") & (mol.resid == 297) & (mol.name == "ND2")
-    )[0][0]
+    nd2_idx = np.where((mol.chain == "A") & (mol.resid == 297) & (mol.name == "ND2"))[
+        0
+    ][0]
     h_atom = Molecule().empty(1)
     h_atom.name[:] = "HD22"
     h_atom.element[:] = "H"
@@ -899,7 +906,16 @@ def test_glycan_break_points():
     mol = Molecule(
         os.path.join(curr_dir, "data", "test-amber-build", "glycans", "3AVE_frag.pdb")
     )
-    ren = {1: "UYB", 2: "4YB", 3: "VMB", 4: "2MA", 5: "0YB", 6: "2MA", 7: "0YB", 8: "0fA"}
+    ren = {
+        1: "UYB",
+        2: "4YB",
+        3: "VMB",
+        4: "2MA",
+        5: "0YB",
+        6: "2MA",
+        7: "0YB",
+        8: "0fA",
+    }
     for resid, code in ren.items():
         mol.resname[(mol.chain == "C") & (mol.resid == resid)] = code
     mol.segid[:] = np.where(mol.chain == "C", "G1", "P1")
@@ -925,9 +941,7 @@ def _minimal_sugar_mol(resname, resid, segid, chain, x0=0.0):
     at real bonding distance) - just enough for glycamUnitMask's
     composition-and-geometry gate to recognize it."""
     mol = Molecule()
-    mol.append(
-        _glycam_atom(resname, resid, segid, chain, "C1", "C", [x0, 0.0, 0.0])
-    )
+    mol.append(_glycam_atom(resname, resid, segid, chain, "C1", "C", [x0, 0.0, 0.0]))
     mol.append(
         _glycam_atom(resname, resid, segid, chain, "O5", "O", [x0 + 1.4, 0.0, 0.0])
     )
@@ -1037,21 +1051,32 @@ def test_glycam_tleap_script(tmp_path):
     # the anchor bond and at least the branch bonds are explicit
     bond_lines = [ln for ln in tleap_in.splitlines() if ln.startswith("bond ")]
     assert any(".ND2" in ln and ".C1" in ln for ln in bond_lines)
-    assert sum(1 for ln in bond_lines if ".O6" in ln or ".O4" in ln or ".O3" in ln or ".O2" in ln) >= 7
+    assert (
+        sum(
+            1
+            for ln in bond_lines
+            if ".O6" in ln or ".O4" in ln or ".O3" in ln or ".O2" in ln
+        )
+        >= 7
+    )
     # consecutive glycan residues alternate chain IDs in input.pdb
     input_pdb = (tmp_path / "input.pdb").read_text()
     per_residue = []  # (chain, resid) in file order, one entry per residue
     for ln in input_pdb.splitlines():
         if ln.startswith(("ATOM", "HETATM")) and ln[17:20].strip() in (
-            "UYB", "4YB", "VMB", "2MA", "0YB", "0fA",
+            "UYB",
+            "4YB",
+            "VMB",
+            "2MA",
+            "0YB",
+            "0fA",
         ):
             entry = (ln[21], ln[22:26].strip())
             if not per_residue or per_residue[-1] != entry:
                 per_residue.append(entry)
     assert len(per_residue) == 8
     assert all(
-        per_residue[i][0] != per_residue[i + 1][0]
-        for i in range(len(per_residue) - 1)
+        per_residue[i][0] != per_residue[i + 1][0] for i in range(len(per_residue) - 1)
     ), "consecutive glycan residues must differ in chain ID"
     assert len({c for c, _ in per_residue}) == 2, "two alternating chain IDs"
 
@@ -1071,9 +1096,9 @@ def _mixed_cyclic_mol(closure_dist=1.32):
     lig.chain[:] = "A"
     lig.segid[:] = "P0"
     lig.record[:] = "HETATM"
-    lig.coords = np.array(
-        [[5.0, 0, 0], [6.5, 0, 0], [7.0, 1, 0]], np.float32
-    ).reshape(3, 3, 1)
+    lig.coords = np.array([[5.0, 0, 0], [6.5, 0, 0], [7.0, 1, 0]], np.float32).reshape(
+        3, 3, 1
+    )
     mol.append(lig)
     mol.append(_ala_mol(3, "P0", "A", x0=10.0))
     mol.guessBonds()
@@ -1307,9 +1332,7 @@ def _assert_glycan_bond(molbuilt, resname_a, name_a, resname_b, name_b):
     idx_a = np.where((molbuilt.resname == resname_a) & (molbuilt.name == name_a))[0]
     idx_b = np.where((molbuilt.resname == resname_b) & (molbuilt.name == name_b))[0]
     bset = {tuple(sorted(b)) for b in molbuilt.bonds.tolist()}
-    found = any(
-        tuple(sorted((int(a), int(b)))) in bset for a in idx_a for b in idx_b
-    )
+    found = any(tuple(sorted((int(a), int(b)))) in bset for a in idx_a for b in idx_b)
     assert found, f"missing bond {resname_a}.{name_a} - {resname_b}.{name_b}"
 
 
@@ -1366,3 +1389,188 @@ def test_glycam_build_1g1s_olinked(tmp_path):
     _assert_glycan_bond(molbuilt, "3LB", "O3", "0SA", "C2")
     total_charge = float(np.sum(molbuilt.charge))
     assert abs(total_charge - round(total_charge)) < 1e-3  # SIA contributes -1
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+@pytest.mark.parametrize(
+    "shape,expected_angle,ifbox",
+    [("cube", 90.0, 1), ("octahedron", 109.4712206, 2), ("dodecahedron", 60.0, 3)],
+)
+def test_build_stamps_the_solvate_cell(tmp_path, shape, expected_angle, ifbox):
+    """The built prmtop, crd and pdb must all carry solvate's cell.
+
+    tleap has no command that sets box angles and it discards CRYST1, so the
+    cell has to be written onto its output. The equilateral representative is
+    what makes this lossless: the prmtop's BOX_DIMENSIONS stores one angle.
+    """
+    import parmed
+    from moleculekit.molecule import Molecule
+
+    from htmd.builder.solvate import solvate
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    smol = solvate(mol, pad=10, shape=shape)
+
+    molbuilt = build(smol, ff=defaultFf(), outdir=str(tmp_path))
+
+    assert np.allclose(molbuilt.box.ravel(), smol.box.ravel(), atol=1e-2)
+    assert np.allclose(molbuilt.boxangles.ravel(), expected_angle, atol=1e-2)
+
+    parm = parmed.load_file(os.path.join(tmp_path, "structure.prmtop"))
+    assert parm.parm_data["POINTERS"][27] == ifbox
+    assert np.allclose(parm.box[:3], smol.box.ravel(), atol=1e-2)
+    assert np.allclose(parm.box[3:], expected_angle, atol=1e-2)
+
+    pdb = Molecule(os.path.join(tmp_path, "structure.pdb"))
+    assert np.allclose(pdb.box.ravel(), smol.box.ravel(), atol=1e-2)
+    assert np.allclose(pdb.boxangles.ravel(), expected_angle, atol=1e-2)
+
+    # Read structure.crd back. It is the file a simulation actually takes its
+    # coordinates from, and rewriting its final line is the riskiest step in
+    # the stamp, so assert the coordinates survived as well as the cell.
+    crd = Molecule(os.path.join(tmp_path, "structure.prmtop"), validateElements=False)
+    crd.read(os.path.join(tmp_path, "structure.crd"), type="inpcrd")
+    assert crd.numAtoms == molbuilt.numAtoms
+    assert np.allclose(crd.box.ravel(), smol.box.ravel(), atol=1e-2)
+    assert np.allclose(crd.boxangles.ravel(), expected_angle, atol=1e-2)
+    assert np.isfinite(crd.coords).all()
+    assert np.allclose(
+        crd.coords[:, :, 0], molbuilt.coords[:, :, 0], atol=2e-3
+    ), "coordinates in structure.crd do not match the returned Molecule"
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_build_without_a_cell_keeps_tleap_setbox(tmp_path):
+    """With no input cell at all, tleap's setBox "vdw" still supplies one.
+
+    The box has to be cleared explicitly. A structure fetched from the PDB
+    carries its crystallographic CRYST1 cell, and that survives
+    `filter("protein")`, so it is NOT an example of a molecule without a cell.
+    """
+    from moleculekit.molecule import Molecule
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    # Drop the crystallographic cell so the no-cell gate is actually exercised
+    mol.box = np.zeros((3, 1), dtype=np.float32)
+    mol.boxangles = np.zeros((3, 1), dtype=np.float32)
+
+    from htmd.builder.builder import _has_cell
+
+    assert not _has_cell(mol), "fixture must have no usable cell"
+
+    molbuilt = build(mol, ff=defaultFf(), outdir=str(tmp_path))
+
+    # tleap still supplies a box, so the prmtop stays periodic as before
+    assert molbuilt.box is not None and np.all(molbuilt.box > 0)
+    assert np.allclose(molbuilt.boxangles.ravel(), 90.0, atol=1e-2)
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_build_stamps_an_input_crystal_cell(tmp_path):
+    """An input cell is honored even with no water, matching openmm.build.
+
+    `Molecule("3PTB")` carries CRYST1 [54.89, 58.52, 67.63] at 90 degrees and
+    it survives `filter("protein")`, so the gate sees a cell on an unsolvated
+    build. That cell is stamped rather than replaced by tleap's vdW
+    measurement. This is deliberate: `openmm.build`'s `_ensure_box_vectors`
+    already prefers a non-zero `mol.box`, so honoring it here makes the two
+    builders agree.
+    """
+    from moleculekit.molecule import Molecule
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    expected = mol.box[:, 0].copy()
+    assert np.all(expected > 0), "fixture must carry a crystallographic cell"
+    assert not np.any(mol.atomselect("water")), "fixture must be unsolvated"
+
+    molbuilt = build(mol, ff=defaultFf(), outdir=str(tmp_path))
+
+    assert np.allclose(
+        molbuilt.box[:, 0], expected, atol=1e-2
+    ), f"expected the input cell {expected}, got {molbuilt.box[:, 0]}"
+
+
+def test_cell_angles_rejects_zero_filled_boxangles():
+    """A zero-filled boxangles must fall back to 90, not describe a flat cell.
+
+    readers.py:470 sets boxangles to np.zeros((3, 1)) when a reader supplies a
+    box but no angles, so testing presence by size alone emits 0/0/0 degrees.
+    """
+    import numpy as np
+    from moleculekit.molecule import Molecule
+
+    from htmd.builder.builder import _cell_angles
+
+    mol = Molecule().empty(1)
+    mol.name[:] = ["O"]
+    mol.element[:] = ["O"]
+    mol.resname[:] = "HOH"
+    mol.resid[:] = [1]
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+    mol.box = np.array([[30.0], [30.0], [30.0]], dtype=np.float32)
+
+    # The readers.py:470 shape: present, size 3, all zeros
+    mol.boxangles = np.zeros((3, 1), dtype=np.float32)
+    assert _cell_angles(mol) == [90.0, 90.0, 90.0]
+
+    # Never set at all
+    mol.boxangles = np.empty((3, 0), dtype=np.float32)
+    assert _cell_angles(mol) == [90.0, 90.0, 90.0]
+
+    # Genuine angles are passed through
+    mol.boxangles = np.array([[60.0], [60.0], [90.0]], dtype=np.float32)
+    assert _cell_angles(mol) == pytest.approx([60.0, 60.0, 90.0])
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_gbsa_build_follows_the_same_cell_gate(tmp_path):
+    """GBSA builds still work, and their cell follows the same gate.
+
+    An earlier version of this test asserted that GBSA builds are never
+    stamped. That was wrong and it passed only by luck: the stamp does fire
+    for a 3PTB fixture, writing the crystallographic cell, and the assertion
+    survived only because that crystal is orthorhombic so the angles are 90
+    either way. The gate keys on whether the input carries a cell, not on
+    whether the system is implicitly solvated, so both branches are asserted
+    here explicitly.
+
+    `setBox "vdw"` stays in the tleap script unconditionally, GBSA included,
+    which is what keeps a GBSA prmtop periodic when there is no input cell.
+    """
+    from moleculekit.molecule import Molecule
+
+    from htmd.builder.builder import _has_cell
+
+    np.random.seed(1)
+
+    # With an input cell, GBSA is stamped like anything else
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    expected = mol.box[:, 0].copy()
+    assert _has_cell(mol), "fixture must carry a crystallographic cell"
+    molbuilt = build(
+        mol, ff=defaultFf(), outdir=str(tmp_path / "withcell"), gbsa=True, igb=2
+    )
+    assert np.allclose(
+        molbuilt.box[:, 0], expected, atol=1e-2
+    ), f"expected the input cell {expected}, got {molbuilt.box[:, 0]}"
+
+    # With no input cell, tleap's setBox "vdw" supplies one and nothing is stamped
+    mol2 = Molecule("3PTB")
+    mol2.filter("protein")
+    mol2.box = np.zeros((3, 1), dtype=np.float32)
+    mol2.boxangles = np.zeros((3, 1), dtype=np.float32)
+    assert not _has_cell(mol2)
+    molbuilt2 = build(
+        mol2, ff=defaultFf(), outdir=str(tmp_path / "nocell"), gbsa=True, igb=2
+    )
+    assert molbuilt2.box is not None and np.all(molbuilt2.box > 0)
+    assert not np.allclose(
+        molbuilt2.box[:, 0], expected, atol=1e-2
+    ), "the no-cell GBSA build should carry tleap's vdW box, not the crystal cell"

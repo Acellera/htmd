@@ -654,9 +654,8 @@ def equilibrateMembrane(
         if detected_oxygen is not None and detected_oxygen != water_oxygen_name:
             work.name[is_water & (work.name == detected_oxygen)] = water_oxygen_name
 
-    # buildMembrane leaves mol.box as all zeros (solvate does not set it),
-    # so we fall back to coord extents in that case. For user-supplied
-    # membranes that already have a valid box, respect it.
+    # buildMembrane overrides solvate's box with the lipid head bbox, so fall
+    # back to coord extents if neither ran. Respect a user-supplied box.
     if work.box is not None and work.box.size == 3 and np.all(work.box > 0):
         box = work.box[:, 0].astype(np.float32)
     else:
@@ -1048,16 +1047,15 @@ def buildMembrane(
     minc = head_coords.min(axis=0) - 5
     maxc = head_coords.max(axis=0) + 5
 
-    mm = [
-        [minc[0] - 5, minc[1] - 5, maxc[2] - 2],
-        [maxc[0] + 5, maxc[1] + 5, maxc[2] + waterbuff],
-    ]
-    smemb = solvate(memb, minmax=mm)
-    mm = [
-        [minc[0] - 5, minc[1] - 5, minc[2] - waterbuff],
-        [maxc[0] + 5, maxc[1] + 5, minc[2] + 2],
-    ]
-    smemb = solvate(smemb, minmax=mm)
+    # Full slab minus the hydrophobic interior, replacing two stacked calls.
+    smemb = solvate(
+        memb,
+        minmax=[
+            [minc[0] - 5, minc[1] - 5, minc[2] - waterbuff],
+            [maxc[0] + 5, maxc[1] + 5, maxc[2] + waterbuff],
+        ],
+        exclude_z=(minc[2] + 2, maxc[2] - 2),
+    )
 
     # Set the PBC cell to the lipid head bbox (minc/maxc already include
     # a +-5 A tail-buffer) in xy and the water-padded lipid extent in z.

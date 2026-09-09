@@ -70,6 +70,56 @@ class MissingAtomTypeError(_MissingErrorType):
     pass
 
 
+def _has_cell(mol: "Molecule") -> bool:
+    """Whether a Molecule carries a usable periodic cell.
+
+    A fresh Molecule has ``box`` of shape ``(3, 0)``, and a Molecule read from
+    a file with no cell can have an all-zero box, so both size and content are
+    checked.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The Molecule to inspect.
+
+    Returns
+    -------
+    has_cell : bool
+        True if `mol` has three positive box lengths.
+    """
+    return (
+        mol.box is not None and mol.box.size >= 3 and bool(np.all(mol.box[:3, 0] > 0))
+    )
+
+
+def _cell_angles(mol: "Molecule") -> list:
+    """A Molecule's cell angles, defaulting to 90 degrees when it has none.
+
+    ``boxangles`` cannot be tested for presence by size alone. A reader that
+    supplies a box but no angles leaves it as ``np.zeros((3, 1))``
+    (``moleculekit/readers.py:470``), whose size is 3, and emitting those zeros
+    as angles would describe a degenerate zero-volume cell.
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The Molecule to inspect.
+
+    Returns
+    -------
+    angles : list of float
+        ``[alpha, beta, gamma]`` in degrees, or ``[90.0, 90.0, 90.0]`` when
+        `mol` carries no usable angles.
+    """
+    if (
+        mol.boxangles is not None
+        and mol.boxangles.size >= 3
+        and bool(np.any(mol.boxangles[:3, 0]))
+    ):
+        return [float(v) for v in mol.boxangles[:3, 0]]
+    return [90.0, 90.0, 90.0]
+
+
 def embed(mol1: "Molecule", mol2: "Molecule", gap: float = 1.3) -> "Molecule":
     """Embed one molecule into another, removing overlapping residues.
 
