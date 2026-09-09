@@ -2730,3 +2730,158 @@ def test_export_amber_coords_follow_parmed_reordering(tmpdir):
     assert np.allclose(
         returned.value_in_unit(unit.angstrom), written, atol=1e-3
     ), "returned coordinates are not in the prmtop's atom order"
+
+
+# ====================================================================
+# Non-rectangular unit cells
+# ====================================================================
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
+@pytest.mark.parametrize(
+    "boxshape,expected_angle",
+    [("octahedron", 109.4712206), ("dodecahedron", 60.0)],
+)
+def test_build_solvent_kwargs_uses_equilateral_box_vectors(boxshape, expected_angle):
+    """A named shape must reach addSolvent as boxVectors, not boxShape.
+
+    boxShape would leave the topology in OpenMM's reduced frame, whose three
+    angles differ, and ParmEd then writes a prmtop that reads back as the
+    wrong lattice: the truncated octahedron becomes a rhombohedron.
+    """
+    import numpy as np
+    import openmm.unit as unit
+
+    from htmd.builder.openmm import _build_solvent_kwargs
+    from htmd.builder.solvate import _cell_lengths_and_angles
+
+    kw = _build_solvent_kwargs(
+        "tip3p", 10.0, None, boxshape, False, 0, None, None, unit, width=60.0
+    )
+
+    assert "boxVectors" in kw, kw.keys()
+    assert "boxShape" not in kw
+    assert "padding" not in kw
+
+    vectors = np.array([v.value_in_unit(unit.angstrom) for v in kw["boxVectors"]])
+    lengths, angles = _cell_lengths_and_angles(vectors)
+    assert lengths == pytest.approx([60.0, 60.0, 60.0], rel=1e-9)
+    assert angles == pytest.approx([expected_angle] * 3, abs=1e-6)
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
+@pytest.mark.parametrize("boxshape", ["rectangular", "cube"])
+def test_build_solvent_kwargs_doubles_pad(boxshape):
+    """openmm.build's pad is per-side, like solvate's, so it doubles here.
+
+    OpenMM's addSolvent padding is the minimum image distance itself, so
+    forwarding pad raw produced half the gap solvate(pad=) gives.
+    """
+    import openmm.unit as unit
+
+    from htmd.builder.openmm import _build_solvent_kwargs
+
+    kw = _build_solvent_kwargs(
+        "tip3p", 10.0, None, boxshape, False, 0, None, None, unit
+    )
+    assert kw["padding"].value_in_unit(unit.nanometer) == pytest.approx(2.0)
+    assert "boxVectors" not in kw
+    assert "boxShape" not in kw
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
+def test_build_solvent_kwargs_validates_shape_and_width():
+    import openmm.unit as unit
+
+    from htmd.builder.openmm import _build_solvent_kwargs
+
+    with pytest.raises(ValueError, match="banana"):
+        _build_solvent_kwargs("tip3p", 10.0, None, "banana", False, 0, None, None, unit)
+    with pytest.raises(ValueError, match="width"):
+        _build_solvent_kwargs(
+            "tip3p", 10.0, None, "octahedron", False, 0, None, None, unit
+        )
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
+@pytest.mark.parametrize("boxshape", ["octahedron", "dodecahedron"])
+def test_build_solvent_kwargs_shape_wins_over_boxsize(boxshape):
+    """A scalar boxsize is the cell width for a named shape, not a rectangle.
+
+    Checking `boxsize` first silently built a rectangular box for a requested
+    octahedron, with no error and no test noticing.
+    """
+    import numpy as np
+    import openmm.unit as unit
+
+    from htmd.builder.openmm import _build_solvent_kwargs
+    from htmd.builder.solvate import _cell_lengths_and_angles
+
+    kw = _build_solvent_kwargs(
+        "tip3p", 10.0, 60.0, boxshape, False, 0, None, None, unit
+    )
+    assert "boxVectors" in kw, kw.keys()
+    assert "boxSize" not in kw, "boxsize silently overrode the shape"
+
+    vectors = np.array([v.value_in_unit(unit.angstrom) for v in kw["boxVectors"]])
+    lengths, angles = _cell_lengths_and_angles(vectors)
+    assert lengths == pytest.approx([60.0, 60.0, 60.0], rel=1e-9)
+    assert angles[0] == pytest.approx(
+        109.4712206 if boxshape == "octahedron" else 60.0, abs=1e-6
+    )
+
+    with pytest.raises(ValueError, match="single cell width"):
+        _build_solvent_kwargs(
+            "tip3p", 10.0, [60.0, 60.0, 70.0], boxshape, False, 0, None, None, unit
+        )
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
+def test_openmm_width_matches_solvate():
+    """Both builders must size an equilateral cell identically.
+
+    The formula lives in `solvate._cell_width` and is called from both, so this
+    pins the value rather than two copies of the arithmetic.
+    """
+    import numpy as np
+
+    from htmd.builder.solvate import _cell_width
+
+    coords = np.array([[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]])
+    center = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
+    assert _cell_width(coords, center, 5.0) == pytest.approx(60.0)
+    # The 4*pad floor takes over for a solute much smaller than the padding
+    tiny = np.array([[0.0, 0.0, 0.0], [1.5, 0.0, 0.0]])
+    tiny_c = 0.5 * (tiny.min(axis=0) + tiny.max(axis=0))
+    assert _cell_width(tiny, tiny_c, 12.0) == pytest.approx(48.0)
+
+
+@pytest.mark.skipif(
+    not (_openmm_installed and _tleap_installed), reason="Requires openmm and teLeap"
+)
+@pytest.mark.parametrize(
+    "boxshape,expected_angle,ifbox",
+    [("octahedron", 109.4712206, 2), ("dodecahedron", 60.0, 3)],
+)
+def test_openmm_build_exports_a_correct_prmtop_cell(
+    tmpdir, boxshape, expected_angle, ifbox
+):
+    """Regression: the exported prmtop used to read back as the wrong lattice."""
+    import numpy as np
+    import parmed
+    from moleculekit.molecule import Molecule
+
+    from htmd.builder.openmm import build as omm_build
+
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+
+    molbuilt, _ = omm_build(mol, outdir=str(tmpdir), boxshape=boxshape, padding=10.0)
+
+    assert np.allclose(molbuilt.boxangles.ravel(), expected_angle, atol=1e-2)
+    lengths = molbuilt.box[:, 0]
+    assert np.allclose(lengths, lengths[0], rtol=1e-3), lengths
+
+    parm = parmed.load_file(os.path.join(str(tmpdir), "structure.prmtop"))
+    assert parm.parm_data["POINTERS"][27] == ifbox
+    assert np.allclose(parm.box[3:], expected_angle, atol=1e-2)

@@ -167,14 +167,20 @@ xy_max = system.coords[lipid_mask, :2, 0].max(axis=0)
 z_min = system.coords[:, 2, 0].min() - 15
 z_max = system.coords[:, 2, 0].max() + 15
 
+# Phosphate planes mark the two headgroup surfaces.
+p_z = system.coords[system.name == "P", 2, 0]
+z_lower_heads = p_z[p_z < p_z.mean()].mean()
+z_upper_heads = p_z[p_z > p_z.mean()].mean()
+
 system = solvate(
     system,
     minmax=[[xy_min[0], xy_min[1], z_min],
             [xy_max[0], xy_max[1], z_max]],
+    exclude_z=(z_lower_heads + 2, z_upper_heads - 2),
 )
 ```
 
-The XY box matches the lipid extent (so water doesn't poke out past the bilayer edge), and Z extends 15 Å above and below the tallest / lowest atom in the system, enough to fully solvate the protein's intracellular and extracellular domains. `solvate` will only place waters where there's space, so no waters appear inside the bilayer.
+The XY box matches the lipid extent (so water doesn't poke out past the bilayer edge), and Z extends 15 Å above and below the tallest / lowest atom in the system, enough to fully solvate the protein's intracellular and extracellular domains. `exclude_z` is what keeps the bilayer dry: the 2.4 Å clash buffer alone is not enough, since the lipid tail region has free volume where a water can sit further than that from any lipid atom, so a call spanning the full Z range puts water inside the membrane. On a freshly packed POPC bilayer that is about 15% of all the water added, including some in the deep core.
 
 ```{code-cell} python
 :tags: [remove-input]

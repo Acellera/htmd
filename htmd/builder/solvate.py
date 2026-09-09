@@ -121,6 +121,30 @@ def _cell_lengths_and_angles(vectors: np.ndarray) -> tuple[list[float], list[flo
     return [float(v) for v in la[:3]], [float(v) for v in la[3:]]
 
 
+def _cell_width(coords: np.ndarray, center: np.ndarray, pad: float) -> float:
+    """Equilateral cell edge length that pads a solute by `pad` per side.
+
+    `pad` is per-side, so the image distance is ``2 * pad``, matching GROMACS
+    ``-d``. The ``4 * pad`` floor is OpenMM's rule in that convention.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        Atom coordinates, shape ``(N, 3)``.
+    center : np.ndarray
+        Cell center, shape ``(3,)``.
+    pad : float
+        Padding in Angstroms, applied per side.
+
+    Returns
+    -------
+    width : float
+        Cell edge length in Angstroms.
+    """
+    radius = float(np.linalg.norm(coords - center, axis=1).max())
+    return max(2.0 * radius + 2.0 * pad, 4.0 * pad)
+
+
 def _ws_halfspaces(vectors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Half-spaces bounding the Wigner-Seitz cell of a lattice.
 
@@ -362,17 +386,14 @@ def solvate(
                 center = coords[selatoms].mean(axis=0)
             else:
                 center = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
-            radius = float(np.linalg.norm(coords - center, axis=1).max())
         else:
+            coords = np.zeros((1, 3))
             center = np.zeros(3)
-            radius = 0.0
 
         if boxsize is not None:
             width = float(np.atleast_1d(np.array(boxsize, dtype=float))[0])
         elif pad is not None:
-            # pad is per-side, so the image distance is 2*pad, as GROMACS -d.
-            # The 4*pad floor is OpenMM's rule in that convention.
-            width = max(2.0 * radius + 2.0 * pad, 4.0 * pad)
+            width = _cell_width(coords, center, pad)
         else:
             raise ValueError(f"shape '{shape}' needs either pad or boxsize.")
 

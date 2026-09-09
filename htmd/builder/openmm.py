@@ -627,6 +627,7 @@ def build(
     padding: float = 10.0,
     water_model: str = "tip3p",
     boxsize: float | list | None = None,
+    boxshape: str = "cube",
     gbsa: bool = False,
 ):
     """Build a system using OpenMM force fields and export to AMBER format.
@@ -674,12 +675,24 @@ def build(
     solvate : bool
         Add explicit water via ``Modeller.addSolvent()``.
     padding : float
-        Box padding in Angstroms (used when *solvate* is True).
+        Box padding in Angstroms, applied per side, so the minimum distance
+        between periodic images is ``2 * padding``. This matches
+        :func:`htmd.builder.solvate.solvate`'s ``pad`` and GROMACS
+        ``editconf -d``. OpenMM's own ``addSolvent`` padding is the image
+        distance itself, so this value is doubled before being forwarded.
     water_model : str
         Water model name for ``Modeller.addSolvent()``.
     boxsize : float or list of float, optional
         Explicit box dimensions ``[x, y, z]`` in Angstroms.  Overrides
         *padding*.
+    boxshape : str
+        Unit cell shape for solvation. ``"cube"`` (the default) reproduces the
+        historical behavior, a cube sized from the solute's bounding sphere.
+        ``"rectangular"`` is treated the same way here, because
+        ``addSolvent`` has no per-axis padding. ``"octahedron"`` and
+        ``"dodecahedron"`` build the equilateral truncated octahedron and
+        rhombic dodecahedron, which reach the same minimum image distance with
+        77.0% and 70.7% of a cube's water.
     gbsa : bool
         Use GBSA implicit solvent (OBC2 model).
 
@@ -797,15 +810,26 @@ def build(
     if solvate and not has_water:
         logger.info("Solvating system with Modeller.addSolvent()...")
         modeller = app.Modeller(topology, positions)
+
+        width = None
+        if boxshape not in ("rectangular", "cube") and boxsize is None:
+            from htmd.builder.solvate import _cell_width
+
+            coords = mol.coords[:, :, 0]
+            center = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
+            width = _cell_width(coords, center, padding)
+
         solvent_kw = _build_solvent_kwargs(
             water_model,
             padding,
             boxsize,
+            boxshape,
             ionize,
             saltconc,
             saltanion,
             saltcation,
             unit,
+            width=width,
         )
         modeller.addSolvent(forcefield, **solvent_kw)
         topology = modeller.topology
@@ -2597,26 +2621,59 @@ def _build_solvent_kwargs(
     water_model,
     padding,
     boxsize,
+    boxshape,
     ionize,
     saltconc,
     saltanion,
     saltcation,
     unit,
+    width=None,
 ):
-    """Construct keyword dict for ``Modeller.addSolvent``."""
+    """Construct keyword dict for ``Modeller.addSolvent``.
+
+    Non-cubic shapes pass explicit ``boxVectors``, never ``boxShape``: OpenMM's
+    reduced frame has different angles and would export the wrong lattice.
+    """
+    from openmm import Vec3
+
+    from htmd.builder.solvate import _CELL_SHAPES, _cell_vectors
+
+    if boxshape not in _CELL_SHAPES:
+        raise ValueError(f"Unknown cell shape '{boxshape}'. Valid: {_CELL_SHAPES}")
+
     kw = {"model": water_model}
 
-    if boxsize is not None:
+    if boxshape not in ("rectangular", "cube"):
+        # A named shape wins over boxsize, which is then the single cell width
+        # rather than three edge lengths, matching solvate.
+        if boxsize is not None:
+            edges = np.atleast_1d(np.array(boxsize, dtype=float))
+            if edges.size != 1:
+                raise ValueError(
+                    f"shape '{boxshape}' needs a single cell width, so boxsize "
+                    "must be a scalar. A 3-element boxsize only applies to "
+                    "shape='rectangular' or 'cube'."
+                )
+            width = float(edges[0])
+        if width is None:
+            raise ValueError(
+                f"shape '{boxshape}' needs a cell width. Pass padding, or a "
+                "scalar boxsize."
+            )
+        kw["boxVectors"] = [
+            Vec3(*(v / 10.0)) * unit.nanometers for v in _cell_vectors(boxshape, width)
+        ]
+    elif boxsize is not None:
         if isinstance(boxsize, (int, float)):
             boxsize = [boxsize] * 3
-        from openmm import Vec3
-
         kw["boxSize"] = (
             Vec3(boxsize[0] / 10.0, boxsize[1] / 10.0, boxsize[2] / 10.0)
             * unit.nanometers
         )
     else:
-        kw["padding"] = (padding / 10.0) * unit.nanometers
+        # padding is per-side here but is the image distance in addSolvent,
+        # so double it. addSolvent's default boxShape is already a cube.
+        kw["padding"] = (2.0 * padding / 10.0) * unit.nanometers
 
     if ionize:
         kw["neutralize"] = True

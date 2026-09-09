@@ -94,12 +94,19 @@ def build_apelin_membrane() -> None:
         xy_max = system.coords[lipid_mask, :2, 0].max(axis=0)
         z_min = system.coords[:, 2, 0].min() - 15
         z_max = system.coords[:, 2, 0].max() + 15
+
+        # Phosphate planes mark the two headgroup surfaces.
+        p_z = system.coords[system.name == "P", 2, 0]
+        z_lower_heads = p_z[p_z < p_z.mean()].mean()
+        z_upper_heads = p_z[p_z > p_z.mean()].mean()
+
         system = solvate(
             system,
             minmax=[
                 [xy_min[0], xy_min[1], z_min],
                 [xy_max[0], xy_max[1], z_max],
             ],
+            exclude_z=(z_lower_heads + 2, z_upper_heads - 2),
         )
 
         built = amber.build(

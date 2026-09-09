@@ -77,8 +77,15 @@ xy_min = system.coords[lipid_mask, :2, 0].min(axis=0)
 xy_max = system.coords[lipid_mask, :2, 0].max(axis=0)
 z_min  = system.coords[:, 2, 0].min() - 15
 z_max  = system.coords[:, 2, 0].max() + 15
+
+# Phosphate planes mark the two headgroup surfaces.
+p_z = system.coords[system.name == "P", 2, 0]
+z_lower_heads = p_z[p_z < p_z.mean()].mean()
+z_upper_heads = p_z[p_z > p_z.mean()].mean()
+
 system = solvate(system, minmax=[[xy_min[0], xy_min[1], z_min],
-                                  [xy_max[0], xy_max[1], z_max]])
+                                  [xy_max[0], xy_max[1], z_max]],
+                  exclude_z=(z_lower_heads + 2, z_upper_heads - 2))
 amber.build(system, outdir="./build", ionize=True, saltconc=0.15)
 ```
 
@@ -87,6 +94,7 @@ amber.build(system, outdir="./build", ionize=True, saltconc=0.15)
 - The protein and the membrane must be in the **same coordinate frame** before `embed`. If the membrane sits at `z ∈ [50, 90]` but the protein is OPM-aligned (`z=0` is the bilayer centre), `embed` will see no overlap and the protein ends up floating in the water layer.
 - `embed` removes **entire residues** of `mol2` whose any-atom comes within `gap` of `mol1`. For a membrane this means whole lipids get dropped, not partial ones, so the carved hole is the union of every clashing lipid residue (no convex-hull expansion; that's a separate function, {py:func}`~htmd.builder.builder.removeLipidsInProtein`).
 - After `embed`, the membrane's water layer probably doesn't cover the protein's intracellular / extracellular domains. Always re-solvate with a membrane-aware box (XY from the lipid extent, Z padded above and below the tallest atom) before the build.
+- Solvating a membrane across its full Z range puts water **inside** the bilayer. The 2.4 Å clash buffer does not exclude the tail region's free volume. Always pass `exclude_z=(z_lower_heads + 2, z_upper_heads - 2)` to {py:func}`~htmd.builder.solvate.solvate`, taking the head planes from the phosphate atoms.
 - When in doubt, prefer {py:func}`buildMembrane(solute=...) <htmd.membranebuilder.build_membrane.buildMembrane>`: it handles re-centering, carve-out, and waters in one call. Reach for `embed` only when you have a pre-equilibrated membrane you want to preserve.
 
 ## See also
