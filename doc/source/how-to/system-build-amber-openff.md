@@ -36,7 +36,7 @@ molbuilt, system = builder.build(
 | `small_molecule_ff` | Name of the small-molecule force field, e.g. `"openff-2.3.0"` (SMIRNOFF) or `"gaff-2.2.20"` (GAFF). |
 | `molecules` | List of `openff.toolkit.Molecule` objects (or paths to SDF files) describing every small molecule that needs `small_molecule_ff` templating. |
 | `extra_xml` | Additional OpenMM XML files for non-standard residues that aren't templated. |
-| `solvate=True`, `padding=10.0`, `water_model="tip3p"` | Wrap a water box around the system at build time. Set `solvate=False` if you've already pre-solvated via {py:func}`~htmd.builder.solvate.solvate`. |
+| `solvate=True`, `padding=10.0`, `water_model="tip3p"` | Wrap a water box around the system at build time. `padding` is per side, so the minimum image distance is twice this value. Set `solvate=False` if you've already pre-solvated via {py:func}`~htmd.builder.solvate.solvate`. |
 
 ## Common variations
 

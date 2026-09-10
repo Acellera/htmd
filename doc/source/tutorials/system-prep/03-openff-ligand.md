@@ -111,7 +111,7 @@ built, system = openmm.build(
     extra_xml=list(out.xml_paths),
     custombonds=out.custombonds,
     solvate=True,
-    padding=15.0,
+    padding=7.5,
     ionize=True,
     saltconc=0.15,
 )
@@ -124,7 +124,7 @@ Argument breakdown:
 | `extra_xml` | Additional XML files describing the non-canonical residues; here, the per-cluster Sage XML emitted by `parameterizeFromSpecs`. |
 | `custombonds` | Inter-residue bonds (same shape as in `amber.build`). |
 | `solvate=True` | The OpenMM builder solvates internally; no separate {py:func}`~htmd.builder.solvate.solvate` call is needed. If you'd rather pre-solvate (with your own padding, water model, or `centersel`), call {py:func}`~htmd.builder.solvate.solvate` on `prepared` first, then pass `solvate=False` here and the builder will skip the internal step. |
-| `padding` | Solvation padding in Å. |
+| `padding` | Solvation padding in Å, applied per side, so the minimum image distance across the box is twice this value. |
 | `ionize` + `saltconc` | Same meaning as in `amber.build`. |
 
 `openmm.build` returns a `(built_mol, openmm_system)` tuple. The `built_mol` is a {py:class}`~moleculekit.molecule.Molecule` of the final system; `openmm_system` is the OpenMM `System` object you can hand straight to an OpenMM `Simulation`. The output directory still contains `structure.prmtop` + `structure.pdb` so the result is consumable by any downstream MD driver, including ACEMD via {py:func}`acemd.protocols.setup_equilibration`.
