@@ -26,6 +26,8 @@ from htmd.builder.builder import (
     detectCisPeptideBonds,
     convertDisulfide,
     _checkMixedSegment,
+    _has_cell,
+    _cell_angles,
     BuildError,
 )
 
@@ -608,6 +610,11 @@ def _maybe_add_glycam(mol, extra_xml):
     return list(extra_xml) + [glycam_ffxml]
 
 
+# Shapes whose cell is built from per-axis padding/lengths rather than a
+# single equilateral width - see `htmd.builder.solvate._cell_vectors`.
+_AXIS_ALIGNED_SHAPES = ("rectangular", "cube")
+
+
 def build(
     mol: Molecule,
     ff: list | None = None,
@@ -709,6 +716,19 @@ def build(
     import openmm
     import openmm.app as app
     import openmm.unit as unit
+
+    from htmd.builder.solvate import _CELL_SHAPES
+
+    if boxshape not in _CELL_SHAPES:
+        raise ValueError(f"Unknown cell shape '{boxshape}'. Valid: {_CELL_SHAPES}")
+    if boxshape not in _AXIS_ALIGNED_SHAPES and (
+        not solvate or np.any(mol.atomselect("water"))
+    ):
+        logger.warning(
+            f"boxshape='{boxshape}' has no effect here: solvation is skipped "
+            "(the system is already solvated, or solvate=False), so the cell "
+            "comes from the input Molecule's own box, not boxshape."
+        )
 
     mol = mol.copy()
     if ff is None:
@@ -812,11 +832,15 @@ def build(
         modeller = app.Modeller(topology, positions)
 
         width = None
-        if boxshape not in ("rectangular", "cube") and boxsize is None:
+        if boxshape not in _AXIS_ALIGNED_SHAPES and boxsize is None:
             from htmd.builder.solvate import _cell_width
 
-            coords = mol.coords[:, :, 0]
-            center = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
+            if mol.numAtoms > 0:
+                coords = mol.coords[:, :, 0]
+                center = 0.5 * (coords.min(axis=0) + coords.max(axis=0))
+            else:
+                coords = np.zeros((1, 3))
+                center = np.zeros(3)
             width = _cell_width(coords, center, padding)
 
         solvent_kw = _build_solvent_kwargs(
@@ -972,7 +996,12 @@ def _write_ff_handoff(molbuilt, outdir, prefix, ff, extra_xml, smallmol_ffxml):
     if molbuilt.box is not None and molbuilt.box.shape[1] > 0:
         box = [float(b) for b in molbuilt.box[:, molbuilt.frame]]
         if any(box):
-            system_yaml["boxsize"] = box
+            angles = _cell_angles(molbuilt)
+            if np.allclose(angles, 90.0):
+                system_yaml["boxsize"] = box
+            else:
+                # Six elements when non-rectangular: acemd's boxsize takes lengths+angles.
+                system_yaml["boxsize"] = box + angles
     with open(os.path.join(outdir, "system.yaml"), "w") as fh:
         yaml.safe_dump(system_yaml, fh, sort_keys=False)
     logger.info(f"Wrote ForceField-XML handoff to {outdir}")
@@ -2643,7 +2672,7 @@ def _build_solvent_kwargs(
 
     kw = {"model": water_model}
 
-    if boxshape not in ("rectangular", "cube"):
+    if boxshape not in _AXIS_ALIGNED_SHAPES:
         # A named shape wins over boxsize, which is then the single cell width
         # rather than three edge lengths, matching solvate.
         if boxsize is not None:
@@ -2692,31 +2721,52 @@ def _build_solvent_kwargs(
 def _ensure_box_vectors(topology, positions, unit, mol=None):
     """Set periodic box vectors on *topology* if missing.
 
-    If *mol* has non-zero ``box`` (Angstroms) those dimensions are used.
-    Otherwise the bounding box of *positions* (nanometers) is used.
+    If *mol* has a usable cell (Angstroms) both its lengths AND angles are
+    used - using lengths alone would flatten any non-orthorhombic cell (e.g.
+    a solvate() truncated octahedron) into a plain cube. Otherwise the
+    bounding box of *positions* (nanometers) is used.
     """
     if topology.getPeriodicBoxVectors() is not None:
         return
     from openmm import Vec3
 
-    bx = by = bz = 0.0
-    if mol is not None and mol.box is not None and mol.box.shape[0] >= 3:
-        bx = float(mol.box[0, 0]) / 10.0
-        by = float(mol.box[1, 0]) / 10.0
-        bz = float(mol.box[2, 0]) / 10.0
+    vectors = None
+    if mol is not None and _has_cell(mol):
+        lengths = [float(v) for v in mol.box[:3, 0]]
+        angles = _cell_angles(mol)
 
-    if bx <= 0 or by <= 0 or bz <= 0:
+        # Prefer the exact construction for a named shape; the generic
+        # conversion needs reduced=True to satisfy OpenMM.
+        from htmd.builder.solvate import _cell_vectors
+
+        box = None
+        if np.allclose(lengths, lengths[0], rtol=1e-6):
+            for shape, shape_angle in (
+                ("octahedron", 109.4712206),
+                ("dodecahedron", 60.0),
+            ):
+                if np.allclose(angles, shape_angle, atol=1e-3):
+                    box = _cell_vectors(shape, lengths[0])
+                    break
+        if box is None:
+            from moleculekit.unitcell import lengths_and_angles_to_box_vectors
+
+            a, b, c = lengths_and_angles_to_box_vectors(*lengths, *angles, reduced=True)
+            box = np.array([a, b, c])
+
+        vectors = [Vec3(*row) for row in box / 10.0] * unit.nanometers
+
+    if vectors is None:
         coords = np.array([[p.x, p.y, p.z] for p in positions])
         bx, by, bz = (coords.max(axis=0) - coords.min(axis=0)).tolist()
+        if bx <= 0 or by <= 0 or bz <= 0:
+            raise ValueError("Cannot determine periodic box dimensions.")
+        vectors = [
+            Vec3(bx, 0, 0),
+            Vec3(0, by, 0),
+            Vec3(0, 0, bz),
+        ] * unit.nanometers
 
-    if bx <= 0 or by <= 0 or bz <= 0:
-        raise ValueError("Cannot determine periodic box dimensions.")
-
-    vectors = [
-        Vec3(bx, 0, 0),
-        Vec3(0, by, 0),
-        Vec3(0, 0, bz),
-    ] * unit.nanometers
     topology.setPeriodicBoxVectors(vectors)
 
 
@@ -2999,7 +3049,18 @@ def _read_built_molecule(outdir, prefix, topology=None, positions=None):
                 molbuilt.box = np.array(la[:3], dtype=np.float32).reshape(3, 1)
                 molbuilt.boxangles = np.array(la[3:], dtype=np.float32).reshape(3, 1)
             elif os.path.exists(pdb):
-                molbuilt.box = Molecule(pdb).box.copy()
+                pdbmol = Molecule(pdb)
+                molbuilt.box = pdbmol.box.copy()
+                molbuilt.boxangles = pdbmol.boxangles.copy()
+
+            # amber._stamp_cell / charmm._insert_cryst1 set this too; the
+            # cif writer needs it.
+            if _has_cell(molbuilt):
+                lengths = [float(v) for v in molbuilt.box[:3, 0]]
+                angles = _cell_angles(molbuilt)
+                molbuilt.crystalinfo = dict(
+                    zip(("a", "b", "c", "alpha", "beta", "gamma"), lengths + angles)
+                )
             return molbuilt
         except Exception:
             logger.warning("Could not read prmtop - falling back to PDB.")

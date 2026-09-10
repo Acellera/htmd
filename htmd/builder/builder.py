@@ -120,6 +120,37 @@ def _cell_angles(mol: "Molecule") -> list:
     return [90.0, 90.0, 90.0]
 
 
+def _write_topology_input(mol: "Molecule", path: str, **kwargs) -> None:
+    """Write `mol` to `path` with no cell, for tleap/psfgen input.
+
+    Both tleap's ``loadpdb`` and psfgen discard CRYST1 on read anyway, and a
+    non-rectangular cell in the intermediate PDB is more likely to be
+    misread than ignored, so it is dropped before writing.
+
+    `mol`'s ``box``/``boxangles`` are saved and restored around the write
+    rather than working on a ``mol.copy()``: a full Molecule copy duplicates
+    every atom field just to protect two small arrays, and `mol` here is
+    sometimes the very same object called once per segment in a loop whose
+    caller reads it again right after (see ``charmm._write_segments``).
+
+    Parameters
+    ----------
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The Molecule to write. Its box/boxangles are unchanged on return.
+    path : str
+        The output file path.
+    **kwargs
+        Forwarded to :meth:`Molecule.write <moleculekit.molecule.Molecule.write>`.
+    """
+    box, boxangles = mol.box, mol.boxangles
+    mol.box = np.zeros((3, 1), dtype=np.float32)
+    mol.boxangles = np.zeros((3, 1), dtype=np.float32)
+    try:
+        mol.write(path, **kwargs)
+    finally:
+        mol.box, mol.boxangles = box, boxangles
+
+
 def embed(mol1: "Molecule", mol2: "Molecule", gap: float = 1.3) -> "Molecule":
     """Embed one molecule into another, removing overlapping residues.
 

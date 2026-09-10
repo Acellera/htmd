@@ -1427,9 +1427,7 @@ def test_build_stamps_the_solvate_cell(tmp_path, shape, expected_angle, ifbox):
     assert np.allclose(pdb.box.ravel(), smol.box.ravel(), atol=1e-2)
     assert np.allclose(pdb.boxangles.ravel(), expected_angle, atol=1e-2)
 
-    # Read structure.crd back. It is the file a simulation actually takes its
-    # coordinates from, and rewriting its final line is the riskiest step in
-    # the stamp, so assert the coordinates survived as well as the cell.
+    # structure.crd is what a simulation actually reads coordinates from.
     crd = Molecule(os.path.join(tmp_path, "structure.prmtop"), validateElements=False)
     crd.read(os.path.join(tmp_path, "structure.crd"), type="inpcrd")
     assert crd.numAtoms == molbuilt.numAtoms
@@ -1439,6 +1437,51 @@ def test_build_stamps_the_solvate_cell(tmp_path, shape, expected_angle, ifbox):
     assert np.allclose(
         crd.coords[:, :, 0], molbuilt.coords[:, :, 0], atol=2e-3
     ), "coordinates in structure.crd do not match the returned Molecule"
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_stamp_cell_refuses_unequal_angles(tmp_path, caplog):
+    """_stamp_cell must not stamp a cell whose three angles differ.
+
+    The prmtop's BOX_DIMENSIONS field stores a single angle, so a monoclinic
+    cell cannot be stamped losslessly. Refusing must leave the prmtop, crd
+    and returned Molecule all agreeing with each other (tleap's own
+    orthorhombic cell), rather than splitting three ways.
+    """
+    import logging
+    import parmed
+    from moleculekit.molecule import Molecule
+
+    from htmd.builder.solvate import solvate
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    smol = solvate(mol, pad=10)
+    # Force a monoclinic cell: unequal angles the prmtop cannot represent.
+    smol.boxangles = np.array([[90.0], [102.3], [90.0]], dtype=np.float32)
+
+    with caplog.at_level(logging.WARNING, logger="htmd.builder.amber"):
+        molbuilt = build(smol, ff=defaultFf(), outdir=str(tmp_path))
+
+    assert any(
+        "102.3" in r.getMessage() for r in caplog.records
+    ), "expected a warning naming the unequal angles"
+
+    # Refusal must leave tleap's own rectangular cell in place everywhere.
+    assert np.allclose(molbuilt.boxangles.ravel(), 90.0, atol=1e-2)
+
+    parm = parmed.load_file(os.path.join(tmp_path, "structure.prmtop"))
+    pdb = Molecule(os.path.join(tmp_path, "structure.pdb"))
+    crd = Molecule(os.path.join(tmp_path, "structure.prmtop"), validateElements=False)
+    crd.read(os.path.join(tmp_path, "structure.crd"), type="inpcrd")
+
+    assert np.allclose(parm.box[:3], molbuilt.box.ravel(), atol=1e-2)
+    assert np.allclose(parm.box[3:], molbuilt.boxangles.ravel(), atol=1e-2)
+    assert np.allclose(pdb.box.ravel(), molbuilt.box.ravel(), atol=1e-2)
+    assert np.allclose(pdb.boxangles.ravel(), molbuilt.boxangles.ravel(), atol=1e-2)
+    assert np.allclose(crd.box.ravel(), molbuilt.box.ravel(), atol=1e-2)
+    assert np.allclose(crd.boxangles.ravel(), molbuilt.boxangles.ravel(), atol=1e-2)
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)

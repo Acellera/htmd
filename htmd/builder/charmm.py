@@ -21,6 +21,7 @@ from htmd.builder.builder import (
     detectCisPeptideBonds,
     _checkMixedSegment,
     _checkLongResnames,
+    _write_topology_input,
     MissingResidueError,
     BuildError,
 )
@@ -199,6 +200,7 @@ def build(
     >>> ar = {'SAPI24': 'SP24'}  # Alias large resnames to a short-hand version
     >>> molbuilt = charmm.build(mol, topo=topos, outdir='/tmp/build', saltconc=0.15, disulfide=disu, aliasresidues=ar)  # doctest: +SKIP
     """
+    mol_orig = mol
     mol = mol.copy()
     _missingSegID(mol)
     _checkMixedSegment(mol)
@@ -309,7 +311,7 @@ def build(
             prefix="solute_charge",
         )
         molbuilt_solute = _run_psfgen(
-            psfgen, outdir, "build_solute.vmd", "solute_charge"
+            psfgen, outdir, "build_solute.vmd", "solute_charge", mol_orig
         )
 
         totalcharge = float(np.sum(molbuilt_solute.charge))
@@ -361,7 +363,7 @@ def build(
     if not execute:
         return None
 
-    molbuilt = _run_psfgen(psfgen, outdir, "build.vmd", prefix)
+    molbuilt = _run_psfgen(psfgen, outdir, "build.vmd", prefix, mol_orig)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
@@ -404,7 +406,9 @@ def _write_segments(mol, outdir):
     logger.info("Writing out segments.")
     for seg in _getSegments(mol):
         pdbname = f"segment{seg}.pdb"
-        mol.write(path.join(segdir, pdbname), sel=mol.segid == seg)
+        _write_topology_input(
+            mol, path.join(segdir, pdbname), sel=mol.segid == seg, writebonds=False
+        )
 
 
 def _write_psfgen_script(
@@ -480,7 +484,52 @@ def _write_psfgen_script(
         f.write(f"writepdb {prefix}.pdb\n")
 
 
-def _run_psfgen(psfgen, outdir, script_name, prefix):
+def _insert_cryst1(pdb_path: str, mol: Molecule) -> list | None:
+    """Add a CRYST1 record to psfgen's PDB from `mol`'s cell.
+
+    psfgen writes no CRYST1, so a charmm-built system carries no cell. Only
+    the one line is inserted, after any leading REMARK records, so the rest of
+    psfgen's output stays byte-identical.
+
+    Parameters
+    ----------
+    pdb_path : str
+        Path to psfgen's output PDB, modified in place.
+    mol : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The input Molecule, whose cell is authoritative.
+
+    Returns
+    -------
+    cell : list of float or None
+        ``[a, b, c, alpha, beta, gamma]`` written, or None if `mol` has no cell.
+    """
+    from htmd.builder.builder import _cell_angles, _has_cell
+
+    if not _has_cell(mol):
+        return None
+
+    lengths = [float(v) for v in mol.box[:3, 0]]
+    angles = _cell_angles(mol)
+
+    with open(pdb_path) as fh:
+        lines = fh.read().splitlines(True)
+
+    if not any(ll.startswith("CRYST1") for ll in lines):
+        idx = 0
+        while idx < len(lines) and lines[idx].startswith("REMARK"):
+            idx += 1
+        cryst1 = (
+            f"CRYST1{lengths[0]:9.3f}{lengths[1]:9.3f}{lengths[2]:9.3f}"
+            f"{angles[0]:7.2f}{angles[1]:7.2f}{angles[2]:7.2f} P 1           1 \n"
+        )
+        lines.insert(idx, cryst1)
+        with open(pdb_path, "w") as fh:
+            fh.writelines(lines)
+
+    return lengths + angles
+
+
+def _run_psfgen(psfgen, outdir, script_name, prefix, mol):
     """Invoke psfgen on ``outdir/script_name`` and return the resulting Molecule."""
     logpath = os.path.abspath(path.join(outdir, "log.txt"))
     logger.info("Starting the build.")
@@ -510,8 +559,17 @@ def _run_psfgen(psfgen, outdir, script_name, prefix):
             f"No {prefix} pdb/psf file was generated. Check {logpath} for errors in building."
         )
 
+    cell = _insert_cryst1(pdb_path, mol)
+
     molbuilt = Molecule(pdb_path, validateElements=False)
+    # Reading the psf on top of the pdb resets box/boxangles, so re-stamp them.
     molbuilt.read(psf_path)
+    if cell is not None:
+        molbuilt.box = np.array(cell[:3], dtype=np.float32).reshape(3, 1)
+        molbuilt.boxangles = np.array(cell[3:], dtype=np.float32).reshape(3, 1)
+        molbuilt.crystalinfo = dict(
+            zip(("a", "b", "c", "alpha", "beta", "gamma"), cell)
+        )
     return molbuilt
 
 

@@ -2837,6 +2837,60 @@ def test_build_solvent_kwargs_shape_wins_over_boxsize(boxshape):
 
 
 @pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
+def test_ensure_box_vectors_preserves_a_non_orthorhombic_cell():
+    """_ensure_box_vectors must not flatten a non-cubic cell to a cube.
+
+    It used to read only mol.box (lengths) and always emit an orthogonal
+    triple, so an octahedral input cell (a=b=c, alpha=beta=gamma=109.4712206
+    - what solvate(shape="octahedron") produces) came out as diag(60, 60,
+    60): a plain cube. This is the only place that sets the box whenever
+    addSolvent is skipped (pre-solvated input, or solvate=False).
+    """
+    import openmm
+    import openmm.app as app
+    import openmm.unit as unit
+    from moleculekit.molecule import Molecule
+    from moleculekit.unitcell import box_vectors_to_lengths_and_angles
+
+    from htmd.builder.openmm import _ensure_box_vectors
+
+    mol = Molecule().empty(1)
+    mol.name[:] = ["O"]
+    mol.element[:] = ["O"]
+    mol.resname[:] = "HOH"
+    mol.resid[:] = [1]
+    mol.coords = np.zeros((1, 3, 1), dtype=np.float32)
+    mol.box = np.array([[60.0], [60.0], [60.0]], dtype=np.float32)
+    mol.boxangles = np.array(
+        [[109.4712206], [109.4712206], [109.4712206]], dtype=np.float32
+    )
+
+    topology = app.Topology()
+    chain = topology.addChain()
+    res = topology.addResidue("HOH", chain)
+    topology.addAtom("O", app.element.oxygen, res)
+    positions = unit.Quantity(np.zeros((1, 3)), unit.angstrom)
+
+    _ensure_box_vectors(topology, positions, unit, mol)
+
+    a, b, c = topology.getPeriodicBoxVectors()
+    lengths_and_angles = box_vectors_to_lengths_and_angles(
+        np.array(a.value_in_unit(unit.angstrom)),
+        np.array(b.value_in_unit(unit.angstrom)),
+        np.array(c.value_in_unit(unit.angstrom)),
+    )
+    assert np.allclose(lengths_and_angles[:3], 60.0, atol=1e-2)
+    assert np.allclose(lengths_and_angles[3:], 109.4712206, atol=1e-2), (
+        f"expected the octahedral angles, got {lengths_and_angles[3:]} "
+        "(flattened to a cube)"
+    )
+
+    # OpenMM's own reduction check must also accept the result.
+    system = openmm.System()
+    system.setDefaultPeriodicBoxVectors(a, b, c)
+
+
+@pytest.mark.skipif(not _openmm_installed, reason="Requires openmm")
 def test_openmm_width_matches_solvate():
     """Both builders must size an equilateral cell identically.
 

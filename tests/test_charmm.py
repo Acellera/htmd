@@ -107,3 +107,72 @@ class TestCharmmBuild(unittest.TestCase):
         _ = build(smol, topo=topos, outdir=tmpdir)
         compareDir = home(dataDir=os.path.join("test-charmm-build", "3PTB_insertion"))
         assertSameAsReferenceDir(compareDir, tmpdir)
+
+    @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
+    def test_build_records_the_cell(self):
+        """psfgen's PDB has no CRYST1, so charmm.build has to add it."""
+        import os
+
+        import numpy as np
+        from moleculekit.molecule import Molecule
+
+        from htmd.builder.solvate import solvate
+        from htmd.home import home
+        from htmd.util import tempname
+
+        inFile = os.path.join(
+            home(dataDir="test-proteinprepare"), "3PTB", "3PTB-prepared.pdb"
+        )
+        mol = Molecule(inFile)
+        mol.filter("protein")
+
+        np.random.seed(1)
+        smol = solvate(mol)
+
+        tmpdir = tempname()
+        molbuilt = build(
+            smol,
+            topo=["top/top_all36_prot.rtf", "top/top_water_ions.rtf"],
+            outdir=tmpdir,
+        )
+
+        assert np.allclose(molbuilt.box.ravel(), smol.box.ravel(), atol=1e-2)
+        assert np.allclose(molbuilt.boxangles.ravel(), [90.0, 90.0, 90.0], atol=1e-2)
+
+        pdb = Molecule(os.path.join(tmpdir, "structure.pdb"))
+        assert np.allclose(pdb.box.ravel(), smol.box.ravel(), atol=1e-2)
+
+    @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
+    def test_build_records_a_non_rectangular_cell(self):
+        """_insert_cryst1 must carry a non-rectangular cell, not just 90/90/90."""
+        import os
+
+        import numpy as np
+        from moleculekit.molecule import Molecule
+
+        from htmd.builder.solvate import solvate
+        from htmd.home import home
+        from htmd.util import tempname
+
+        inFile = os.path.join(
+            home(dataDir="test-proteinprepare"), "3PTB", "3PTB-prepared.pdb"
+        )
+        mol = Molecule(inFile)
+        mol.filter("protein")
+
+        np.random.seed(1)
+        smol = solvate(mol, pad=10, shape="octahedron")
+
+        tmpdir = tempname()
+        molbuilt = build(
+            smol,
+            topo=["top/top_all36_prot.rtf", "top/top_water_ions.rtf"],
+            outdir=tmpdir,
+        )
+
+        assert np.allclose(molbuilt.box.ravel(), smol.box.ravel(), atol=1e-2)
+        assert np.allclose(molbuilt.boxangles.ravel(), [109.4712206] * 3, atol=1e-2)
+
+        pdb = Molecule(os.path.join(tmpdir, "structure.pdb"))
+        assert np.allclose(pdb.box.ravel(), smol.box.ravel(), atol=1e-2)
+        assert np.allclose(pdb.boxangles.ravel(), [109.4712206] * 3, atol=1e-2)

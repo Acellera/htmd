@@ -273,12 +273,8 @@ def test_build_membrane_has_no_water_in_the_bilayer(tmp_path):
     p_z = memb.coords[memb.name == "P", 2, 0]
     assert p_z.size > 0, "no phosphate atoms found"
 
-    # Both leaflets must be non-empty. numpy's mean of an empty slice is nan,
-    # not an error, and every comparison against nan is False, so a structure
-    # whose phosphates do not split into two groups would leave z_lo and z_up
-    # as nan, make n_inside come out 0, and pass this test without asserting
-    # anything. That happens for a monolayer, a single phosphate, or any case
-    # where all phosphates fall on one side of their own mean.
+    # Both leaflets must be non-empty, or a nan mean would silently pass this
+    # test without asserting anything (see the message below).
     lower = p_z[p_z < p_z.mean()]
     upper = p_z[p_z > p_z.mean()]
     assert lower.size > 0 and upper.size > 0, (

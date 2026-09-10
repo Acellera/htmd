@@ -238,7 +238,6 @@ def _big_solute():
     effect of `_outOfBoundaries` dropping whole water residues at the cell
     faces, and it predates this work.
     """
-    import numpy as np
     from moleculekit.molecule import Molecule
 
     mol = Molecule().empty(2)
@@ -265,8 +264,6 @@ def test_solvate_shape_sets_cell_and_density(shape, volume_factor):
     `_big_solute()` with pad=5 to land near 60 A. See that fixture's docstring
     for the measured size dependence.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate, _cell_vectors
 
     smol = solvate(_big_solute(), pad=5, shape=shape)
@@ -318,8 +315,6 @@ def test_solvate_shape_water_lies_inside_the_cell(shape):
     box, so the half-space test can be pinned exactly rather than with a loose
     tolerance.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate, _cell_vectors, _ws_halfspaces
 
     solute = _big_solute()
@@ -344,8 +339,6 @@ def test_ws_inradius_is_half_the_width(shape):
     parallelepiped, whose inradius is 0.40825*width for the two skewed shapes.
     If this ever fails, `width = 2*radius + 2*pad` stops delivering `pad`.
     """
-    import numpy as np
-
     from htmd.builder.solvate import _cell_vectors, _ws_halfspaces
 
     width = 60.0
@@ -362,7 +355,6 @@ def _shell_solute(radius=25.0, natoms=400, seed=0):
     carves the wrong region. A shell reaches every direction at once, and is
     closer to how a real protein's atoms are distributed.
     """
-    import numpy as np
     from moleculekit.molecule import Molecule
 
     rng = np.random.default_rng(seed)
@@ -393,8 +385,6 @@ def test_solvate_shape_never_waters_the_solutes_own_image(shape):
     dodecahedron. The cube was clean, which is why no rectangular test and no
     line-shaped fixture could see it.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate, _cell_vectors, _ws_halfspaces
 
     solute = _shell_solute()
@@ -433,8 +423,6 @@ def test_solvate_shape_survives_compact_wrapping(shape):
     representation. If solvate's cell and moleculekit's cell conventions
     disagree, this either raises or leaves water split across a face.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     smol = solvate(_big_solute(), pad=5, shape=shape)
@@ -459,8 +447,6 @@ def test_solvate_pad_is_per_side():
     different periodic copies. A tiny solute triggers the floor; a large one
     is governed by the primary term.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     def _radius(mol):
@@ -519,8 +505,6 @@ def test_solvate_shape_works_with_centersel(shape):
     specified together." check, or this combination is unreachable while every
     other test still passes. Nothing else guards that ordering.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     solute = _big_solute()
@@ -549,8 +533,6 @@ def test_solvate_unknown_shape_raises():
 
 def test_solvate_exclude_z_leaves_a_gap():
     """No water residue may have an atom inside the excluded z range."""
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     zlo, zhi = -6.0, 6.0
@@ -600,8 +582,6 @@ def test_solvate_exclude_z_applies_to_every_shape(shape):
     moved it inside the rectangular branch would regress silently, since the
     docstring promises it works for every shape.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     zlo, zhi = -8.0, 8.0
@@ -618,8 +598,6 @@ def test_solvate_exclude_z_applies_to_every_shape(shape):
 
 def test_solvate_exclude_z_matches_two_call_equivalent():
     """One call with exclude_z must match the two-slab pattern it replaces."""
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     mm = [[-25.0, -25.0, -25.0], [25.0, 25.0, 25.0]]
@@ -649,8 +627,6 @@ def test_solvate_rectangular_sets_the_cell_it_built():
     `_solute()` spans 1.5 A along x and nothing on y or z, so pad=10 gives
     21.5 by 20 by 20.
     """
-    import numpy as np
-
     from htmd.builder.solvate import solvate
 
     smol = solvate(_solute(), pad=10)

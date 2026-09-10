@@ -16,6 +16,7 @@ from htmd.builder.builder import (
     detectCisPeptideBonds,
     convertDisulfide,
     _checkMixedSegment,
+    _write_topology_input,
     BuildError,
     MissingResidueError,
     MissingAngleError,
@@ -1268,7 +1269,9 @@ def build(
             nanion,
             ncation,
         )
-        solvent_mol.write(os.path.join(outdir, "solvent.pdb"), writebonds=False)
+        _write_topology_input(
+            solvent_mol, os.path.join(outdir, "solvent.pdb"), writebonds=False
+        )
 
     if execute:
         # mol_orig, not `mol`: _add_caps splices caps in with Molecule.insert,
@@ -1715,11 +1718,13 @@ def _prepare_build(
         solute_mol = _apply_chain_breaks(
             solute_mol, break_points, alternate_segids=glycan_segids
         )
-        solute_mol.write(os.path.join(outdir, "input.pdb"))
+        _write_topology_input(solute_mol, os.path.join(outdir, "input.pdb"))
 
     if has_water:
         water_mol = nonc_mol.copy(sel=water_sel)
-        water_mol.write(os.path.join(outdir, "solvent.pdb"), writebonds=False)
+        _write_topology_input(
+            water_mol, os.path.join(outdir, "solvent.pdb"), writebonds=False
+        )
 
     cyc_info = []
     if len(cyclic):
@@ -1729,7 +1734,7 @@ def _prepare_build(
                 seg_mol, break_points, alternate_segids=glycan_segids
             )
             fname = f"cyclic_{seg}.pdb"
-            seg_mol.write(os.path.join(outdir, fname))
+            _write_topology_input(seg_mol, os.path.join(outdir, fname))
             cyc_var = f"cyc_{seg}"
             cyc_info.append((cyc_var, fname, res_start, res_end))
 
@@ -1798,6 +1803,15 @@ def _stamp_cell(outdir: str, prefix: str, mol: Molecule, molbuilt: Molecule) -> 
 
     lengths = [float(v) for v in mol.box[:3, 0]]
     angles = _cell_angles(mol)
+
+    if not (np.isclose(angles[0], angles[1]) and np.isclose(angles[1], angles[2])):
+        logger.warning(
+            f"Cell angles [{angles[0]:.3f}, {angles[1]:.3f}, {angles[2]:.3f}] are "
+            "not all equal. The AMBER prmtop's BOX_DIMENSIONS field stores only a "
+            f"single angle, so stamping would corrupt {prefix}.prmtop. Leaving "
+            "the prmtop, crd and returned Molecule as tleap produced them."
+        )
+        return
 
     prmtop_path = os.path.join(outdir, f"{prefix}.prmtop")
     crd_path = os.path.join(outdir, f"{prefix}.crd")
