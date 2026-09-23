@@ -10,6 +10,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Exclusion radius for a sealed-region point, matching the grid spacing
+# lipid_inaccessible_points samples at so the points tile without gaps.
+_SEALED_RADIUS = 1.0
+
 # Based on: http://onlinelibrary.wiley.com/doi/10.1002/(SICI)1097-0134(199601)24:1%3C92::AID-PROT7%3E3.0.CO;2-Q/epdf
 # Structure, energetics, and dynamics of lipid–protein interactions: A molecular dynamics study
 # of the gramicidin A channel in a DMPC bilayer
@@ -84,7 +88,7 @@ def listLipids():
     print("* Lipid DB file: " + os.path.join(membranebuilderhome, "lipiddb.csv"))
 
 
-def _solute_footprint(solute, head_z, slab=5.0, offset=4.0, buffer=5.0):
+def _solute_footprint(solute, head_z, sealed=None, slab=5.0, offset=4.0, buffer=5.0):
     """XY footprint of solute heavy atoms in a slab inside the leaflet.
 
     The slab is one-sided (extends toward the bilayer center), starting
@@ -108,6 +112,14 @@ def _solute_footprint(solute, head_z, slab=5.0, offset=4.0, buffer=5.0):
     representing the head center, a seed must be at least one head-radius
     away from any solute atom to keep the head atoms outside protein
     pores or near surfaces.
+
+    ``sealed`` carries the points
+    :func:`lipid_inaccessible_points <htmd.builder.builder.lipid_inaccessible_points>`
+    found walled off from the bilayer. The disks above only cover what the
+    solute's atoms reach, so a lumen wider than one disk reads as free
+    membrane; the sealed points close it. Those of this leaflet's half are
+    added as obstacles of their own, one grid spacing wide, which is enough
+    to tile the region they came from.
     """
     from moleculekit.periodictable import periodictable
 
@@ -128,7 +140,12 @@ def _solute_footprint(solute, head_z, slab=5.0, offset=4.0, buffer=5.0):
             for el in solute.element[mask]
         ]
     )
-    return xy, vdw + buffer
+    radii = vdw + buffer
+    if sealed is not None and len(sealed):
+        half = sealed[:, 2] > 0 if head_z >= 0 else sealed[:, 2] < 0
+        xy = np.vstack((xy, sealed[half, :2]))
+        radii = np.concatenate((radii, np.full(half.sum(), _SEALED_RADIUS)))
+    return xy, radii
 
 
 def _solute_area_fraction(footprint, xysize, n_samples=10000):
@@ -856,6 +873,7 @@ def buildMembrane(
     forcefield_files: list | None = None,
     seed: int | None = None,
     solute: Molecule | None = None,
+    solute_thickness: float | None = None,
     timestep_fs: float = 2.0,
     head_z: float = 15.0,
     head_restraint_k: float = 0.0,
@@ -910,6 +928,14 @@ def buildMembrane(
         must be centered at z=0 (bilayer midplane). Lipids are packed around
         the solute footprint and are rotationally optimized to minimize
         clashes. The input Molecule is not modified.
+    solute_thickness : float, optional
+        The solute's own hydrophobic belt in Angstrom, as
+        :func:`get_opm_pdb <moleculekit.opm.get_opm_pdb>` reports it. The
+        search for space the solute seals off from the bilayer runs either
+        way, on the lipid composition's hydrocarbon core; this only caps that
+        slab. It is worth passing when the solute's belt is thinner than the
+        lipids would form on their own, since a slab reaching past the belt
+        finds nothing sealed.
     timestep_fs : float
         Integrator timestep in femtoseconds for OpenMM equilibration.
         2.0 fs is compatible with ``constraints=HBonds``.
@@ -935,6 +961,10 @@ def buildMembrane(
     >>> res = buildMembrane(width, lipidratioupper, lipidratiolower)
     """
     from htmd.membranebuilder.ringpenetration import resolveRingPenetrations
+    from htmd.builder.builder import (
+        HEAD_TO_CORE_OFFSET,
+        lipid_inaccessible_points,
+    )
     from htmd.builder.solvate import solvate
     from htmd.util import tempname
     from htmd.home import home
@@ -972,8 +1002,26 @@ def buildMembrane(
         anchor_mask = embedded if embedded.any() else np.ones(solute.numAtoms, bool)
         com_xy = solute.coords[anchor_mask, :2, 0].mean(axis=0).astype(np.float32)
 
-        upper_fp = _solute_footprint(solute, head_z)
-        lower_fp = _solute_footprint(solute, -head_z)
+        # Space the solute walls off from the bilayer, which the per-atom
+        # footprint cannot see. Found once here rather than per leaflet,
+        # since it spans the whole slab. The slab is this composition's
+        # hydrocarbon core, taken from its thinnest lipid: reaching past the
+        # solute's own belt is what makes the search come back empty, so the
+        # conservative end of the mixture is the one to use.
+        core = (
+            min(lipiddb.loc[name, "Thickness"] for name in uqlip)
+            - 2 * HEAD_TO_CORE_OFFSET
+        )
+        if solute_thickness is not None:
+            core = min(core, solute_thickness)
+        sealed = lipid_inaccessible_points(solute, core)
+        if len(sealed):
+            logger.info(
+                f"Solute seals {len(sealed) * _SEALED_RADIUS**3:.0f} A^3 off "
+                "from the bilayer; no lipids will be placed there."
+            )
+        upper_fp = _solute_footprint(solute, head_z, sealed=sealed)
+        lower_fp = _solute_footprint(solute, -head_z, sealed=sealed)
         # Lipid placement (Halton/obstacles) happens in the box-centered
         # frame, so translate the footprint by -com_xy.
         if upper_fp is not None:

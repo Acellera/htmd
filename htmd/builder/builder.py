@@ -453,6 +453,119 @@ def removeAtomsInHull(
     return mol2, numlipsrem
 
 
+# Distance in Angstrom from a lipid's head atom to where its hydrocarbon
+# starts. htmd's lipiddb records head-to-head thickness (phosphate to
+# phosphate for the phospholipids: 38.5 for POPC), while the tails that pack
+# around a solute occupy only the core between the two headgroup regions.
+# 6 A is the offset that turns POPC's 38.5 into its ~26.5 A hydrocarbon core.
+HEAD_TO_CORE_OFFSET = 6.0
+
+
+def lipid_inaccessible_points(
+    solute: "Molecule",
+    thickness: float,
+    probe: float = 2.5,
+    resolution: float = 1.0,
+    min_volume: float = 1200.0,
+) -> np.ndarray:
+    """Points inside the bilayer slab that no lipid can reach.
+
+    The free space in the slab is flood-filled inward from its lateral edges
+    with a probe the size of an acyl methylene. Whatever the fill cannot reach
+    is walled off from the bulk lipid by the solute, so no lipid could ever
+    diffuse into it and none should be placed there. Space that is merely
+    concave, such as a groove between protomers or a lateral fenestration,
+    stays reachable and is left alone. That reachability is what separates a
+    sealed pore from a homodimer interface lipids legitimately fill; the
+    shape of the space does not.
+
+    The solute must be pre-aligned with the bilayer centered at z=0, which is
+    how :func:`get_opm_pdb <moleculekit.opm.get_opm_pdb>` returns it.
+
+    Parameters
+    ----------
+    solute : :class:`Molecule <moleculekit.molecule.Molecule>`
+        The membrane-embedded solute, centered on the bilayer midplane.
+    thickness : float
+        Full bilayer thickness in Angstrom. Only ``|z| < thickness / 2`` is
+        searched, since that is the span lipids occupy. This is the
+        hydrocarbon core, not a head-to-head thickness, and it must not reach
+        past the solute's hydrophobic belt: a taller slab runs into the
+        vestibules above and below the belt, where the fill enters from the
+        side and comes back down into the region being tested. Erring thin is
+        safe, erring tall is not, and the error is one of omission either way
+        (nothing reported sealed rather than something sealed that is not).
+    probe : float
+        Radius in Angstrom of the probe that must reach a point for a lipid to
+        occupy it, i.e. one acyl methylene.
+    resolution : float
+        Grid spacing in Angstrom.
+    min_volume : float
+        Sealed regions below this volume in cubic Angstrom are ignored, since
+        nothing large enough to matter fits inside them. One POPC displaces
+        roughly 1200 A^3.
+
+    Returns
+    -------
+    points : np.ndarray
+        An ``(N, 3)`` array of grid points, one per sealed voxel. Empty when
+        the solute seals nothing off, which is the common case.
+
+    Examples
+    --------
+    >>> from moleculekit.opm import get_opm_pdb
+    >>> mol, thickness = get_opm_pdb("5YIL")             # doctest: +SKIP
+    >>> pts = lipid_inaccessible_points(mol, thickness)  # doctest: +SKIP
+    """
+    from moleculekit.periodictable import periodictable
+    from scipy.spatial import cKDTree
+    from scipy import ndimage
+
+    half = thickness / 2
+    coords = solute.coords[:, :, 0]
+    # Reach past the slab so atoms just outside it still wall the grid in.
+    sel = (solute.element != "H") & (np.abs(coords[:, 2]) < half + probe + 2)
+    xyz = coords[sel]
+    radii = np.array([periodictable[el].vdw_radius for el in solute.element[sel]])
+
+    # Far enough out that every boundary point clears the largest atom, so
+    # the faces the fill seeds from are bulk lipid by construction.
+    margin = radii.max() + probe
+    # np.arange stops short of its endpoint, so pad it by one step to keep
+    # the far faces a full margin out rather than wherever they happen to land.
+    axes = [
+        np.arange(
+            xyz[:, 0].min() - margin, xyz[:, 0].max() + margin + resolution, resolution
+        ),
+        np.arange(
+            xyz[:, 1].min() - margin, xyz[:, 1].max() + margin + resolution, resolution
+        ),
+        np.arange(-half, half, resolution),
+    ]
+    grid = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
+
+    dist, nearest = cKDTree(xyz).query(grid.reshape(-1, 3), k=1, workers=-1)
+    free = (dist >= radii[nearest] + probe).reshape(grid.shape[:3])
+    labels = ndimage.label(free)[0]
+
+    # Bulk lipid is whatever the slab's lateral faces open onto. A region that
+    # is free but touches none of them is enclosed by the solute.
+    bulk = np.unique(
+        np.concatenate(
+            [
+                labels[0].ravel(),
+                labels[-1].ravel(),
+                labels[:, 0].ravel(),
+                labels[:, -1].ravel(),
+            ]
+        )
+    )
+    sealed = np.bincount(labels.ravel()) * resolution**3 >= min_volume
+    sealed[0] = False  # the occupied label
+    sealed[bulk] = False
+    return grid[sealed[labels]].astype(np.float32)
+
+
 def removeHET(prot: "Molecule") -> "Molecule":
     """Remove all HETATM residues from a structure.
 
