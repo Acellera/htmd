@@ -75,12 +75,12 @@ built.read("./build/structure.pdb")
 
 ```{code-cell} python
 :tags: [remove-input]
-show3d(built, focus='segid "P0"', ball_and_stick='segid "P0"')
+show3d(built, focus="protein and resid 1 to 17", ball_and_stick="protein and resid 1 to 17")
 ```
 
 ## Step 2: Compute the cellular restraints
 
-The apelin peptide sits in segment `P0` (chain A of the original PDB). On the OPM-aligned structure, `+z` points toward the extracellular side of the membrane, so the peptide lives in the **extracellular** compartment. We want a restraint that keeps it there throughout production.
+The apelin peptide is the first 17 residues of the built system. The AMBER build renumbers every residue contiguously and its topology carries no segment IDs, so select the peptide by residue range (`protein and resid 1 to 17`) rather than by the `P0` segment the pre-build structure had. On the OPM-aligned structure, `+z` points toward the extracellular side of the membrane, so the peptide lives in the **extracellular** compartment. We want a restraint that keeps it there throughout production.
 
 `membrane_rel_z` is the fraction of the box height at which the bilayer is centred. The default `0.5` only holds when the bilayer sits exactly mid-box; in practice the build's z-padding above and below the membrane is rarely symmetric, so compute it from the actual lipid coordinates:
 
@@ -92,7 +92,7 @@ print(f"membrane centred at z = {lipid_z.mean():.1f} / {built.box[2, 0]:.1f} "
 ```
 
 ```{code-cell} python
-extracellular_sel = 'segid "P0"'   # apelin peptide
+extracellular_sel = "protein and resid 1 to 17"   # apelin peptide
 intracellular_sel = None           # no intracellular ligand in this system
 
 restraints = get_cellular_restraints(
