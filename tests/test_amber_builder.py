@@ -558,21 +558,22 @@ def _hoh_mol(resid, segid, x0):
 
 def test_tleap_residue_positions_solute_only():
     """All non-water non-cyclic residues get sequential positions 1..N."""
-    from htmd.builder.amber import _tleap_residue_positions
+    from htmd.builder.amber import _tleap_residue_positions, _Unit
 
     parts = [_ala_mol(r, "P0", "A", x0=r * 5.0) for r in (1, 2, 3)]
     mol = Molecule()
     for p in parts:
         mol.append(p)
 
-    pos = _tleap_residue_positions(mol, cyc_info=[], include_water=False)
+    units = [_Unit("solute", "mol", "input.pdb", ["P0"])]
+    pos = _tleap_residue_positions(mol, units, include_water=False)
     # Three ALA residues, each with 4 atoms -> positions [1,1,1,1, 2,2,2,2, 3,3,3,3].
     assert list(pos) == [1] * 4 + [2] * 4 + [3] * 4
 
 
 def test_tleap_residue_positions_solute_then_water():
     """Solute residues get 1..N_solute, then waters get N_solute+1..."""
-    from htmd.builder.amber import _tleap_residue_positions
+    from htmd.builder.amber import _tleap_residue_positions, _Unit
 
     mol = Molecule()
     mol.append(_ala_mol(1, "P0", "A", x0=0.0))
@@ -580,7 +581,10 @@ def test_tleap_residue_positions_solute_then_water():
     mol.append(_hoh_mol(3, "P1", x0=12.0))
     mol.append(_ala_mol(4, "P2", "B", x0=20.0))  # solute again, after waters
 
-    pos = _tleap_residue_positions(mol, cyc_info=[], include_water=True)
+    # The water-only segid P1 never becomes a unit of its own; it is written to
+    # solvent.pdb and combined last.
+    units = [_Unit("solute", "mol", "input.pdb", ["P0", "P2"])]
+    pos = _tleap_residue_positions(mol, units, include_water=True)
     # Two solute residues (4 atoms each) followed by two waters (3 atoms each).
     # Solute first -> positions 1 and 2 - this is the load-order in the
     # final combined unit, NOT the mol order which has waters interleaved.
@@ -594,11 +598,11 @@ def test_tleap_residue_positions_solute_then_water():
     assert hoh3_pos == {4}
 
 
-def test_tleap_residue_positions_cyclic_appended_in_cyc_info_order():
-    """Cyclic-segment residues are appended after solute+water, in the
-    same order the _write_tleap_script combine emits.
+def test_tleap_residue_positions_follow_the_units_with_the_solvent_last():
+    """Residues are numbered in the order the combine lists the units, and the
+    solvent is numbered after all of them.
     """
-    from htmd.builder.amber import _tleap_residue_positions
+    from htmd.builder.amber import _tleap_residue_positions, _Unit
 
     mol = Molecule()
     mol.append(_ala_mol(1, "P0", "A", x0=0.0))  # solute
@@ -606,23 +610,42 @@ def test_tleap_residue_positions_cyclic_appended_in_cyc_info_order():
     mol.append(_ala_mol(3, "CYC1", "X", x0=20.0))  # first cyclic seg
     mol.append(_ala_mol(4, "CYC2", "Y", x0=30.0))  # second cyclic seg
 
-    # cyc_info entries name the cyclic segs in the order they're combined.
-    # See _write_tleap_script: `mol = combine {mol wat cyc_CYC1 cyc_CYC2}`.
-    cyc_info = [
-        ("cyc_CYC1", "cyclic_CYC1.pdb", 1, 1),
-        ("cyc_CYC2", "cyclic_CYC2.pdb", 1, 1),
+    units = [
+        _Unit("solute", "mol", "input.pdb", ["P0"]),
+        _Unit("cyclic", "cyc_CYC1", "cyclic_CYC1.pdb", ["CYC1"], 1, 1),
+        _Unit("cyclic", "cyc_CYC2", "cyclic_CYC2.pdb", ["CYC2"], 1, 1),
     ]
-    pos = _tleap_residue_positions(mol, cyc_info=cyc_info, include_water=True)
+    pos = _tleap_residue_positions(mol, units, include_water=True)
 
-    solute_pos = set(pos[mol.atomselect("resid 1")].tolist())
-    water_pos = set(pos[mol.atomselect("water")].tolist())
-    cyc1_pos = set(pos[mol.segid == "CYC1"].tolist())
-    cyc2_pos = set(pos[mol.segid == "CYC2"].tolist())
-    # Order in combined unit: solute (1) -> water (2) -> CYC1 (3) -> CYC2 (4).
-    assert solute_pos == {1}
-    assert water_pos == {2}
-    assert cyc1_pos == {3}
-    assert cyc2_pos == {4}
+    assert set(pos[mol.atomselect("resid 1")].tolist()) == {1}
+    assert set(pos[mol.segid == "CYC1"].tolist()) == {2}
+    assert set(pos[mol.segid == "CYC2"].tolist()) == {3}
+    assert set(pos[mol.atomselect("water")].tolist()) == {4}
+
+
+def test_a_cyclic_unit_between_two_solute_runs_is_numbered_between_them():
+    """A cyclic segment bonded to a solute segment is combined beside it, which
+    puts a second solute run after it -- and the numbering has to follow.
+    """
+    from htmd.builder.amber import _tleap_residue_positions, _Unit
+
+    mol = Molecule()
+    mol.append(_ala_mol(1, "P0", "A", x0=0.0))
+    mol.append(_ala_mol(2, "CYC1", "X", x0=10.0))
+    mol.append(_ala_mol(3, "P1", "B", x0=20.0))
+    mol.append(_hoh_mol(4, "W0", x0=30.0))
+
+    units = [
+        _Unit("solute", "mol", "input.pdb", ["P0"]),
+        _Unit("cyclic", "cyc_CYC1", "cyclic_CYC1.pdb", ["CYC1"], 1, 1),
+        _Unit("solute", "mol_2", "input_2.pdb", ["P1"]),
+    ]
+    pos = _tleap_residue_positions(mol, units, include_water=True)
+
+    assert set(pos[mol.segid == "P0"].tolist()) == {1}
+    assert set(pos[mol.segid == "CYC1"].tolist()) == {2}
+    assert set(pos[mol.segid == "P1"].tolist()) == {3}
+    assert set(pos[mol.atomselect("water")].tolist()) == {4}
 
 
 def _cyclic_peptide_mol(closure_dist, add_closure_bond):
