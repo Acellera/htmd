@@ -349,7 +349,8 @@ class AdaptiveBase(abc.ABC, ProtocolInterface):
         epoch = 0
         regex = re.compile(r"e(\d+)")
         for f in folders:
-            res = regex.search(f)
+            # Match the folder name only; parent dirs (e.g. tmp names) can contain "e<digit>"
+            res = regex.match(path.basename(path.normpath(f)))
             if res:
                 num = res.group(1)
                 if int(num) > epoch:
