@@ -1548,6 +1548,49 @@ def _write_tleap_script(
         f.write("quit")
 
 
+def _bonded_segment_order(mol, disulfide, custombonds):
+    """The solute's segids, with covalently joined ones adjacent.
+
+    Segments joined by a disulfide or a custom bond are grouped into the
+    connected components of the graph those bonds form, so that each resulting
+    molecule occupies one consecutive span once tleap writes the solute in this
+    order. Order is otherwise preserved: the first segment of each group keeps
+    the group's place, and segments keep theirs within it.
+    """
+
+    def segid_of(sel):
+        # Disulfides arrive as UniqueResidueID and custom bonds as UniqueAtomID,
+        # which locate themselves by different methods.
+        locate = getattr(sel, "selectAtoms", None) or sel.selectAtom
+        idx = np.atleast_1d(locate(mol, indexes=True))
+        return mol.segid[idx[0]] if len(idx) else None
+
+    segs = list(dict.fromkeys(mol.segid))
+    joined = {}
+    for pairs in (disulfide or [], custombonds or []):
+        for sel1, sel2 in pairs:
+            s1, s2 = segid_of(sel1), segid_of(sel2)
+            if s1 is None or s2 is None or s1 == s2:
+                continue
+            joined.setdefault(s1, set()).add(s2)
+            joined.setdefault(s2, set()).add(s1)
+
+    order, placed = [], set()
+    for seg in segs:
+        if seg in placed:
+            continue
+        group, stack = [], [seg]
+        while stack:  # the component this segment belongs to
+            cur = stack.pop()
+            if cur in placed:
+                continue
+            placed.add(cur)
+            group.append(cur)
+            stack.extend(sorted(joined.get(cur, set()) - placed))
+        order.extend(sorted(group, key=segs.index))
+    return order
+
+
 def _prepare_build(
     mol,
     ff=None,
@@ -1692,6 +1735,20 @@ def _prepare_build(
 
     param_names = [os.path.basename(p) for p in newparam]
 
+    # Before the PDB split and the tleap script: both the atom order written to
+    # input.pdb and the residue positions the bond commands address are derived
+    # from `mol`, and they have to agree.
+    order = _bonded_segment_order(mol, disulfide, custombonds)
+    if order != list(dict.fromkeys(mol.segid)):
+        logger.info(
+            f"Writing segments as {', '.join(order)} to keep covalently "
+            "bonded ones in one block"
+        )
+        mol = mol.copy()
+        mol.reorderAtoms(
+            np.concatenate([np.flatnonzero(mol.segid == seg) for seg in order])
+        )
+
     # --- Cyclic segments (decided earlier, while bonds were present) and write
     #     PDB files. Break auto-sequencing at custom-bond (e.g. isopeptide)
     #     junctions and at glycan residues on the per-PDB copies only - the
@@ -1774,6 +1831,31 @@ def _prepare_build(
     return backend, value, resname_aliases
 
 
+def _write_prmtop_box(prmtop_path: str, lengths, angle: float) -> None:
+    """Replace the prmtop's BOX_DIMENSIONS with `angle` and the three `lengths`.
+
+    That section is the whole of the cell a prmtop carries -- one angle and
+    three lengths -- so rewriting the one line in place leaves every other
+    section byte for byte as tleap wrote it, and the atom order with it.
+    """
+    out, state = [], None
+    with open(prmtop_path) as fh:
+        for line in fh:
+            if line.startswith("%FLAG"):
+                state = "flag" if line.split()[1] == "BOX_DIMENSIONS" else None
+            elif state == "flag" and line.startswith("%FORMAT"):
+                state = "data"
+            elif state == "data":
+                out.append("".join(f"{v:16.8E}" for v in (angle, *lengths)) + "\n")
+                state = None
+                continue
+            out.append(line)
+    if state is not None:
+        raise BuildError(f"{prmtop_path} has no BOX_DIMENSIONS section to stamp")
+    with open(prmtop_path, "w") as fh:
+        fh.writelines(out)
+
+
 def _stamp_cell(outdir: str, prefix: str, mol: Molecule, molbuilt: Molecule) -> None:
     """Write `mol`'s unit cell onto the built prmtop, crd and Molecule.
 
@@ -1794,8 +1876,6 @@ def _stamp_cell(outdir: str, prefix: str, mol: Molecule, molbuilt: Molecule) -> 
     molbuilt : :class:`Molecule <moleculekit.molecule.Molecule>`
         The Molecule read back from the build, mutated in place.
     """
-    import parmed
-
     from htmd.builder.builder import _cell_angles, _has_cell
 
     if not _has_cell(mol):
@@ -1831,12 +1911,9 @@ def _stamp_cell(outdir: str, prefix: str, mol: Molecule, molbuilt: Molecule) -> 
             "coordinates."
         )
 
-    # Topology only, so ParmEd does not rewrite the coordinates.
-    parm = parmed.load_file(prmtop_path)
-    parm.box = lengths + angles
-    parm.write_parm(prmtop_path)
+    _write_prmtop_box(prmtop_path, lengths, angles[0])
 
-    # parm.save() writes a CHARMM CRD for a .crd extension and loses the box.
+    # The box is the inpcrd's last line: three lengths then three angles.
     lines[-1] = "".join(f"{v:12.7f}" for v in lengths + angles) + "\n"
     with open(crd_path, "w") as fh:
         fh.writelines(lines)
@@ -1851,6 +1928,49 @@ def _stamp_cell(outdir: str, prefix: str, mol: Molecule, molbuilt: Molecule) -> 
         f"lengths [{lengths[0]:.3f}, {lengths[1]:.3f}, {lengths[2]:.3f}], "
         f"angles [{angles[0]:.3f}, {angles[1]:.3f}, {angles[2]:.3f}]"
     )
+
+
+def _check_molecule_blocks(molbuilt, prmtop_path: str) -> None:
+    """Raise unless the prmtop's molecules are the ones its bonds describe.
+
+    ATOMS_PER_MOLECULE partitions the atoms into molecules by length, so it
+    agrees with the bonds only when each molecule's atoms are consecutive.
+    pmemd reads it for pressure scaling and imaging and never rechecks it
+    against the bonds, so a partition that disagrees costs a wrong trajectory
+    rather than a crash.
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    declared = []
+    grab = False
+    with open(prmtop_path) as fh:
+        for line in fh:
+            if line.startswith("%FLAG"):
+                grab = line.split()[1] == "ATOMS_PER_MOLECULE"
+                continue
+            if line.startswith("%FORMAT") or not grab:
+                continue
+            declared += [int(x) for x in line.split()]
+    if not declared:
+        return  # no box, no molecule section to be wrong
+
+    bonds = molbuilt.bonds
+    n = molbuilt.numAtoms
+    labels = connected_components(
+        coo_matrix((np.ones(len(bonds)), (bonds[:, 0], bonds[:, 1])), shape=(n, n)),
+        directed=False,
+    )[1]
+    start = 0
+    for size in declared:
+        if len(set(labels[start : start + size])) != 1:
+            raise BuildError(
+                f"{os.path.basename(prmtop_path)} declares a molecule spanning atoms "
+                f"{start}..{start + size - 1}, but its bonds say that is more than one "
+                "molecule. A molecule's atoms have to be written consecutively; a "
+                "segment bonded to another needs to sit beside it."
+            )
+        start += size
 
 
 def _read_tleap_output(outdir, prefix, logpath, mol: Molecule | None = None):
@@ -1895,6 +2015,7 @@ def _read_tleap_output(outdir, prefix, logpath, mol: Molecule | None = None):
 
     if mol is not None:
         _stamp_cell(outdir, prefix, mol, molbuilt)
+    _check_molecule_blocks(molbuilt, prmtop_path)
     molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
     return molbuilt

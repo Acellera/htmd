@@ -52,11 +52,14 @@ def _compareResultFolders(
     import filecmp
 
     def _cutfirstline(infile, outfile):
-        # Cut out the first line of prmtop which has a build date in it
+        # Cut out the first line of prmtop, which has a build date in it, and
+        # the padding to 80 columns that tLeap writes and ParmEd does not. Every
+        # prmtop field is fixed-width, so trailing blanks are padding on any
+        # line; the mol_equal checks above compare the parsed contents.
         with open(infile, "r") as fin:
-            data = fin.read().splitlines(True)
+            data = fin.read().splitlines()
         with open(outfile, "w") as fout:
-            fout.writelines(data[1:])
+            fout.writelines(line.rstrip() + "\n" for line in data[1:])
 
     mol2 = Molecule(os.path.join(compare, "structure.prmtop"))
     mol2.read(os.path.join(compare, "structure.pdb"))
@@ -1617,3 +1620,91 @@ def test_gbsa_build_follows_the_same_cell_gate(tmp_path):
     assert not np.allclose(
         molbuilt2.box[:, 0], expected, atol=1e-2
     ), "the no-cell GBSA build should carry tleap's vdW box, not the crystal cell"
+
+
+def test_a_bonded_ligand_is_written_beside_the_chain_it_is_bonded_to():
+    """4DKL's beta-funaltrexamine is covalently bound to Lys233, so it and the
+    protein are one molecule. An ion written between them splits it, and AMBER
+    describes a molecule as a span of consecutive atoms -- so the layout has to
+    put the ligand back beside the protein.
+    """
+    from moleculekit.molecule import UniqueAtomID
+    from htmd.builder.amber import _bonded_segment_order
+
+    mol = Molecule("4DKL")
+    mol.filter("protein or resname BF0 CL", _logger=False)
+    # The deposited entry already has the ligand before the ion; write the ion
+    # between them, which is what the build's own segid assignment produced.
+    cl = np.flatnonzero(mol.resname == "CL")
+    bf0 = np.flatnonzero(mol.resname == "BF0")
+    rest = np.setdiff1d(np.arange(mol.numAtoms), np.concatenate([cl, bf0]))
+    mol.reorderAtoms(np.concatenate([rest, cl, bf0]))
+    mol.segid[:] = "P0"
+    mol.segid[mol.resname == "CL"] = "P2"
+    mol.segid[mol.resname == "BF0"] = "P3"
+    assert list(dict.fromkeys(mol.segid)) == ["P0", "P2", "P3"], "setup is not the bad layout"
+
+    bond = [
+        UniqueAtomID.fromMolecule(mol, "resname BF0 and name CAW"),
+        UniqueAtomID.fromMolecule(mol, "resid 233 and name NZ"),
+    ]
+    assert _bonded_segment_order(mol, None, [bond]) == ["P0", "P3", "P2"]
+
+    # Nothing bonded across segments, nothing moves.
+    assert _bonded_segment_order(mol, None, None) == ["P0", "P2", "P3"]
+
+
+def test_two_chains_each_keep_their_own_bonded_ligand():
+    """Grouping both ligands at the end splits the first chain's molecule. What
+    the layout owes each molecule is one unbroken run, not a fixed position."""
+    from moleculekit.molecule import UniqueAtomID
+    from htmd.builder.amber import _bonded_segment_order
+
+    mol = Molecule("4DKL")
+    mol.filter("protein", _logger=False)
+    half = int(np.median(mol.resid))
+    mol.segid[:] = "A"
+    mol.segid[mol.resid > half] = "B"
+    mol.segid[mol.resid == mol.resid.min()] = "L1"
+    mol.segid[mol.resid == mol.resid.max()] = "L2"
+
+    def atom(sel):
+        return UniqueAtomID.fromMolecule(mol, sel)
+
+    bonds = [
+        [atom("segid L1 and name CA"), atom(f"segid A and name CA and resid {half - 1}")],
+        [atom("segid L2 and name CA"), atom(f"segid B and name CA and resid {half + 1}")],
+    ]
+    order = _bonded_segment_order(mol, None, bonds)
+    for group in (("A", "L1"), ("B", "L2")):
+        at = sorted(order.index(g) for g in group)
+        assert at == list(range(at[0], at[0] + len(group))), (
+            f"{group} is split across the layout {order}"
+        )
+
+
+def test_stamping_the_box_rewrites_only_the_cell():
+    """Setting the cell through a topology library rebuilds ATOMS_PER_MOLECULE,
+    and that rebuild reorders atoms whose molecule is not contiguous -- leaving
+    the coordinates, which live in another file, behind."""
+    from htmd.builder.amber import _write_prmtop_box
+
+    prmtop = (
+        "%FLAG ATOM_NAME\n%FORMAT(20a4)\nN   CA  C   \n"
+        "%FLAG BOX_DIMENSIONS\n%FORMAT(5E16.8)\n"
+        "  9.00000000E+01  1.00000000E+01  1.10000000E+01  1.20000000E+01\n"
+        "%FLAG RADIUS_SET\n%FORMAT(1a80)\nmodified Bondi radii\n"
+    )
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_box_test.prmtop")
+    try:
+        with open(path, "w") as fh:
+            fh.write(prmtop)
+        _write_prmtop_box(path, (20.0, 21.0, 22.0), 90.0)
+        out = open(path).read()
+        assert "2.00000000E+01  2.10000000E+01  2.20000000E+01" in out
+        assert "1.00000000E+01" not in out, "the old cell is still there"
+        for keep in ("N   CA  C", "modified Bondi radii", "%FLAG RADIUS_SET"):
+            assert keep in out, f"{keep!r} was lost"
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
