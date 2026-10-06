@@ -366,6 +366,7 @@ def build(
     molbuilt = _run_psfgen(psfgen, outdir, "build.vmd", prefix, mol_orig)
     _checkFailedAtoms(molbuilt)
     _recoverProtonations(molbuilt)
+    molbuilt.write(os.path.join(outdir, f"{prefix}.cif"))
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
     return molbuilt
 

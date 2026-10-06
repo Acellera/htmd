@@ -2044,6 +2044,7 @@ def _read_tleap_output(outdir, prefix, logpath, mol: Molecule | None = None):
         _stamp_cell(outdir, prefix, mol, molbuilt)
     _check_molecule_blocks(molbuilt, prmtop_path)
     molbuilt.write(os.path.join(outdir, f"{prefix}.pdb"), writebonds=False)
+    molbuilt.write(os.path.join(outdir, f"{prefix}.cif"))
     detectCisPeptideBonds(molbuilt, respect_bonds=True)
     return molbuilt
 
