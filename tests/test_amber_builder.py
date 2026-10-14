@@ -1652,7 +1652,7 @@ def test_a_bonded_ligand_is_written_beside_the_chain_it_is_bonded_to():
     put the ligand back beside the protein.
     """
     from moleculekit.molecule import UniqueAtomID
-    from htmd.builder.amber import _bonded_segment_order
+    from htmd.builder.amber import _bonded_segment_groups
 
     mol = Molecule("4DKL")
     mol.filter("protein or resname BF0 CL", _logger=False)
@@ -1671,17 +1671,17 @@ def test_a_bonded_ligand_is_written_beside_the_chain_it_is_bonded_to():
         UniqueAtomID.fromMolecule(mol, "resname BF0 and name CAW"),
         UniqueAtomID.fromMolecule(mol, "resid 233 and name NZ"),
     ]
-    assert _bonded_segment_order(mol, None, [bond]) == ["P0", "P3", "P2"]
+    assert _bonded_segment_groups(mol, None, [bond]) == [["P0", "P3"], ["P2"]]
 
     # Nothing bonded across segments, nothing moves.
-    assert _bonded_segment_order(mol, None, None) == ["P0", "P2", "P3"]
+    assert _bonded_segment_groups(mol, None, None) == [["P0"], ["P2"], ["P3"]]
 
 
 def test_two_chains_each_keep_their_own_bonded_ligand():
     """Grouping both ligands at the end splits the first chain's molecule. What
     the layout owes each molecule is one unbroken run, not a fixed position."""
     from moleculekit.molecule import UniqueAtomID
-    from htmd.builder.amber import _bonded_segment_order
+    from htmd.builder.amber import _bonded_segment_groups
 
     mol = Molecule("4DKL")
     mol.filter("protein", _logger=False)
@@ -1698,12 +1698,45 @@ def test_two_chains_each_keep_their_own_bonded_ligand():
         [atom("segid L1 and name CA"), atom(f"segid A and name CA and resid {half - 1}")],
         [atom("segid L2 and name CA"), atom(f"segid B and name CA and resid {half + 1}")],
     ]
-    order = _bonded_segment_order(mol, None, bonds)
-    for group in (("A", "L1"), ("B", "L2")):
-        at = sorted(order.index(g) for g in group)
-        assert at == list(range(at[0], at[0] + len(group))), (
-            f"{group} is split across the layout {order}"
-        )
+    groups = _bonded_segment_groups(mol, None, bonds)
+    assert sorted(map(sorted, groups)) == [["A", "L1"], ["B", "L2"]], groups
+
+
+def test_bonded_reorder_keeps_unbonded_segids_interleaved():
+    """A membrane alternates its leaflet segids per lipid, and those segid
+    changes are the only TERs between lipids. Gathering a bonded ligand to its
+    chain must not gather the leaflets too, or tleap chains the lipids."""
+    from htmd.builder.amber import _bonded_segment_permutation
+
+    mol = Molecule().empty(7)
+    mol.segid[:] = ["P0", "L0", "L1", "L0", "L1", "I0", "P1"]
+    groups = [["P0", "P1"], ["L0"], ["L1"], ["I0"]]
+    perm = _bonded_segment_permutation(mol, groups)
+    assert mol.segid[perm].tolist() == ["P0", "P1", "L0", "L1", "L0", "L1", "I0"]
+
+    # Nothing grouped, nothing moves.
+    perm = _bonded_segment_permutation(mol, [[s] for s in dict.fromkeys(mol.segid)])
+    assert perm.tolist() == list(range(7))
+
+
+def test_lipid_boundaries_survive_a_segid_reorder():
+    """Each lipid is marked by a chain change, not an alternating segid, so
+    gathering atoms by segid cannot merge lipids into one tleap chain."""
+    from htmd.builder.amber import _charmmLipid2Amber
+
+    homedir = os.path.join(curr_dir, "data", "test-amber-build", "membrane")
+    mol = Molecule(os.path.join(homedir, "structure.psf"))
+    mol.read(os.path.join(homedir, "structure.pdb"))
+    nlipids = len(np.unique(mol.resid[mol.resname == "POPC"]))
+    nlipatoms = np.sum(mol.resname == "POPC")
+    mol = _charmmLipid2Amber(mol)
+
+    assert np.sum(mol.segid == "MEMB") == nlipatoms, "lipids are split over segids"
+    mol.reorderAtoms(np.argsort(mol.segid, kind="stable"))
+    lip = mol.copy(sel=mol.segid == "MEMB")
+    starts = np.flatnonzero(np.r_[True, lip.chain[1:] != lip.chain[:-1]])
+    assert len(starts) == nlipids
+    assert np.all(lip.resname[starts] == "PA"), "a chain change falls inside a lipid"
 
 
 def test_stamping_the_box_rewrites_only_the_cell():

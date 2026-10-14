@@ -1552,8 +1552,8 @@ def _write_tleap_script(
         f.write("quit")
 
 
-def _bonded_segment_order(mol, disulfide, custombonds):
-    """The solute's segids, with covalently joined ones adjacent.
+def _bonded_segment_groups(mol, disulfide, custombonds):
+    """The solute's segids, grouped into covalently joined components.
 
     Segments joined by a disulfide or a custom bond are grouped into the
     connected components of the graph those bonds form, so that each resulting
@@ -1591,8 +1591,29 @@ def _bonded_segment_order(mol, disulfide, custombonds):
             placed.add(cur)
             group.append(cur)
             stack.extend(sorted(joined.get(cur, set()) - placed))
-        order.extend(sorted(group, key=segs.index))
+        order.append(sorted(group, key=segs.index))
     return order
+
+
+def _bonded_segment_permutation(mol, groups):
+    """Atom order that gathers each multi-segment group into one block at its
+    first appearance and leaves every other segid run where it is.
+
+    Unbonded segids may be interleaved on purpose: a membrane alternates its
+    leaflet segids per lipid, and those segid changes are its only TERs.
+    """
+    group_of = {s: tuple(g) for g in groups if len(g) > 1 for s in g}
+    starts = np.flatnonzero(np.r_[True, mol.segid[1:] != mol.segid[:-1]])
+    ends = np.r_[starts[1:], mol.numAtoms]
+    perm, done = [], set()
+    for st, en in zip(starts, ends):
+        group = group_of.get(mol.segid[st])
+        if group is None:
+            perm.append(np.arange(st, en))
+        elif group not in done:
+            done.add(group)
+            perm += [np.flatnonzero(mol.segid == s) for s in group]
+    return np.concatenate(perm)
 
 
 def _prepare_build(
@@ -1742,16 +1763,15 @@ def _prepare_build(
     # Before the PDB split and the tleap script: both the atom order written to
     # input.pdb and the residue positions the bond commands address are derived
     # from `mol`, and they have to agree.
-    order = _bonded_segment_order(mol, disulfide, custombonds)
+    groups = _bonded_segment_groups(mol, disulfide, custombonds)
+    order = [s for g in groups for s in g]
     if order != list(dict.fromkeys(mol.segid)):
         logger.info(
             f"Writing segments as {', '.join(order)} to keep covalently "
             "bonded ones in one block"
         )
         mol = mol.copy()
-        mol.reorderAtoms(
-            np.concatenate([np.flatnonzero(mol.segid == seg) for seg in order])
-        )
+        mol.reorderAtoms(_bonded_segment_permutation(mol, groups))
 
     # --- Cyclic segments (decided earlier, while bonds were present) and write
     #     PDB files. Break auto-sequencing at custom-bond (e.g. isopeptide)
@@ -2684,11 +2704,18 @@ def _charmmLipid2Amber(mol):
     # if len(begters) > 999:
     #    raise NameError('More than 999 lipids. Cannot define separate segments for all of them.')
 
+    # One lipid segid, with the chain alternating per lipid so tleap does not
+    # auto-sequence one lipid into the next. Independent of atom order, unlike
+    # alternating segids, which any segid-based reorder gathers back together.
+    if len(begters):
+        used = set(np.unique(mol.chain).tolist())
+        chains = [c for c in _CHAIN_POOL if c not in used][:2]
     for i in range(len(begters)):
         mapping = np.zeros(len(mol.resid), dtype=bool)
         mapping[begters[i] : finters[i] + 1] = True
         mol.set("resid", sequenceID(mol.get("resname", sel=mapping)), sel=mapping)
-        mol.set("segid", f"L{i % 2}", sel=mapping)
+        mol.segid[mapping] = "MEMB"
+        mol.chain[mapping] = chains[i % 2]
 
     return mol
 
