@@ -175,7 +175,7 @@ def _createLipids(
     files,
     leaflet=None,
     area_fraction_used=0.0,
-    head_z=15.0,
+    head_z=None,
 ):
     if leaflet not in ("upper", "lower"):
         raise ValueError(f"leaflet must be 'upper' or 'lower', got {leaflet!r}")
@@ -213,16 +213,14 @@ def _createLipids(
             f"or adjust the ratios."
         )
 
-    # All lipids in a leaflet share the same head plane (z = +-head_z) so
-    # mixed bilayers start with a flat surface. Per-species depths emerge
-    # naturally during NPT equilibration.
+    # head_z maps resname -> head height, so each species' tail ends at the midplane.
     z_sign = 1 if leaflet == "upper" else -1
     lipids = []
     for i in range(len(lipidnames)):
         resname = lipidnames[i]
         rings = _detectRings(Molecule(files[resname][0]))
         for k in range(counts[i]):
-            xyz = np.array([np.nan, np.nan, z_sign * head_z])
+            xyz = np.array([np.nan, np.nan, z_sign * head_z[resname]])
             lipids.append(
                 _Lipid(
                     resname=resname,
@@ -421,6 +419,123 @@ def _optimizeLipidRotations(lipids, solute, n_angles=24, search_radius=15.0):
             f"Optimized rotation for {n_optimized} lipids near solute "
             f"(within {search_radius:.1f} A)."
         )
+
+
+def _optimizeNeighbourRotations(
+    lipids,
+    box,
+    solute=None,
+    n_angles=24,
+    cutoff=2.0,
+    max_sweeps=10,
+    shift=1.0,
+    max_drift=2.0,
+):
+    """Pick per-lipid z-rotations, then small xy shifts, that minimize atom
+    overlaps with same-leaflet neighbours (and the solute).
+
+    Coordinate descent, worst lipid first, on ``sum(max(0, cutoff - d)^2)``.
+    Each move lowers the total, so the sweeps converge to a local optimum.
+    Only lipids whose neighbourhood changed are re-scored. Hydrogens are
+    included: heavy atoms at a normal distance can still have overlapping H.
+    Heads move at most ``max_drift`` A in xy from their packed position.
+    """
+    from scipy.spatial import cKDTree
+    from moleculekit.util import rotationMatrix
+
+    box = np.asarray(box[:2], dtype=float)
+    n = len(lipids)
+    origin = np.array([ll.xyz[:2] for ll in lipids])
+    leaflet = np.array([ll.xyz[2] > 0 for ll in lipids])
+    # Two lipids each reach ~5 A sideways from the head, plus both drifting.
+    radius = 11.0 + 2 * max_drift
+    pairs = cKDTree(np.mod(origin, box), boxsize=box).query_pairs(radius)
+    neigh = [set() for _ in lipids]
+    for i, j in pairs:
+        if leaflet[i] == leaflet[j]:
+            neigh[i].add(j)
+            neigh[j].add(i)
+    stree = None
+    if solute is not None:
+        stree = cKDTree(solute.coords[:, :, 0])
+
+    grid = np.linspace(-180, 180, n_angles, endpoint=False)
+    R = np.array([rotationMatrix([0, 0, 1], np.deg2rad(a)) for a in grid])
+    rotated, current = [], []
+    for ll in lipids:
+        mol = ll.mol
+        local = mol.coords[:, :, 0] - mol.coords[mol.name == ll.headname, :, 0]
+        rotated.append(np.einsum("nij,kj->nki", R, local))  # (n_angles, N, 3)
+        # Snap the random starting rotation onto the grid.
+        a = int(np.argmin(np.abs((grid - ll.rot + 180) % 360 - 180)))
+        ll.rot = float(grid[a])
+        current.append(rotated[-1][a])  # head-relative coords
+
+    def penalties(i, cand):
+        # cand: (n_cand, N, 3) head-relative coords of lipid i.
+        xyz = lipids[i].xyz
+        flat = cand.reshape(-1, 3)
+        pen = np.zeros(len(flat))
+        others = []
+        for j in neigh[i]:
+            delta = lipids[j].xyz - xyz
+            delta[:2] -= box * np.round(delta[:2] / box)
+            others.append(current[j] + delta)
+        for tree, pts in (
+            (cKDTree(np.vstack(others)) if others else None, flat),
+            (stree, flat + xyz),
+        ):
+            if tree is not None:
+                d, _ = tree.query(pts, k=8, distance_upper_bound=cutoff)
+                pen += (np.clip(cutoff - d, 0, None) ** 2).sum(axis=1)
+        return pen.reshape(len(cand), -1).sum(axis=1)
+
+    def descend(shifts):
+        score = np.array([penalties(i, current[i][None])[0] for i in range(n)])
+        dirty = set(range(n))
+        for sweep in range(max_sweeps):
+            todo = sorted((i for i in dirty if score[i] > 0), key=lambda i: -score[i])
+            dirty = set()
+            for i in todo:
+                cand = (rotated[i][:, None] + shifts[None, :, None]).reshape(
+                    -1, *current[i].shape
+                )
+                pen = penalties(i, np.concatenate([current[i][None], cand]))
+                drift = lipids[i].xyz[:2] + shifts[:, :2] - origin[i]
+                too_far = np.linalg.norm(drift, axis=1) > max_drift + 1e-6
+                pen[1:][np.tile(too_far, len(grid))] = np.inf
+                best = int(np.argmin(pen[1:]))
+                if pen[best + 1] < pen[0]:
+                    a, s = divmod(best, len(shifts))
+                    lipids[i].rot = float(grid[a])
+                    lipids[i].xyz[:2] += shifts[s, :2]
+                    current[i] = rotated[i][a]
+                    dirty |= neigh[i] | {i}
+            for j in dirty:
+                score[j] = penalties(j, current[j][None])[0]
+            if not dirty:
+                break
+        return score.sum(), sweep + 1
+
+    start = sum(penalties(i, current[i][None])[0] for i in range(n))
+    rot_total, rot_sweeps = descend(np.zeros((1, 3)))
+    dirs = np.deg2rad(np.arange(0, 360, 45))
+    shifts = np.vstack(
+        [np.zeros(3), np.c_[np.cos(dirs), np.sin(dirs), np.zeros(len(dirs))] * shift]
+    )
+    final, shift_sweeps = descend(shifts)
+    logger.info(
+        f"Lipid packing sweeps: clash penalty {start:.1f} -> {rot_total:.1f} "
+        f"(rotations, {rot_sweeps} sweeps) -> {final:.1f} "
+        f"(+{shift:.1f} A xy shifts, {shift_sweeps} sweeps)."
+    )
+
+
+def _tailLength(path, headname):
+    """Head-to-deepest-atom distance along z of an upright lipid conformer."""
+    mol = Molecule(path)
+    z = mol.coords[:, 2, 0]
+    return float(z[mol.name == headname][0] - z.min())
 
 
 def _locateLipidFiles(folder, lipidnames):
@@ -875,7 +990,7 @@ def buildMembrane(
     solute: Molecule | None = None,
     solute_thickness: float | None = None,
     timestep_fs: float = 2.0,
-    head_z: float = 15.0,
+    head_z: float | None = None,
     head_restraint_k: float = 0.0,
 ) -> Molecule:
     """Construct a membrane bilayer containing arbitrary lipid species and ratios.
@@ -891,7 +1006,9 @@ def buildMembrane(
     Parameters
     ----------
     xysize : list or np.ndarray
-        XY dimensions of the membrane in Angstroms, e.g. ``[100, 100]``.
+        XY dimensions of the membrane in Angstroms, e.g. ``[100, 100]``. This
+        is also the periodic box in xy. Each side must be at least 25 A when
+        minimizing or equilibrating.
     ratioupper : dict
         Lipid composition of the upper leaflet. Keys are lipid residue names
         (matching entries in the lipid library) and values are relative
@@ -939,10 +1056,12 @@ def buildMembrane(
     timestep_fs : float
         Integrator timestep in femtoseconds for OpenMM equilibration.
         2.0 fs is compatible with ``constraints=HBonds``.
-    head_z : float
-        Half-bilayer head-plane position in Angstroms. Every lipid head is
-        initially placed at ``+head_z`` (upper leaflet) or ``-head_z``
-        (lower leaflet) to start from a flat bilayer geometry.
+    head_z : float, optional
+        Half-bilayer head-plane position in Angstroms. When given, every lipid
+        head is placed at ``+head_z`` (upper leaflet) or ``-head_z`` (lower
+        leaflet). By default each species' head is placed at its conformer's
+        head-to-tail length along z (+0.5 A), so tails of opposite leaflets
+        meet at the midplane instead of overlapping.
     head_restraint_k : float
         Harmonic Z-restraint strength in kcal/mol/A^2 applied to lipid head
         atoms toward their initial head plane during minimization and
@@ -973,6 +1092,14 @@ def buildMembrane(
 
     if isinstance(equilibrate, bool):
         raise ValueError("equilibrate must be a float")
+    # The box is the lipid packing period; OpenMM needs it above twice the
+    # 10 A cutoff, with headroom for the barostat shrinking it.
+    if (minimize > 0 or equilibrate > 0) and min(xysize[:2]) < 25:
+        raise ValueError(
+            f"xysize {list(xysize[:2])} is too small to minimize or equilibrate: "
+            "each side must be at least 25 A (twice the 10 A nonbonded cutoff "
+            "plus barostat headroom)."
+        )
 
     if seed is not None:
         np.random.seed(seed)
@@ -983,6 +1110,16 @@ def buildMembrane(
 
     uqlip = np.unique(list(ratioupper.keys()) + list(ratiolower.keys()))
     files = _locateLipidFiles(lipidf, uqlip)
+    if head_z is None:
+        lipid_z = {
+            name: max(_tailLength(f, lipiddb.loc[name, "Head"]) for f in files[name])
+            + 0.5
+            for name in uqlip
+        }
+    else:
+        lipid_z = {name: float(head_z) for name in uqlip}
+    # Single plane for the solute footprint slab and the debug PDB.
+    head_z = max(lipid_z.values())
 
     area = np.prod(xysize)
     upper_fraction = 0.0
@@ -1038,7 +1175,7 @@ def buildMembrane(
         files,
         leaflet="upper",
         area_fraction_used=upper_fraction,
-        head_z=head_z,
+        head_z=lipid_z,
     )
     lipids += _createLipids(
         ratiolower,
@@ -1047,7 +1184,7 @@ def buildMembrane(
         files,
         leaflet="lower",
         area_fraction_used=lower_fraction,
-        head_z=head_z,
+        head_z=lipid_z,
     )
 
     _setPositionsLJSim(
@@ -1077,6 +1214,7 @@ def buildMembrane(
 
     if solute is not None:
         _optimizeLipidRotations(lipids, solute)
+    _optimizeNeighbourRotations(lipids, xysize, solute)
 
     resolveRingPenetrations(lipids, xysize)
     memb = _createMembraneMolecule(lipids)
@@ -1095,29 +1233,36 @@ def buildMembrane(
     minc = head_coords.min(axis=0) - 5
     maxc = head_coords.max(axis=0) + 5
 
-    # Full slab minus the hydrophobic interior, replacing two stacked calls.
-    smemb = solvate(
-        memb,
-        minmax=[
-            [minc[0] - 5, minc[1] - 5, minc[2] - waterbuff],
-            [maxc[0] + 5, maxc[1] + 5, maxc[2] + waterbuff],
-        ],
-        exclude_z=(minc[2] + 2, maxc[2] - 2),
-    )
+    # Water fills exactly the periodic cell the lipids were packed in.
+    lo = np.r_[com_xy - np.asarray(xysize[:2]) / 2, minc[2] - waterbuff]
+    hi = np.r_[com_xy + np.asarray(xysize[:2]) / 2, maxc[2] + waterbuff]
+    smemb = solvate(memb, minmax=[lo, hi], exclude_z=(minc[2] + 2, maxc[2] - 2))
+    smemb.box = (hi - lo).reshape(3, 1).astype(np.float32)
 
-    # Set the PBC cell to the lipid head bbox (minc/maxc already include
-    # a +-5 A tail-buffer) in xy and the water-padded lipid extent in z.
-    # solvate fills [minc-5, maxc+5] in xy, so the outer ~5 A of water
-    # wraps to the opposite edge at startup; the MonteCarloMembraneBarostat
-    # (XYIsotropic, ZFree) then converges the cell to the natural APL.
-    smemb.box = np.array(
-        [
-            [maxc[0] - minc[0]],
-            [maxc[1] - minc[1]],
-            [maxc[2] - minc[2] + 2.0 * waterbuff],
-        ],
-        dtype=np.float32,
+    # solvate() sees neither periodic images nor the solute: drop waters whose
+    # heavy atoms come within 2.4 A of another molecule across the PBC or of the solute.
+    from scipy.spatial import cKDTree
+    from moleculekit.util import sequenceID
+
+    n = smemb.numAtoms
+    xyz, res = smemb.coords[:, :, 0], sequenceID((smemb.resid, smemb.segid))
+    heavy = smemb.element != "H"
+    if solute is not None:
+        xyz = np.vstack([xyz, solute.coords[:, :, 0]])
+        res = np.r_[res, np.full(solute.numAtoms, -1)]
+        heavy = np.r_[heavy, solute.element != "H"]
+    iswat = np.arange(len(xyz)) >= memb.numAtoms
+    iswat[n:] = False
+    idx = np.where(heavy)[0]
+    box = smemb.box[:, 0].astype(float)
+    pairs = cKDTree(np.mod(xyz[idx] - lo, box), boxsize=box).query_pairs(
+        2.4, output_type="ndarray"
     )
+    i, j = idx[pairs].T  # i < j
+    keep = res[i] != res[j]
+    drop = np.where(iswat[j[keep]], j[keep], i[keep])
+    drop = drop[iswat[drop]]
+    smemb.remove(np.isin(res[:n], res[drop]), _logger=False)
     smemb.boxangles = np.array([[90.0], [90.0], [90.0]], dtype=np.float32)
 
     if outdir is None:
@@ -1148,10 +1293,8 @@ def buildMembrane(
     if equilibrate > 0 or minimize > 0:
         smemb.write(os.path.join(outdir, "starting_structure.pdb"))
 
-        # Use the lipid placement's design intent (xyz[2] sign) to assign
-        # leaflets, not the current head z. This is more robust than the
-        # generic helper for membranes fresh out of LJ packing, where a
-        # head could occasionally cross the midplane.
+        # Anchor each head at its placement z, not its current z: a head fresh
+        # out of LJ packing can occasionally cross the midplane.
         head_anchors = None
         if head_restraint_k > 0:
             head_anchors = []
@@ -1160,8 +1303,7 @@ def buildMembrane(
                 idx = np.where(m)[0]
                 if len(idx) != 1:
                     continue
-                z_target = head_z if ll.xyz[2] > 0 else -head_z
-                head_anchors.append((int(idx[0]), float(z_target)))
+                head_anchors.append((int(idx[0]), float(ll.xyz[2])))
 
         equilibrateMembrane(
             smemb,

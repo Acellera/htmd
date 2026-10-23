@@ -61,7 +61,7 @@ def test_build_membrane(tmp_path):
 
 def test_build_membrane_minimize(tmp_path):
     buildMembrane(
-        [20, 20],
+        [30, 30],
         ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
         ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
         equilibrate=0,
@@ -76,7 +76,7 @@ def test_build_membrane_minimize(tmp_path):
 
 def test_build_membrane_equil(tmp_path):
     buildMembrane(
-        [20, 20],
+        [30, 30],
         ratioupper={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
         ratiolower={"popc": 0.42, "pope": 0.4, "chl1": 0.18},
         equilibrate=0.005,
