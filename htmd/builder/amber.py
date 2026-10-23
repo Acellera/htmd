@@ -2704,13 +2704,19 @@ def _charmmLipid2Amber(mol):
     # One lipid segid, with the chain alternating per lipid so tleap does not
     # auto-sequence one lipid into the next. Independent of atom order, unlike
     # alternating segids, which any segid-based reorder gathers back together.
+    # Residues are numbered on across lipids, not from 1 in each: tleap starts a
+    # residue at a resid change, not a chain change, so consecutive one-residue
+    # lipids (cholesterol) restarting at the same resid merge into one.
     if len(begters):
         used = set(np.unique(mol.chain).tolist())
         chains = [c for c in _CHAIN_POOL if c not in used][:2]
+    nextresid = 1
     for i in range(len(begters)):
         mapping = np.zeros(len(mol.resid), dtype=bool)
         mapping[begters[i] : finters[i] + 1] = True
-        mol.set("resid", sequenceID(mol.get("resname", sel=mapping)), sel=mapping)
+        resids = sequenceID(mol.get("resname", sel=mapping)) + nextresid
+        mol.resid[mapping] = resids
+        nextresid = resids.max() + 1
         mol.segid[mapping] = "MEMB"
         mol.chain[mapping] = chains[i % 2]
 

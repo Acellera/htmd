@@ -1782,6 +1782,29 @@ def test_lipid_boundaries_survive_a_segid_reorder():
     assert np.all(lip.resname[starts] == "PA"), "a chain change falls inside a lipid"
 
 
+def test_consecutive_cholesterols_stay_separate():
+    """Cholesterol is a one-residue lipid. Neighbouring ones must get different
+    resids, or tleap, which starts a residue at a resid change and not at a
+    chain change, merges them into one and drops the duplicate atoms."""
+    from htmd.builder.amber import _charmmLipid2Amber
+    from htmd.home import home
+
+    chl = Molecule(
+        os.path.join(home(shareDir=True), "membranebuilder", "lipids", "chl1", "chl1.cif")
+    )
+    mol = Molecule()
+    for i in range(4):
+        lipid = chl.copy()
+        lipid.resid[:] = i + 1
+        lipid.moveBy([10 * i, 0, 0])
+        mol.append(lipid)
+    mol = _charmmLipid2Amber(mol)
+
+    assert np.all(mol.resname == "CHL")
+    starts = np.flatnonzero(np.r_[True, mol.resid[1:] != mol.resid[:-1]])
+    assert len(starts) == 4, "consecutive cholesterols share a resid"
+
+
 def test_stamping_the_box_rewrites_only_the_cell():
     """Setting the cell through a topology library rebuilds ATOMS_PER_MOLECULE,
     and that rebuild reorders atoms whose molecule is not contiguous -- leaving
