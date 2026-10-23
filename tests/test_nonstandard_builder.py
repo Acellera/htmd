@@ -3772,7 +3772,10 @@ def _run_5vbl_param_reference(
     fixture covers five chain-resident NCAAs (HRG, ALC, OIC, NLE, 200)
     plus an isopeptide GLU(CD)-LYS(NZ) crosslink that exercises the
     canonical-anchor rename path. 200 is C-terminal."""
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
 
     regenerate = bool(os.environ.get("HTMD_REGEN_REFERENCES"))
     mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "5VBL_A.cif"))
@@ -3793,17 +3796,9 @@ def _run_5vbl_param_reference(
         mol.templateResidueFromSmiles(
             f'resname "{resname}"', smi, addHs=True, _logger=False
         )
-    # The chain-A peptide inhibitor in 5VBL_A.cif is missing the
-    # sidechain atoms of LYS1 / PHE2 / ARG3 / ARG4 / LYS12 (only
-    # backbone + CB), so PDB2PQR's 10%-missing-atom threshold would
-    # reject the structure. ``restore_missing_sidechains=True`` runs
-    # moleculekit's Dunbrack-rotamer mutator pre-PDB2PQR to fill them
-    # in at canonical coordinates.
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+    restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
     out = parameterizeFromSpecs(
         specs,
         pmol,
@@ -4163,7 +4158,10 @@ def test_amber_build_5vbl_matches_reference(tmp_path):
     OIC, NLE, 200) + GLU(CD)-LYS(NZ) isopeptide (XX1/XX2 renames).
     Exercises the prolinoid backbone pin (OIC) and the
     canonical-anchor rename path end to end."""
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
     from htmd.builder.amber import build as amber_build
 
     mol = Molecule(os.path.join(_CUSTOM_PARAM_DIR, "5VBL_A.cif"))
@@ -4179,11 +4177,9 @@ def test_amber_build_5vbl_matches_reference(tmp_path):
         mol.templateResidueFromSmiles(
             f'resname "{resname}"', smi, addHs=True, _logger=False
         )
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+    restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
 
     out = parameterizeFromSpecs(
         specs,

@@ -1166,7 +1166,10 @@ def test_parameterize_from_specs_openff_cluster_nle(tmp_path):
     markers are present for N/C, and the XML loads in app.ForceField."""
     from moleculekit.molecule import Molecule
     from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
     from htmd.builder.nonstandard import parameterizeFromSpecs
     import openmm.app as app
     import xml.etree.ElementTree as ET
@@ -1185,16 +1188,9 @@ def test_parameterize_from_specs_openff_cluster_nle(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    # The 5VBL_A chain-A peptide is missing sidechain atoms on several
-    # canonical residues, so PDB2PQR needs the Dunbrack rotamer mutator
-    # to fill them in before debumping (same setup as
-    # _test_custom_residue_param_reference_5vbl_cluster in
-    # test_nonstandard_builder.py).
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+    restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
 
     # Run only the NLE residue through the cluster pipeline via the
     # per-resname backend map (everything else stays on antechamber).
@@ -1385,7 +1381,10 @@ def test_parameterize_from_specs_openff_backbone_pin(tmp_path):
     visible in the emitted XML."""
     from moleculekit.molecule import Molecule
     from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
     from htmd.builder.nonstandard import parameterizeFromSpecs
     import xml.etree.ElementTree as ET
 
@@ -1403,11 +1402,9 @@ def test_parameterize_from_specs_openff_backbone_pin(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+    restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
 
     def _nle_backbone_charges(pin, norm):
         out = parameterizeFromSpecs(
@@ -1626,14 +1623,16 @@ def _load_three_way_system(input_filename):
     from :data:`_NCAA_SMILES`, run systemPrepare, return ``(pmol, specs)``.
 
     All systems share the same setup - water removal, detectNonStandard,
-    SMILES templating, and ``systemPrepare(detect_specs=specs,
-    restore_missing_sidechains=True)``. Per-system tweaks are only
-    expressed via ``pytest.mark.xfail`` markers; the loader itself
+    SMILES templating, and ``systemPrepare(detect_specs=specs)``. Per-system
+    tweaks are only expressed via ``pytest.mark.xfail`` markers; the loader itself
     treats every fixture identically.
     """
     from moleculekit.molecule import Molecule
     from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
 
     mol = Molecule(os.path.join(_TESTS_DIR, input_filename))
     # Defensive: even though fixtures are pre-filtered with no water,
@@ -1647,16 +1646,10 @@ def _load_three_way_system(input_filename):
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
 
-    # PDB2PQR rejects chains with >10% of sidechain atoms missing. Many
-    # of our test fixtures (notably 5VBL_A) carry trimmed sidechains for
-    # disorder reasons; restore them via moleculekit's Dunbrack rotamer
-    # mutator so PDB2PQR sees a complete structure. Harmless when no
-    # atoms are missing.
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    if input_filename == "5VBL_A.cif":
+        # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+        restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
     return pmol, specs
 
 
@@ -2092,7 +2085,10 @@ def test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
     """
     from moleculekit.molecule import Molecule
     from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
     from htmd.builder.nonstandard import parameterizeFromSpecs
     from htmd.builder.amber import build as amber_build
     from htmd.builder.openmm import build as openmm_build
@@ -2112,11 +2108,9 @@ def test_5vbl_three_way_amber_vs_antechamber_vs_openff(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+    restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
     caps = {"1": ("none", "none")}
 
     # Parameterise both ways.
@@ -2295,7 +2289,10 @@ def test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
     """
     from moleculekit.molecule import Molecule
     from moleculekit.tools.nonstandard_residues import detectNonStandardResidues
-    from moleculekit.tools.preparation import systemPrepare
+    from moleculekit.tools.preparation import (
+        restoreTrimmedSidechains,
+        systemPrepare,
+    )
     from htmd.builder.nonstandard import parameterizeFromSpecs
     from htmd.builder.openmm import build as openmm_build
 
@@ -2313,11 +2310,9 @@ def test_5vbl_antechamber_vs_openff_cross_consistency(tmp_path):
             mol.templateResidueFromSmiles(
                 f'resname "{resname}"', smi, addHs=True, _logger=False
             )
-    pmol = systemPrepare(
-        mol,
-        detect_specs=specs,
-        restore_missing_sidechains=True,
-    )[0]
+    # Trimmed sidechains exceed PDB2PQR's 10% heavy-atom repair limit
+    restoreTrimmedSidechains(mol, specs)
+    pmol = systemPrepare(mol, detect_specs=specs)[0]
 
     # C-terminal residue 200 carries its own OXT through both parameterise
     # paths, so an auto-NME cap on top would clash. 5VBL_A.cif uses segid
