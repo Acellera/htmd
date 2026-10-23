@@ -22,7 +22,7 @@ kernelspec:
 For a protein containing only canonical residues, building is four steps after loading:
 
 1. {py:func}`~moleculekit.tools.autosegment.autoSegment`: automatically split the structure into independent segments by walking the residue connectivity and starting a new segment at every real chain break (decided from the backbone-atom distance between consecutive residues; resid numbering is not consulted).
-2. {py:func}`~moleculekit.tools.preparation.systemPrepare`: protonate at the chosen pH, fix protonation states, and patch a few missing heavy atoms (full missing-sidechain restoration is off by default; opt in with `restore_missing_sidechains=True`).
+2. {py:func}`~moleculekit.tools.preparation.systemPrepare`: protonate at the chosen pH, fix protonation states, and rebuild missing heavy atoms (if more than 10% are missing, run {py:func}`~moleculekit.tools.preparation.restoreTrimmedSidechains` first).
 3. {py:func}`~htmd.builder.solvate.solvate`: wrap a water box around the prepared structure.
 4. {py:func}`htmd.builder.amber.build`: run tLeap to produce a `prmtop` + `pdb` pair (and ionise to the requested salt concentration).
 
