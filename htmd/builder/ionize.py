@@ -244,9 +244,12 @@ def resolveSalts(
         first salt also neutralizes the system.
     saltconc : float
         Concentration (M) of the single salt, when ``salts`` is not given.
-    cation, anion : str, optional
-        Ions of the single salt. Default to ``"NA"`` and ``"CL"``. Deprecated in
-        favour of ``salts``.
+    cation : str, optional
+        Cation of the single salt. Defaults to ``"NA"``. Deprecated in favour of
+        ``salts``.
+    anion : str, optional
+        Anion of the single salt. Defaults to ``"CL"``. Deprecated in favour of
+        ``salts``.
 
     Returns
     -------
