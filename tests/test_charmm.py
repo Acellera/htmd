@@ -45,6 +45,17 @@ class TestCharmmBuild(unittest.TestCase):
 
                 # shutil.rmtree(tmpdir)
 
+    def test_non_chloride_salt_is_refused(self):
+        """CHARMM's ion topology has chloride as its only anion, so a bromide salt
+        is refused before anything is built."""
+        from moleculekit.molecule import Molecule
+        from htmd.builder.solvate import solvate
+        from htmd.util import tempname
+
+        mol = solvate(Molecule("3PTB"), pad=3)
+        with self.assertRaisesRegex(ValueError, "no BR"):
+            build(mol, outdir=tempname(), salts=[("KBr", 0.15)])
+
     @unittest.skipUnless(_psfgen_exists, "Requires psfgen")
     def test_customDisulfideBonds(self):
         from moleculekit.molecule import Molecule

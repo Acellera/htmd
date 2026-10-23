@@ -11,8 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Info about all ions, with charge, name, amber and charmm names (may
-# need residues too). Only the first column is currently used.
+# Info about all ions, keyed by their residue name in AMBER/OpenMM ion libraries:
+# charge, name, AMBER name and CHARMM name (None when CHARMM has no such ion).
 _ions = {
     "NA": (1, "sodium", "Na+", "SOD"),
     "MG": (2, "magnesium", "Mg2+", "MG"),
@@ -21,12 +21,32 @@ _ions = {
     "CS": (1, "cesium", "Cs+", "CES"),
     "CA": (2, "calcium", "Ca2+", "CAL"),
     "CL": (-1, "chloride", "Cl-", "CLA"),
+    "F": (-1, "fluoride", "F-", None),
+    "BR": (-1, "bromide", "Br-", None),
+    "IOD": (-1, "iodide", "I-", None),
 }
 
 _ion_aliases = {}
 for _key, (_charge, _fullname, _ambername, _charmmname) in _ions.items():
     for _alias in (_key, _fullname, _ambername, _charmmname):
-        _ion_aliases[_alias.upper()] = _key
+        if _alias is not None:
+            _ion_aliases[_alias.upper()] = _key
+_ion_aliases["I"] = "IOD"
+
+
+def _ionElement(ion):
+    """Element symbol of a canonical ion, from its AMBER name: "Mg2+" -> "Mg"."""
+    return _ions[ion][2].rstrip("+-0123456789")
+
+
+# Every supported cation/anion pair, keyed by formula: "MgCl2" -> MG, CL
+_salt_formulas = {
+    f"{_ionElement(cat)}{_ionElement(an)}{'2' if qc == 2 else ''}": (cat, an)
+    for cat, (qc, *_) in _ions.items()
+    if qc > 0
+    for an, (qa, *_) in _ions.items()
+    if qa < 0
+}
 
 
 def ionize(
@@ -154,7 +174,24 @@ def ionize(
     if neutralize:
         return anion, cation, nanion, ncation
 
-    # If we want a specific salt concentration, guess chemical formula
+    cationstoich, anionstoich, num = _saltUnits(
+        mol.resname, cation, anion, saltconc, nwater
+    )
+
+    logger.info(
+        f"Adding {nanion} anions + {ncation} cations for neutralizing and {(cationstoich + anionstoich) * num} ions for the given salt concentration {saltconc} M."
+    )
+    ncation += cationstoich * num
+    nanion += anionstoich * num
+    return anion, cation, anion, cation, nanion, ncation
+
+
+def _saltUnits(resnames, cation, anion, saltconc, nwater):
+    """Formula of the salt made of ``cation`` and ``anion`` and how many formula units
+    to add for ``saltconc`` (M) in ``nwater`` waters, net of the units already present
+    in ``resnames``. Returns ``(cationstoich, anionstoich, num)``."""
+    cationcharge = _ionGetCharge(cation)
+    anioncharge = _ionGetCharge(anion)
     if cationcharge == 1 and anioncharge == -1:  # e.g., NaCl, Kcl, ...
         cationstoich = 1
         anionstoich = 1
@@ -172,10 +209,10 @@ def ionize(
 
     # Count existing salt concentration to not add on top of existing conc
     # TODO: This will break on multi-atom ions! Will require a bit fancier code to calculate individual molecules
-    cation_names = [cation, _ions[cation][3]]  # AMBER and CHARMM names
-    anion_names = [anion, _ions[anion][3]]
-    ncations_exist = np.sum(np.isin(mol.resname, cation_names)) / cationstoich
-    nanions_exist = np.sum(np.isin(mol.resname, anion_names)) / anionstoich
+    cation_names = [n for n in (cation, _ions[cation][3]) if n]  # AMBER, CHARMM
+    anion_names = [n for n in (anion, _ions[anion][3]) if n]
+    ncations_exist = np.sum(np.isin(resnames, cation_names)) / cationstoich
+    nanions_exist = np.sum(np.isin(resnames, anion_names)) / anionstoich
     exist = int(min(ncations_exist, nanions_exist))
 
     num = int(np.floor(0.5 + 0.0187 * saltconc * nwater))
@@ -184,13 +221,114 @@ def ionize(
         raise RuntimeError(
             f"Salt concentration in system is already higher than the requested concentration {saltconc} M. Please remove some ions or change salt concentration and try again."
         )
+    return cationstoich, anionstoich, num
 
-    logger.info(
-        f"Adding {nanion} anions + {ncation} cations for neutralizing and {(cationstoich + anionstoich) * num} ions for the given salt concentration {saltconc} M."
-    )
-    ncation += cationstoich * num
-    nanion += anionstoich * num
-    return anion, cation, anion, cation, nanion, ncation
+
+def resolveSalts(
+    salts: list | None = None,
+    saltconc: float | None = 0,
+    cation: str | None = None,
+    anion: str | None = None,
+) -> list:
+    """Normalize the salts of a build into ``[(cation, anion, concentration), ...]``.
+
+    Builders take either a list of salts or the single-salt shorthand
+    ``saltconc`` / ``saltcation`` / ``saltanion``, not both.
+
+    Parameters
+    ----------
+    salts : list, optional
+        ``[(formula, concentration), ...]`` with concentrations in molar, e.g.
+        ``[("KCl", 0.15), ("MgCl2", 0.001)]``. A formula pairs Na, K, Cs, Mg, Ca or
+        Zn with Cl, F, Br or I (e.g. ``"NaBr"``, ``"CaI2"``), in any case. The
+        first salt also neutralizes the system.
+    saltconc : float
+        Concentration (M) of the single salt, when ``salts`` is not given.
+    cation, anion : str, optional
+        Ions of the single salt. Default to ``"NA"`` and ``"CL"``. Deprecated in
+        favour of ``salts``.
+
+    Returns
+    -------
+    salts : list
+        ``[(cation, anion, concentration), ...]`` with canonical ion keys.
+    """
+    if not salts:
+        if cation or anion:
+            logger.warning(
+                "saltcation / saltanion are deprecated. Pass the salt as a formula "
+                'instead, e.g. salts=[("KCl", 0.15)].'
+            )
+        cation, anion = _resolve_ion(cation or "NA"), _resolve_ion(anion or "CL")
+        if _ionGetCharge(cation) <= 0 or _ionGetCharge(anion) >= 0:
+            raise ValueError(f"{cation} is not a cation or {anion} not an anion.")
+        return [(cation, anion, float(saltconc or 0))]
+    if saltconc or cation or anion:
+        raise ValueError(
+            "Give either salts or saltconc / saltcation / saltanion, not both."
+        )
+    resolved = []
+    for formula, conc in salts:
+        ions = next(
+            (v for k, v in _salt_formulas.items() if k.upper() == formula.upper()),
+            None,
+        )
+        if ions is None:
+            raise ValueError(
+                f"Unknown salt '{formula}'. Supported: {', '.join(_salt_formulas)}."
+            )
+        if any(ions == (c, a) for c, a, _ in resolved):
+            raise ValueError(f"Salt '{formula}' is given twice.")
+        if conc < 0:
+            raise ValueError(f"Salt '{formula}' has a negative concentration.")
+        resolved.append((*ions, float(conc)))
+    return resolved
+
+
+def ionizeSalts(resnames, netcharge: float, nwater: int, salts: list) -> dict:
+    """Number of each ion to add to neutralize a system and reach several salt
+    concentrations.
+
+    The first salt's ions neutralize the system, as in :func:`ionize`. Every salt
+    then adds the formula units for its concentration on top, like a single
+    ``saltconc``.
+
+    Parameters
+    ----------
+    resnames : array
+        Residue names of the system's atoms, to count ions already present.
+    netcharge : float
+        Net charge of the system.
+    nwater : int
+        Number of water molecules, which sets the volume for the concentrations.
+    salts : list
+        ``[(cation, anion, concentration), ...]`` with canonical ion names, as
+        returned by :func:`resolveSalts`.
+
+    Returns
+    -------
+    counts : dict
+        Number of ions to add, keyed by canonical ion name.
+    """
+    counts = {}
+    for i, (cation, anion, conc) in enumerate(salts):
+        nanion = ncation = 0
+        if i == 0:
+            _, _, nanion, ncation = ionize(
+                None, netcharge, nwater, neutralize=True, cation=cation, anion=anion
+            )
+        cationstoich, anionstoich, num = _saltUnits(
+            resnames, cation, anion, conc, nwater
+        )
+        if conc > 0 and num == 0:
+            logger.warning(
+                f"{conc} M of {cation}/{anion} is less than one formula unit in "
+                f"{nwater} waters, so none is added. Use a larger box to include it."
+            )
+        counts[cation] = counts.get(cation, 0) + ncation + cationstoich * num
+        counts[anion] = counts.get(anion, 0) + nanion + anionstoich * num
+    logger.info(f"Adding ions: {counts}")
+    return counts
 
 
 def _resolve_ion(name):
@@ -259,37 +397,68 @@ def ionizePlace(
     mol : Molecule
         The solvent molecule with ions replacing some water molecules.
     """
+    return _placeIons(
+        solvent_mol,
+        solute_mol,
+        [(anion_resname, anion_name, nanion), (cation_resname, cation_name, ncation)],
+        dfrom,
+        dbetween,
+    )
 
-    newmol = solvent_mol.copy()
 
-    logger.debug(f"Min distance of ions from molecule: {dfrom}A")
-    logger.debug(f"Min distance between ions: {dbetween}A")
-    logger.debug(f"Placing {nanion} anions and {ncation} cations.")
+def placeIons(
+    solvent_mol: Molecule,
+    solute_mol: Molecule | None,
+    counts: dict,
+    dfrom: float = 5,
+    dbetween: float = 5,
+) -> Molecule:
+    """Place ions of any number of types in the solvent, replacing waters.
 
-    if (nanion + ncation) == 0:
-        return newmol
+    Like :func:`ionizePlace`, but for the ``{ion: count}`` of :func:`ionizeSalts`.
+    Each ion's residue and atom name is its canonical name.
 
-    nions = nanion + ncation
+    Parameters
+    ----------
+    solvent_mol : Molecule
+        The solvent (water) molecule.
+    solute_mol : Molecule or None
+        The solute molecule used for minimum-distance filtering.
+    counts : dict
+        Number of ions to add, keyed by canonical ion name.
+    dfrom : float
+        Minimum distance of ions from solute molecule in Angstroms.
+    dbetween : float
+        Minimum distance between ions in Angstroms.
 
-    betabackup = newmol.beta.copy()
-    newmol.set("beta", sequenceID((newmol.resid, newmol.insertion, newmol.segid)))
+    Returns
+    -------
+    mol : Molecule
+        The solvent molecule with ions replacing some water molecules.
+    """
+    return _placeIons(solvent_mol, solute_mol, _ionSpecies(counts), dfrom, dbetween)
 
-    # Find water oxygens to replace with ions
-    wat_oh = newmol.atomselect("noh and water", indexes=True)
 
-    if len(wat_oh) == 0:
-        raise NameError("No water molecules found in the solvent to replace with ions.")
+def _ionSpecies(counts):
+    """``[(resname, name, count), ...]`` for ``counts``, anions first. With one salt
+    this is the (anion, cation) order of :func:`ionizePlace`, so a single salt is
+    labelled exactly as it always was. The atom name is the upper-case element, as
+    in the AMBER and OpenMM ion libraries (``IOD`` holds atom ``I``)."""
+    order = sorted(counts, key=lambda ion: _ionGetCharge(ion) > 0)
+    return [(ion, _ionElement(ion).upper(), counts[ion]) for ion in order]
 
-    wat_coords = newmol.coords[wat_oh, :, 0]
 
+def _pickIonSites(wat_coords, solute_coords, nions, dfrom, dbetween):
+    """Indices into ``wat_coords`` of ``nions`` well-spaced water oxygens at least
+    ``dfrom`` from the solute and ``dbetween`` from each other."""
     # Filter by minimum distance from solute using KD-tree
-    if solute_mol is not None and solute_mol.numAtoms > 0:
-        solute_tree = cKDTree(solute_mol.coords[:, :, 0])
+    if solute_coords is not None and len(solute_coords) > 0:
+        solute_tree = cKDTree(solute_coords)
         dists_to_solute, _ = solute_tree.query(wat_coords)
         valid_mask = dists_to_solute >= dfrom
         valid_local = np.where(valid_mask)[0]
     else:
-        valid_local = np.arange(len(wat_oh))
+        valid_local = np.arange(len(wat_coords))
 
     if len(valid_local) == 0:
         raise NameError(
@@ -321,14 +490,48 @@ def ionizePlace(
         min_dists = np.minimum(min_dists, dists_to_new)
         min_dists[used] = -np.inf
 
-    # Map selected indices back to atom indices in newmol
-    ionlist = [wat_oh[valid_local[s]] for s in selected]
+    return valid_local[selected]
 
-    # Randomly assign ion types to FPS positions.  Since FPS guarantees
-    # well-spaced positions regardless of type, random labelling gives
-    # uniform spatial mixing independent of the anion/cation ratio.
-    type_labels = np.array(["anion"] * nanion + ["cation"] * ncation)
-    np.random.shuffle(type_labels)
+
+def _ionLabels(species):
+    """Shuffled per-ion indices into ``species``. Since farthest point sampling
+    guarantees well-spaced positions regardless of type, random labelling gives
+    uniform spatial mixing independent of the ion ratio."""
+    labels = np.concatenate(
+        [np.full(n, i) for i, (_, _, n) in enumerate(species)]
+    ).astype(int)
+    np.random.shuffle(labels)
+    return labels
+
+
+def _placeIons(solvent_mol, solute_mol, species, dfrom, dbetween):
+    newmol = solvent_mol.copy()
+
+    nions = sum(n for _, _, n in species)
+    logger.debug(f"Min distance of ions from molecule: {dfrom}A")
+    logger.debug(f"Min distance between ions: {dbetween}A")
+    logger.debug(f"Placing {nions} ions: {species}")
+
+    if nions == 0:
+        return newmol
+
+    betabackup = newmol.beta.copy()
+    newmol.set("beta", sequenceID((newmol.resid, newmol.insertion, newmol.segid)))
+
+    # Find water oxygens to replace with ions
+    wat_oh = newmol.atomselect("noh and water", indexes=True)
+
+    if len(wat_oh) == 0:
+        raise NameError("No water molecules found in the solvent to replace with ions.")
+
+    solute_coords = None
+    if solute_mol is not None and solute_mol.numAtoms > 0:
+        solute_coords = solute_mol.coords[:, :, 0]
+    picked = _pickIonSites(
+        newmol.coords[wat_oh, :, 0], solute_coords, nions, dfrom, dbetween
+    )
+    ionlist = wat_oh[picked]
+    type_labels = _ionLabels(species)
 
     # Delete waters but keep their coordinates
     waterpos = np.atleast_2d(newmol.get("coords", ionlist))
@@ -347,11 +550,9 @@ def ionizePlace(
     ions_mol.segid[:] = "I"
     ions_mol.coords = waterpos[:, :, np.newaxis]
 
-    anion_mask = type_labels == "anion"
-    ions_mol.name[anion_mask] = anion_name
-    ions_mol.resname[anion_mask] = anion_resname
-    ions_mol.name[~anion_mask] = cation_name
-    ions_mol.resname[~anion_mask] = cation_resname
+    for i, (resname, name, _) in enumerate(species):
+        ions_mol.resname[type_labels == i] = resname
+        ions_mol.name[type_labels == i] = name
 
     base_resid = newmol.resid[-1] + 1
     ions_mol.resid[:] = np.arange(base_resid, base_resid + nions)

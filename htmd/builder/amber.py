@@ -30,7 +30,7 @@ from subprocess import call
 from typing import NamedTuple
 from moleculekit.molecule import Molecule
 from moleculekit.tools.sequencestructuralalignment import sequenceStructureAlignment
-from htmd.builder.ionize import ionize as ionizef, ionizePlace
+from htmd.builder.ionize import ionizeSalts, placeIons, resolveSalts
 from htmd.util import ensurelist
 import logging
 
@@ -1063,6 +1063,7 @@ def build(
     saltconc: float = 0,
     saltanion: str | None = None,
     saltcation: str | None = None,
+    salts: list | None = None,
     disulfide: list | None = None,
     teleap: str | None = None,
     teleapimports: list | None = None,
@@ -1113,10 +1114,17 @@ def build(
     saltconc : float
         Salt concentration (in Molar) to add to the system after neutralization.
     saltanion : str, optional
-        The anion type. Available: ``'Cl-'``. Also accepts ``'CL'``, ``'chloride'``, ``'CLA'``.
+        Deprecated: use ``salts``, e.g. ``salts=[("KCl", 0.15)]``. The anion type. Available: ``'Cl-'``, ``'F-'``, ``'Br-'``, ``'I-'``. Also accepts
+        formats such as ``'CL'``, ``'chloride'``, ``'CLA'``.
     saltcation : str, optional
-        The cation type. Available: ``'Na+'``, ``'K+'``, ``'Cs+'``, ``'Mg2+'``, ``'Ca2+'``, ``'Zn2+'``.
+        Deprecated: use ``salts``, e.g. ``salts=[("KCl", 0.15)]``. The cation type. Available: ``'Na+'``, ``'K+'``, ``'Cs+'``, ``'Mg2+'``, ``'Ca2+'``, ``'Zn2+'``.
         Also accepts formats such as ``'NA'``, ``'sodium'``, ``'SOD'``.
+    salts : list, optional
+        Several salts as ``[(formula, concentration), ...]`` with concentrations in
+        molar, e.g. ``[("KCl", 0.15), ("MgCl2", 0.001)]``. Formulas are NaCl, KCl,
+        CsCl, MgCl2, CaCl2 or ZnCl2. The first salt also neutralizes the system. Replaces ``saltconc`` / ``saltanion`` /
+        ``saltcation``. A salt that amounts to less than one formula unit in the box
+        is left out with a warning.
     disulfide : list, optional
         If None, disulfide bonds are guessed automatically. Otherwise provide a list of pairs
         of atom selection strings for each pair of residues forming a disulfide bridge.
@@ -1248,28 +1256,17 @@ def build(
             if os.path.exists(fpath):
                 os.remove(fpath)
 
-        anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
-            molbuilt_solute,
+        counts = ionizeSalts(
+            molbuilt_solute.resname,
             totalcharge,
             nwater,
-            saltconc=saltconc,
-            anion=saltanion,
-            cation=saltcation,
+            resolveSalts(salts, saltconc, saltcation, saltanion),
         )
 
         water_sel = mol.atomselect("water")
         solvent_mol = mol.copy(sel=water_sel)
         solute_mol = mol.copy(sel=~water_sel)
-        solvent_mol = ionizePlace(
-            solvent_mol,
-            solute_mol,
-            anion,
-            cation,
-            anionatom,
-            cationatom,
-            nanion,
-            ncation,
-        )
+        solvent_mol = placeIons(solvent_mol, solute_mol, counts)
         _write_topology_input(
             solvent_mol, os.path.join(outdir, "solvent.pdb"), writebonds=False
         )

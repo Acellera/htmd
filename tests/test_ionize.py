@@ -2,7 +2,14 @@ import numpy as np
 import pytest
 import scipy.spatial.distance as dist
 from moleculekit.molecule import Molecule
-from htmd.builder.ionize import ionize, ionizePlace, _ionGetCharge
+from htmd.builder.ionize import (
+    ionize,
+    ionizePlace,
+    ionizeSalts,
+    placeIons,
+    resolveSalts,
+    _ionGetCharge,
+)
 
 
 class TestIonGetCharge:
@@ -18,6 +25,10 @@ class TestIonGetCharge:
 
     def test_anion(self):
         assert _ionGetCharge("CL") == -1
+
+    def test_halides_and_aliases(self):
+        for alias in ("F", "fluoride", "BR", "Br-", "IOD", "I", "iodide", "I-"):
+            assert _ionGetCharge(alias) == -1
 
     def test_unknown_ion_raises(self):
         with pytest.raises(NameError, match="not recognized"):
@@ -243,6 +254,114 @@ class TestIonizePlace:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+class TestResolveSalts:
+    def test_shorthand_defaults_to_nacl(self):
+        assert resolveSalts(None, 0.15) == [("NA", "CL", 0.15)]
+
+    def test_shorthand_aliases(self):
+        assert resolveSalts(None, 0.1, "POT", "chloride") == [("K", "CL", 0.1)]
+
+    def test_shorthand_ions_are_deprecated(self, caplog):
+        with caplog.at_level("WARNING"):
+            resolveSalts(None, 0.15)
+        assert "deprecated" not in caplog.text
+        with caplog.at_level("WARNING"):
+            resolveSalts(None, 0.15, "K")
+        assert "deprecated" in caplog.text
+
+    def test_shorthand_swapped_ions_raise(self):
+        with pytest.raises(ValueError, match="not a cation"):
+            resolveSalts(None, 0.1, "CL", "K")
+
+    def test_formulas_in_order_any_case(self):
+        salts = resolveSalts([("KCl", 0.15), ("mgcl2", 0.001)])
+        assert salts == [("K", "CL", 0.15), ("MG", "CL", 0.001)]
+
+    def test_every_chloride(self):
+        formulas = ["NaCl", "KCl", "CsCl", "MgCl2", "CaCl2", "ZnCl2"]
+        cations = [c for c, _, _ in resolveSalts([(f, 0.1) for f in formulas])]
+        assert cations == ["NA", "K", "CS", "MG", "CA", "ZN"]
+
+    def test_halide_salts(self):
+        salts = resolveSalts([("KBr", 0.1), ("NaI", 0.1), ("CaF2", 0.1)])
+        assert [s[:2] for s in salts] == [("K", "BR"), ("NA", "IOD"), ("CA", "F")]
+
+    def test_unknown_salt_lists_supported(self):
+        with pytest.raises(ValueError, match="Supported: .*MgCl2"):
+            resolveSalts([("Na2SO4", 0.15)])
+
+    def test_salt_given_twice_raises(self):
+        with pytest.raises(ValueError, match="twice"):
+            resolveSalts([("KCl", 0.15), ("kcl", 0.1)])
+
+    def test_list_and_shorthand_raises(self):
+        with pytest.raises(ValueError, match="not both"):
+            resolveSalts([("KCl", 0.15)], saltconc=0.15)
+
+    def test_negative_concentration_raises(self):
+        with pytest.raises(ValueError, match="negative"):
+            resolveSalts([("KCl", -0.1)])
+
+
+class TestIonizeSalts:
+    def test_single_salt_matches_ionize(self):
+        mol = _make_mol_with_atoms(10)
+        _, _, _, _, nanion, ncation = ionize(
+            mol, netcharge=-3, nwater=5000, saltconc=0.15, cation="K"
+        )
+        counts = ionizeSalts(mol.resname, -3, 5000, [("K", "CL", 0.15)])
+        assert counts == {"K": ncation, "CL": nanion}
+
+    def test_first_salt_neutralizes(self):
+        mol = _make_mol_with_atoms(10)
+        # 0.15 M KCl in 5000 waters is 14 units, 0.02 M MgCl2 is 2 units
+        counts = ionizeSalts(
+            mol.resname, -4, 5000, [("K", "CL", 0.15), ("MG", "CL", 0.02)]
+        )
+        assert counts == {"K": 4 + 14, "CL": 14 + 2 * 2, "MG": 2}
+        charge = sum(_ionGetCharge(ion) * n for ion, n in counts.items())
+        assert charge == 4
+
+    def test_divalent_first_salt_neutralizes(self):
+        mol = _make_mol_with_atoms(10)
+        counts = ionizeSalts(mol.resname, -4, 5000, [("MG", "CL", 0), ("K", "CL", 0)])
+        assert counts == {"MG": 2, "CL": 0, "K": 0}
+
+    def test_divalent_cation_halide(self):
+        mol = _make_mol_with_atoms(10)
+        counts = ionizeSalts(mol.resname, 2, 5000, [("MG", "BR", 0.02)])
+        # 2 Br- neutralize, then 2 units of MgBr2
+        assert counts == {"MG": 2, "BR": 2 + 4}
+
+    def test_salt_below_one_unit_warns(self, caplog):
+        mol = _make_mol_with_atoms(10)
+        with caplog.at_level("WARNING"):
+            counts = ionizeSalts(
+                mol.resname, 0, 5000, [("K", "CL", 0.15), ("MG", "CL", 0.001)]
+            )
+        assert counts["MG"] == 0
+        assert "less than one formula unit" in caplog.text
+
+
+class TestPlaceIons:
+    def test_places_every_type(self):
+        solvent, solute = _make_water_and_solute(nwaters=400, solute_atoms=20, box_size=40)
+        newmol = placeIons(solvent, solute, {"K": 5, "CL": 7, "MG": 1, "IOD": 2})
+        for ion, name, n in [("K", "K", 5), ("CL", "CL", 7), ("MG", "MG", 1), ("IOD", "I", 2)]:
+            assert np.sum(newmol.resname == ion) == n
+            assert np.sum((newmol.resname == ion) & (newmol.name == name)) == n
+        assert np.sum(newmol.atomselect("water and noh")) == 400 - 15
+
+    def test_single_salt_matches_ionizeplace(self):
+        solvent, solute = _make_water_and_solute(nwaters=400, solute_atoms=20, box_size=40)
+        np.random.seed(3)
+        old = ionizePlace(solvent, solute, "CL", "NA", "CL", "NA", 6, 4)
+        np.random.seed(3)
+        new = placeIons(solvent, solute, {"NA": 4, "CL": 6})
+        assert (old.resname == new.resname).all()
+        assert np.allclose(old.coords, new.coords)
+
 
 def _make_mol_with_atoms(natoms):
     """Create a minimal molecule with the given number of atoms."""

@@ -468,6 +468,49 @@ def test_ionize_salt(tmp_path):
 
 
 @pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_ionize_mixed_salts(tmp_path):
+    """KCl neutralizes and both salts are added: 3PTB is +6, so the Cl- count is
+    the 6 counterions plus one per K+ and two per Mg2+."""
+    from htmd.builder.solvate import solvate
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    smol = solvate(mol, pad=5)
+    molbuilt = build(
+        smol,
+        outdir=tmp_path,
+        ionize=True,
+        salts=[("KCl", 0.15), ("MgCl2", 0.05)],
+    )
+
+    nk = np.sum(molbuilt.resname == "K")
+    nmg = np.sum(molbuilt.resname == "MG")
+    ncl = np.sum(molbuilt.resname == "CL")
+    assert nk == 9, f"Expected 9 K+ ions (as many as NA for 0.15 M NaCl), got {nk}"
+    assert nmg >= 1, "No Mg2+ added"
+    assert ncl == 6 + nk + 2 * nmg, f"Expected {6 + nk + 2 * nmg} CL ions, got {ncl}"
+    assert abs(np.sum(molbuilt.charge)) < 1e-3
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
+def test_ionize_iodide(tmp_path):
+    """Halides other than chloride come from Amber's ion library: KI neutralizes
+    3PTB (+6) with iodide."""
+    from htmd.builder.solvate import solvate
+
+    np.random.seed(1)
+    mol = Molecule("3PTB")
+    mol.filter("protein")
+    molbuilt = build(solvate(mol, pad=5), outdir=tmp_path, salts=[("KI", 0.15)])
+
+    nk = np.sum(molbuilt.resname == "K")
+    ni = np.sum(molbuilt.resname == "IOD")
+    assert nk == 9 and ni == 6 + 9, (nk, ni)
+    assert abs(np.sum(molbuilt.charge)) < 1e-3
+
+
+@pytest.mark.skipif(not tleap_installed, reason=reason)
 def test_atomtype_decollisioning(tmp_path):
     # Tests that mol2 and cif building produce same results
     np.random.seed(1)

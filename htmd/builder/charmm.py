@@ -25,7 +25,7 @@ from htmd.builder.builder import (
     MissingResidueError,
     BuildError,
 )
-from htmd.builder.ionize import ionize as ionizef, ionizePlace
+from htmd.builder.ionize import ionizeSalts, placeIons, resolveSalts, _ions
 from glob import glob
 import logging
 
@@ -117,6 +117,7 @@ def build(
     saltconc: float = 0,
     saltanion: str | None = None,
     saltcation: str | None = None,
+    salts: list | None = None,
     disulfide: list | None = None,
     regenerate: list | None = ["angles", "dihedrals"],
     patches: list | str | None = None,
@@ -157,10 +158,17 @@ def build(
     saltconc : float
         Salt concentration (in Molar) to add to the system after neutralization.
     saltanion : str, optional
-        The anion type. Use CHARMM ion atom names (e.g. ``'CLA'``).
+        Deprecated: use ``salts``, e.g. ``salts=[("KCl", 0.15)]``. The anion type. Use CHARMM ion atom names (e.g. ``'CLA'``). Chloride is the
+        only anion in CHARMM's ion topology.
     saltcation : str, optional
-        The cation type. Use CHARMM ion atom names
+        Deprecated: use ``salts``, e.g. ``salts=[("KCl", 0.15)]``. The cation type. Use CHARMM ion atom names
         (e.g. ``'SOD'``, ``'MG'``, ``'POT'``, ``'CES'``, ``'CAL'``, ``'ZN2'``).
+    salts : list, optional
+        Several salts as ``[(formula, concentration), ...]`` with concentrations in
+        molar, e.g. ``[("KCl", 0.15), ("MgCl2", 0.001)]``. Formulas are NaCl, KCl,
+        CsCl, MgCl2, CaCl2 or ZnCl2. The first salt also neutralizes the system. Replaces ``saltconc`` / ``saltanion`` /
+        ``saltcation``. A salt that amounts to less than one formula unit in the box
+        is left out with a warning.
     disulfide : list, optional
         If None, disulfide bonds are guessed automatically. Otherwise provide a
         list of pairs of atom selection strings for each pair of residues
@@ -231,6 +239,15 @@ def build(
             f"Glycan residue(s) {', '.join(glycam_present)} are supported "
             f"only by the AMBER builder (htmd.builder.amber.build). "
             f"The CHARMM builder does not support glycans."
+        )
+
+    salt_list = resolveSalts(salts, saltconc, saltcation, saltanion)
+    missing = sorted(
+        {ion for salt in salt_list for ion in salt[:2] if _ions[ion][3] is None}
+    )
+    if ionize and missing:
+        raise ValueError(
+            f"CHARMM's ion topology has no {', '.join(missing)}. Use a chloride salt."
         )
 
     if psfgen is None:
@@ -323,24 +340,13 @@ def build(
             if path.exists(fpath):
                 os.remove(fpath)
 
-        anion, cation, anionatom, cationatom, nanion, ncation = ionizef(
-            molbuilt_solute,
+        counts = ionizeSalts(
+            molbuilt_solute.resname,
             totalcharge,
             nwater,
-            saltconc=saltconc,
-            anion=saltanion,
-            cation=saltcation,
+            salt_list,
         )
-        solvent_mol = ionizePlace(
-            solvent_mol,
-            solute_mol,
-            anion,
-            cation,
-            anionatom,
-            cationatom,
-            nanion,
-            ncation,
-        )
+        solvent_mol = placeIons(solvent_mol, solute_mol, counts)
         mol = solute_mol.copy()
         mol.append(solvent_mol)
 

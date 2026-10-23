@@ -670,6 +670,69 @@ class TestOpenMMComparative:
 
         print(f"[3PTB ionize] atoms={molbuilt.numAtoms}, charge={total_q:.4f}")
 
+    def test_ionize_mixed_salts(self, tmpdir):
+        """KCl + MgCl2 is not something Modeller.addSolvent can place, so htmd
+        places the ions after solvating: neutral, with both salts present."""
+        from htmd.builder.openmm import build as openff_build
+        from moleculekit.molecule import Molecule
+
+        mol = Molecule("3PTB")
+        mol.filter("protein")
+        molbuilt, system = openff_build(
+            mol.copy(),
+            outdir=os.path.join(tmpdir, "openff"),
+            solvate=True,
+            ionize=True,
+            salts=[("KCl", 0.15), ("MgCl2", 0.05)],
+            padding=10.0,
+        )
+        nk = np.sum(molbuilt.resname == "K")
+        nmg = np.sum(molbuilt.resname == "MG")
+        ncl = np.sum(molbuilt.resname == "CL")
+        assert nk > 0 and nmg > 0
+        assert ncl == 6 + nk + 2 * nmg, (nk, nmg, ncl)
+        assert abs(_total_charge(system)) < 0.01
+
+    def test_ionize_bromide(self, tmpdir):
+        """KBr goes through Modeller.addSolvent; MgBr2 through htmd's placement."""
+        from htmd.builder.openmm import build as openff_build
+        from moleculekit.molecule import Molecule
+
+        mol = Molecule("3PTB")
+        mol.filter("protein")
+        for i, salts in enumerate([[("KBr", 0.15)], [("MgBr2", 0.05)]]):
+            molbuilt, system = openff_build(
+                mol.copy(),
+                outdir=os.path.join(tmpdir, f"openff{i}"),
+                solvate=True,
+                ionize=True,
+                salts=salts,
+                padding=10.0,
+            )
+            assert np.sum(molbuilt.resname == "BR") >= 6
+            assert not np.any(molbuilt.resname == "CL")
+            assert abs(_total_charge(system)) < 0.01
+
+    def test_ionize_presolvated_divalent(self, tmpdir):
+        """A pre-solvated system with MgCl2: two Cl- per Mg2+ of salt."""
+        from htmd.builder.openmm import build as openff_build
+        from htmd.builder.solvate import solvate
+        from moleculekit.molecule import Molecule
+
+        mol = Molecule("3PTB")
+        mol.filter("protein")
+        molbuilt, system = openff_build(
+            solvate(mol, pad=8),
+            outdir=os.path.join(tmpdir, "openff"),
+            ionize=True,
+            salts=[("MgCl2", 0.05)],
+        )
+        nmg = np.sum(molbuilt.resname == "MG")
+        ncl = np.sum(molbuilt.resname == "CL")
+        assert nmg > 0
+        assert ncl == 6 + 2 * nmg, (nmg, ncl)
+        assert abs(_total_charge(system)) < 0.01
+
 
 # ====================================================================
 # Phase 1: parameterizeLigandsOpenFF (free ligands via Interchange)
@@ -2939,3 +3002,14 @@ def test_openmm_build_exports_a_correct_prmtop_cell(
     parm = parmed.load_file(os.path.join(str(tmpdir), "structure.prmtop"))
     assert parm.parm_data["POINTERS"][27] == ifbox
     assert np.allclose(parm.box[3:], expected_angle, atol=1e-2)
+
+
+def _total_charge(system):
+    import openmm
+
+    for force in system.getForces():
+        if isinstance(force, openmm.NonbondedForce):
+            return sum(
+                force.getParticleParameters(j)[0]._value
+                for j in range(force.getNumParticles())
+            )

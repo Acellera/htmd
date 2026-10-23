@@ -20,7 +20,8 @@ import numpy as np
 import logging
 
 from moleculekit.molecule import Molecule
-from moleculekit.util import _missingSegID, sequenceID
+from moleculekit.util import _missingSegID
+from htmd.builder.ionize import _ionGetCharge, resolveSalts
 from htmd.builder.builder import (
     detectDisulfideBonds,
     detectCisPeptideBonds,
@@ -28,7 +29,6 @@ from htmd.builder.builder import (
     _checkMixedSegment,
     _has_cell,
     _cell_angles,
-    BuildError,
 )
 
 logger = logging.getLogger(__name__)
@@ -628,6 +628,7 @@ def build(
     saltconc: float = 0,
     saltanion: str | None = None,
     saltcation: str | None = None,
+    salts: list | None = None,
     disulfide: list | None = None,
     custombonds: list | None = None,
     solvate: bool = True,
@@ -670,10 +671,17 @@ def build(
     saltconc : float
         Salt concentration in molar, added on top of neutralisation.
     saltanion : str, optional
-        Anion type.  Accepts ``"Cl-"``, ``"CL"``, ``"chloride"`` etc.
+        Deprecated: use ``salts``, e.g. ``salts=[("KCl", 0.15)]``. Anion type.  Accepts ``"Cl-"``, ``"F-"``, ``"Br-"``, ``"I-"`` and aliases
+        such as ``"CL"``, ``"chloride"``.
     saltcation : str, optional
-        Cation type.  Accepts ``"Na+"``, ``"K+"``, ``"Cs+"`` and
+        Deprecated: use ``salts``, e.g. ``salts=[("KCl", 0.15)]``. Cation type.  Accepts ``"Na+"``, ``"K+"``, ``"Cs+"`` and
         divalent ``"Mg2+"``, ``"Ca2+"``, ``"Zn2+"``.
+    salts : list, optional
+        Several salts as ``[(formula, concentration), ...]`` with concentrations in
+        molar, e.g. ``[("KCl", 0.15), ("MgCl2", 0.001)]``. Formulas are NaCl, KCl,
+        CsCl, MgCl2, CaCl2 or ZnCl2. The first salt also neutralizes the system. Replaces ``saltconc`` / ``saltanion`` /
+        ``saltcation``. A salt that amounts to less than one formula unit in the box
+        is left out with a warning.
     disulfide : list, optional
         Manual disulfide bonds as pairs of atom-selection strings.
         If None, automatic detection is performed.
@@ -826,6 +834,13 @@ def build(
 
     has_water = np.any(mol.atomselect("water"))
     did_solvate = False
+    # Modeller.addSolvent takes one monovalent salt. Anything else is placed by
+    # htmd after solvating.
+    salt_list = resolveSalts(salts, saltconc, saltcation, saltanion)
+    htmd_ions = len(salt_list) > 1 or any(
+        abs(_ionGetCharge(ion)) != 1 for cation, anion, _ in salt_list
+        for ion in (cation, anion)
+    )
 
     if solvate and not has_water:
         logger.info("Solvating system with Modeller.addSolvent()...")
@@ -848,14 +863,16 @@ def build(
             padding,
             boxsize,
             boxshape,
-            ionize,
-            saltconc,
-            saltanion,
-            saltcation,
+            ionize and not htmd_ions,
+            salt_list[0][2],
+            salt_list[0][1],
+            salt_list[0][0],
             unit,
             width=width,
         )
         modeller.addSolvent(forcefield, **solvent_kw)
+        if ionize and htmd_ions:
+            _ionize_modeller(modeller, forcefield, salt_list)
         topology = modeller.topology
         positions = modeller.positions
         did_solvate = True
@@ -871,22 +888,10 @@ def build(
             "to calculate charge for ionisation..."
         )
         _ensure_box_vectors(topology, positions, unit, mol)
-        tmp_system = forcefield.createSystem(
-            topology,
-            nonbondedMethod=app.PME,
-            nonbondedCutoff=1.0 * unit.nanometers,
-            constraints=app.HBonds,
-            rigidWater=True,
-        )
-        mol = _ionize_presolvated(mol, tmp_system, saltconc, saltanion, saltcation)
-        topology, positions = _mol_to_openmm(
-            mol, outdir, extra_xml=extra_xml, skip_peptide_n=skip_peptide_n
-        )
         modeller = app.Modeller(topology, positions)
-        modeller.addHydrogens(forcefield)
+        _ionize_modeller(modeller, forcefield, salt_list)
         topology = modeller.topology
         positions = modeller.positions
-        _apply_bond_specs(topology, bond_specs)
 
     has_water_final = has_water or did_solvate
     # Always assign periodic box vectors to the topology unless GBSA
@@ -2609,28 +2614,17 @@ _OPENMM_ION_NAMES = {
     "ZN": "Zn2+",
     "ZINC": "Zn2+",
     "ZN2+": "Zn2+",
+    "F": "F-",
+    "FLUORIDE": "F-",
+    "F-": "F-",
+    "BR": "Br-",
+    "BROMIDE": "Br-",
+    "BR-": "Br-",
+    "I": "I-",
+    "IOD": "I-",
+    "IODIDE": "I-",
+    "I-": "I-",
 }
-
-_ION_CHARGES = {
-    "Na+": 1,
-    "K+": 1,
-    "Cs+": 1,
-    "Cl-": -1,
-    "Mg2+": 2,
-    "Ca2+": 2,
-    "Zn2+": 2,
-}
-
-_ION_ELEMENTS = {
-    "Na+": "Na",
-    "K+": "K",
-    "Cs+": "Cs",
-    "Cl-": "Cl",
-    "Mg2+": "Mg",
-    "Ca2+": "Ca",
-    "Zn2+": "Zn",
-}
-
 
 def _resolve_ion_name(name):
     """Map any common ion alias to the OpenMM residue-template name."""
@@ -2790,98 +2784,58 @@ def _get_total_charge(system):
     raise RuntimeError("No NonbondedForce found in system")
 
 
-def _ionize_presolvated(mol, system, saltconc, saltanion, saltcation):
-    """Replace water molecules with ions for a pre-solvated system.
+def _ionize_modeller(modeller, forcefield, salts):
+    """Neutralize *modeller*'s solvated system and add *salts*, replacing waters
+    with ions in place.
 
-    Uses farthest-point sampling to spread ions throughout the solvent.
-    Returns the modified *mol* (in-place).
+    Ion counts and sites come from :mod:`htmd.builder.ionize`, the same as the
+    AMBER and CHARMM builders, so any number of salts and divalent ions work.
     """
-    from scipy.spatial import cKDTree
+    import openmm.app as app
+    import openmm.unit as unit
+    from htmd.builder.ionize import ionizeSalts, _ionLabels, _ionSpecies
+    from htmd.builder.ionize import _ionElement, _pickIonSites
 
-    total_q = round(_get_total_charge(system))
-    anion = _resolve_ion_name(saltanion) if saltanion else "Cl-"
-    cation = _resolve_ion_name(saltcation) if saltcation else "Na+"
-    cat_q = _ION_CHARGES[cation]
-    an_q = _ION_CHARGES[anion]
+    topology = modeller.topology
+    system = forcefield.createSystem(
+        topology,
+        nonbondedMethod=app.PME,
+        nonbondedCutoff=1.0 * unit.nanometers,
+        constraints=app.HBonds,
+        rigidWater=True,
+    )
+    total_q = _get_total_charge(system)
 
-    # --- Neutralisation ---
-    ncation = nanion = 0
-    if total_q < 0:
-        ncation = int(abs(total_q) // cat_q)
-        leftover = abs(total_q) - ncation * cat_q
-        if leftover:
-            nanion = int(leftover // abs(an_q))
-    elif total_q > 0:
-        nanion = int(total_q // abs(an_q))
-        leftover = total_q - nanion * abs(an_q)
-        if leftover:
-            ncation = int(leftover // cat_q)
+    atoms = list(topology.atoms())
+    resnames = np.array([a.residue.name for a in atoms])
+    xyz = np.array(modeller.positions.value_in_unit(unit.angstrom))
+    is_water = np.array([a.residue.name in ("HOH", "WAT") for a in atoms])
+    water_o = np.where(
+        is_water & np.array([a.element is not None and a.element.symbol == "O" for a in atoms])
+    )[0]
 
-    # --- Additional salt ---
-    if saltconc and saltconc > 0:
-        nwater = int(np.sum(mol.atomselect("water and noh")))
-        nsalt = max(0, int(round(0.0187 * saltconc * nwater)))
-        ncation += nsalt
-        nanion += nsalt
+    counts = ionizeSalts(resnames, total_q, len(water_o), salts)
+    species = _ionSpecies(counts)
+    nions = sum(n for _, _, n in species)
+    if nions == 0:
+        return
 
-    ntotal = ncation + nanion
-    if ntotal == 0:
-        logger.info("System already neutral and no salt requested.")
-        return mol
+    picked = water_o[
+        _pickIonSites(xyz[water_o], xyz[~is_water], nions, dfrom=5, dbetween=5)
+    ]
+    labels = _ionLabels(species)
 
-    logger.info(f"Adding {ncation} {cation} and {nanion} {anion}")
-
-    # --- Pick water oxygens far from solute (>5 A) ---
-    water_o = mol.atomselect("water and noh")
-    solute = ~mol.atomselect("water")
-    water_o_idx = np.where(water_o)[0]
-    solute_coords = mol.coords[solute, :, 0]
-    water_coords = mol.coords[water_o_idx, :, 0]
-
-    tree = cKDTree(solute_coords)
-    dists, _ = tree.query(water_coords)
-
-    far_mask = dists > 5.0
-    far_idx = water_o_idx[far_mask]
-    far_coords = water_coords[far_mask]
-
-    if len(far_idx) < ntotal:
-        raise BuildError(
-            f"Only {len(far_idx)} water molecules are >5 A from solute, "
-            f"but {ntotal} ions are needed."
-        )
-
-    # Farthest-point sampling
-    picked = [int(np.argmax(dists[far_mask]))]
-    for _ in range(ntotal - 1):
-        d_to_picked = cKDTree(far_coords[picked]).query(far_coords)[0]
-        d_to_picked[picked] = -np.inf
-        picked.append(int(np.argmax(d_to_picked)))
-
-    picked_o = far_idx[np.array(picked)]
-
-    # Assign cation/anion labels (shuffled for spatial mixing)
-    labels = [cation] * ncation + [anion] * nanion
-    rng = np.random.default_rng(42)
-    rng.shuffle(labels)
-
-    # Replace waters with ions
-    uqresid = sequenceID((mol.resid, mol.insertion, mol.segid))
-    torem = np.zeros(mol.numAtoms, dtype=bool)
-    for o_idx, ion in zip(picked_o, labels):
-        res_mask = uqresid == uqresid[o_idx]
-        h_of_water = res_mask & (mol.element == "H")
-        torem |= h_of_water
-        mol.resname[o_idx] = _ION_ELEMENTS[ion]
-        mol.name[o_idx] = ion
-        mol.element[o_idx] = _ION_ELEMENTS[ion]
-        mol.segid[o_idx] = "I"
-        # Remove any extra atoms in the residue that are not the ion
-        extra = res_mask & (np.arange(mol.numAtoms) != o_idx) & ~h_of_water
-        torem |= extra
-
-    mol.remove(torem, _logger=False)
-    return mol
+    ions = app.Topology()
+    chain = ions.addChain()
+    positions = []
+    for o_idx, label in zip(picked, labels):
+        resname, name, _ = species[label]
+        residue = ions.addResidue(resname, chain)
+        ions.addAtom(name, app.Element.getBySymbol(_ionElement(resname)), residue)
+        positions.append(xyz[o_idx])
+    modeller.delete([atoms[i].residue for i in picked])
+    modeller.add(ions, np.array(positions) * unit.angstrom)
+    logger.info(f"Replaced {nions} waters with ions: {counts}")
 
 
 # ====================================================================
