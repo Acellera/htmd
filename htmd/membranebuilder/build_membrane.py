@@ -872,6 +872,12 @@ def equilibrateMembrane(
                 sigma * 0.1 * unit.nanometer,
                 0.4 * unit.kilojoule_per_mole,
             )
+        # Frozen ghosts sit at bond distance: their mutual LJ is a constant
+        # ~1e7 kcal/mol that only pollutes the reported energy.
+        from scipy.spatial import cKDTree
+
+        for i, j in cKDTree(ghost_xyz).query_pairs(10.0):
+            nb.addException(n_lipid_atoms + i, n_lipid_atoms + j, 0.0, 1.0, 0.0)
 
     if head_anchors and head_restraint_k > 0:
         # Harmonic z-restraint on each lipid head atom toward its target
